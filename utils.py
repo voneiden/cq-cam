@@ -48,3 +48,16 @@ def is_parallel_plane(plane1: cq.Plane, plane2: cq.Plane):
         yield abs(plane1.xDir.dot(plane2.xDir) - 1) < cls._eq_tolerance_dot
 
     return all(_eq_iter())
+
+
+def dot(v1: cq.Vector, v2: cq.Vector):
+    return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z
+
+
+def plane_offset_distance(plane1: cq.Plane, plane2: cq.Plane):
+    if not is_parallel_plane(plane1, plane2):
+        return None
+
+    height1 = dot(plane1.origin, plane1.zDir)
+    height2 = dot(plane2.origin, plane2.zDir)
+    return height2 - height1

@@ -1,12 +1,13 @@
 from dataclasses import dataclass
-from typing import List, Union, Tuple
+from typing import List, Union
 
 import numpy as np
 import pyclipper
 from cadquery import cq
 
-from base import Task, Unit, Rapid, Plunge, Cut, Job, PlaneNotAligned, OperationError
-from utils import is_parallel_plane, flatten_edges
+from base import Task, Unit, Plunge, Cut, Job, OperationError
+from utils import is_parallel_plane, flatten_edges, plane_offset_distance
+from visualize import visualize_task
 
 
 class PlaneValidationMixin:
@@ -82,30 +83,27 @@ class Profile(PlaneValidationMixin, ObjectsValidationMixin, Task):
             visual = visual.lineTo(sx[0], sx[1])
         visual = visual.close()
 
-
         # TODO collect layers?
         # Generate automatically the motions when moving between layers
         # Also layer entry points etc.
         profile = [Cut(point[0], point[1], None) for point in points]
-        bottom_height = 0
+        bottom_height = plane_offset_distance(job.workplane.plane, workplane.plane)
         if self.stepdown:
 
-            depths = list(np.arange(self.top_height - self.stepdown, bottom_height, self.stepdown))
+            depths = list(np.arange(self.top_height + self.stepdown, bottom_height, self.stepdown))
             if depths[-1] != bottom_height:
                 depths.append(bottom_height)
 
             for i, depth in enumerate(depths):
                 self.commands.append(profile[0])
-                self.commands.append(Cut(None, None, depth))
+                self.commands.append(Plunge(depth))
                 self.commands += profile[1:]
             self.commands.append(profile[0])
         else:
             self.commands.append(profile[0])
-            self.commands.append(Cut(None, None, bottom_height))
+            self.commands.append(Plunge(bottom_height))
             self.commands = profile[1:]
             self.commands.append(profile[0])
-
-
 
         # Construct profile polygons
 
@@ -134,24 +132,16 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, Task):
         # Generate operation layers
 
 
-if __name__ == '__main__':
-    """
-    commands = [
-        Rapid(None, None, 10),
-        Rapid(20, 15, 10),
-        Rapid(20, 15, 5),
-        Plunge(2),
-        Cut(15, 10, 2),
-        Cut(15, 0, 2),
-        Plunge(5),
-        Rapid(None, None, 10),
-        Rapid(20, 15, 10)
+box = cq.Workplane().box(10, 10, 10)
+box_top = box.faces('>Z').workplane()
 
-    ]
-    """
-    box = cq.Workplane().box(10, 10, 10)
+job = Job(workplane=box_top, feed=300, plunge_feed=50, unit=Unit.METRIC, rapid_height=10)
+profile = Profile(job=job, clearance_height=5, top_height=0, wire=box.wires('<Z'), offset=3.175 / 2, stepdown=-2.77)
 
-    job = Job(box, 300, 50, Unit.METRIC, 15)
-    profile = Profile(job, 15, 10, box.wires('>Z'), 3.175 / 2, -2.77)
+print(job.to_gcode())
 
-    print(job.to_gcode())
+visual_profile_rapids, visual_profile_cuts, visual_profile_plunges = visualize_task(job, profile)
+show_object(box, 'box')
+show_object(visual_profile_rapids, 'visual_profile_rapids', {'color': 'red'})
+show_object(visual_profile_cuts, 'visual_profile_cuts', {'color': 'red'})
+show_object(visual_profile_plunges, 'visual_profile_plunges', {'color': 'red'})

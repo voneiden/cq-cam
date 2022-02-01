@@ -7,11 +7,9 @@ from typing import List, Union
 from cadquery import cq
 
 
-class PlaneNotAligned(Exception):
-    pass
-
 class OperationError(Exception):
     pass
+
 
 class Command(ABC):
     @abstractmethod
@@ -113,7 +111,6 @@ class Job:
     plunge_feed: float
     unit: Unit
     rapid_height: float
-
 
     def to_gcode(self):
         task_break = "\n\n\n"
