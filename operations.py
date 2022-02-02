@@ -3,10 +3,11 @@ from typing import List, Union
 
 import numpy as np
 import pyclipper
-from cadquery import cq
+from OCP.BRepTools import BRepTools_WireExplorer
+from cadquery import cq, Edge
 
 from base import Task, Unit, Plunge, Cut, Job, OperationError
-from utils import is_parallel_plane, flatten_edges, plane_offset_distance
+from utils import is_parallel_plane, flatten_edges, plane_offset_distance, dot, wire_to_ordered_edges
 from visualize import visualize_task
 
 
@@ -59,17 +60,29 @@ class Profile(PlaneValidationMixin, ObjectsValidationMixin, Task):
     """
     Create a profile around the outer wire of a given face
     """
-    wire: cq.Workplane
+    face: cq.Workplane
     offset: float
     stepdown: Union[float, None]
 
     def __post_init__(self):
-        self.validate_wires(self.wire, 1)
-        workplane, _ = self.validate_plane(job, self.wire)
 
-        edges = self.wire.objects[0].Edges()
+        wires = self.face.wires()
+        self.validate_wires(wires, 1)
+        workplane, _ = self.validate_plane(job, self.face)
+
+        # Grap the outer wire edges
+        edges = wire_to_ordered_edges(wires.objects[0])
         vectors = flatten_edges(edges)
-        scaled_points = pyclipper.scale_to_clipper(tuple((vector.x, vector.y) for vector in vectors))
+        # TODO here we need to pick the correct X/Y coordinates according to our workplane!
+        # vector.x, vector.y is correct only when we are doing top to bottom profiling
+        #scaled_points = pyclipper.scale_to_clipper(tuple((vector.x, vector.y) for vector in vectors))
+        scaled_points = pyclipper.scale_to_clipper(
+            tuple(
+                (
+                    job.workplane.plane.xDir.dot(vector),
+                    job.workplane.plane.yDir.dot(vector)
+                ) for vector in vectors)
+        )
 
         pco = pyclipper.PyclipperOffset()
         pco.AddPath(scaled_points, pyclipper.JT_SQUARE, pyclipper.ET_CLOSEDLINE)
@@ -131,17 +144,23 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, Task):
 
         # Generate operation layers
 
+L = cq.Workplane('YZ').lineTo(20, -5).lineTo(20, 10).lineTo(15, 10).lineTo(15, 5).lineTo(0, 5).close().extrude(10)
+L_top = L.faces('<X').workplane()
 
 box = cq.Workplane().box(10, 10, 10)
-box_top = box.faces('>Z').workplane()
+box_top = box.faces('>X').workplane()
 
-job = Job(workplane=box_top, feed=300, plunge_feed=50, unit=Unit.METRIC, rapid_height=10)
-profile = Profile(job=job, clearance_height=5, top_height=0, wire=box.wires('<Z'), offset=3.175 / 2, stepdown=-2.77)
+job = Job(workplane=L_top, feed=300, plunge_feed=50, unit=Unit.METRIC, rapid_height=10)
+profile = Profile(job=job, clearance_height=5, top_height=0, face=L.faces('>X'), offset=3.175 / 2, stepdown=-2.77)
 
 print(job.to_gcode())
 
 visual_profile_rapids, visual_profile_cuts, visual_profile_plunges = visualize_task(job, profile)
-show_object(box, 'box')
+#show_object(box, 'box')
 show_object(visual_profile_rapids, 'visual_profile_rapids', {'color': 'red'})
 show_object(visual_profile_cuts, 'visual_profile_cuts', {'color': 'red'})
 show_object(visual_profile_plunges, 'visual_profile_plunges', {'color': 'red'})
+show_object(L, 'L')
+show_object(L.faces('>X'), 'ltop')
+show_object(L.faces('<X'), 'bottom')
+#show_object(box.faces('<X').wires(), 'bottombox')

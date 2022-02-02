@@ -2,8 +2,9 @@ import math
 from typing import List
 
 import numpy as np
+from OCP.BRepTools import BRepTools_WireExplorer
 from OCP.TopAbs import TopAbs_REVERSED
-from cadquery import cq
+from cadquery import cq, Edge
 
 
 def end_point(edge: cq.Edge):
@@ -42,10 +43,10 @@ def is_parallel_plane(plane1: cq.Plane, plane2: cq.Plane):
         yield isinstance(plane2, cq.Plane)
         # origins are the same
         # yield abs(plane1.origin - plane2.origin) < cls._eq_tolerance_origin
-        # z-axis vectors are parallel (assumption: both are unit vectors)
-        yield abs(plane1.zDir.dot(plane2.zDir) - 1) < cls._eq_tolerance_dot
-        # x-axis vectors are parallel (assumption: both are unit vectors)
-        yield abs(plane1.xDir.dot(plane2.xDir) - 1) < cls._eq_tolerance_dot
+        # z-axis vectors are parallel (assumption: both are unit vectors, ignore direction)
+        yield abs(plane1.zDir.dot(plane2.zDir)) < cls._eq_tolerance_dot + 1
+        # x-axis vectors are parallel (assumption: both are unit vectors, ignore direction)
+        yield abs(plane1.xDir.dot(plane2.xDir)) < cls._eq_tolerance_dot + 1
 
     return all(_eq_iter())
 
@@ -59,5 +60,25 @@ def plane_offset_distance(plane1: cq.Plane, plane2: cq.Plane):
         return None
 
     height1 = dot(plane1.origin, plane1.zDir)
-    height2 = dot(plane2.origin, plane2.zDir)
+    height2 = dot(plane2.origin, plane1.zDir)
     return height2 - height1
+
+
+def wire_to_ordered_edges(wire: cq.Wire) -> List[cq.Edge]:
+    """
+    It's a trap.
+
+    OpenCASCADE topology doesn't mind wire edges not being in order.
+
+    https://dev.opencascade.org/content/connectivity-edges-sequence
+    :param wire: wire to explore edges from
+    :return: list of ordered Edges
+    """
+
+    explorer = BRepTools_WireExplorer(wire.wrapped)
+    ordered_edges = []
+    while not explorer.Current().IsNull():
+        ordered_edges.append(Edge(explorer.Current()))
+        explorer.Next()
+
+    return ordered_edges
