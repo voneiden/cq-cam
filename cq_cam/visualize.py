@@ -1,8 +1,10 @@
-from OCP.AIS import AIS_MultipleConnectedInteractive, AIS_Line
+from OCP.AIS import AIS_MultipleConnectedInteractive, AIS_Line, AIS_Shape
 from OCP.Geom import Geom_CartesianPoint
 from cq_editor.cq_utils import to_occ_color
 
-from base import Task, Job, Plunge, Cut, Rapid
+from cq_cam.commands.command import Plunge, Cut, Rapid, CircularBase
+from cq_cam.job.job import Job
+from cq_cam.operations.base_operation import Task
 
 
 class VisualizeError(Exception):
@@ -13,35 +15,35 @@ def visualize_task(job: Job, task: Task):
     root_workplane = job.workplane
     root_plane = root_workplane.plane
 
-    rapids = AIS_MultipleConnectedInteractive()
-    cuts = AIS_MultipleConnectedInteractive()
-    plunges = AIS_MultipleConnectedInteractive()
+    group = AIS_MultipleConnectedInteractive()
 
     x = 0
     y = 0
     z = job.rapid_height
     last_plunge = True
     for command in task.commands:
-        if isinstance(command, Rapid):
-            group = rapids
-        elif isinstance(command, Cut):
-            group = cuts
-        elif isinstance(command, Plunge):
-            group = plunges
-        else:
-            raise VisualizeError("Unknown command instance")
-
         cx = x if (cx := getattr(command, 'x', None)) is None else cx
         cy = y if (cy := getattr(command, 'y', None)) is None else cy
         cz = z if (cz := getattr(command, 'z', None)) is None else cz
 
         start = root_plane.toWorldCoords((x, y, z))
         end = root_plane.toWorldCoords((cx, cy, cz))
+        if isinstance(command, CircularBase):
+            cx = command.ex
+            cy = command.ey
 
-        line = AIS_Line(
-            Geom_CartesianPoint(start.x, start.y, start.z),
-            Geom_CartesianPoint(end.x, end.y, end.z)
-        )
+            wp = (
+                root_workplane.workplane(offset=z)
+                    .moveTo(x, y)
+            )
+
+            wp = wp.radiusArc((command.ex, command.ey), command.r)
+            line = AIS_Shape(wp.objects[0].wrapped)
+        else:
+            line = AIS_Line(
+                Geom_CartesianPoint(start.x, start.y, start.z),
+                Geom_CartesianPoint(end.x, end.y, end.z)
+            )
         if isinstance(command, Rapid):
             line.SetColor(to_occ_color('green'))
         elif isinstance(command, Cut):
@@ -62,4 +64,4 @@ def visualize_task(job: Job, task: Task):
         y = cy
         z = cz
 
-    return rapids, cuts, plunges
+    return group
