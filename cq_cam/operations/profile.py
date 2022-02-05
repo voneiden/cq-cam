@@ -48,7 +48,7 @@ class Profile(PlaneValidationMixin, ObjectsValidationMixin, Task):
         end = command_sequence.end
 
         # Rapid to clearance height
-        self.commands.append(Rapid(cq.Vector(start.x, start.y, self.clearance_height)))
+        self.commands.append(Rapid(start.x, start.y, self.clearance_height))
         bottom_height = plane_offset_distance(self.job.workplane.plane, workplane.plane)
         if self.stepdown:
             depths = list(np.arange(self.top_height + self.stepdown, bottom_height, self.stepdown))
@@ -59,9 +59,9 @@ class Profile(PlaneValidationMixin, ObjectsValidationMixin, Task):
 
         for i, depth in enumerate(depths):
             # self.commands.append(profile[0])
-            self.commands.append(Plunge(cq.Vector(start.x, start.y, depth)))
+            self.commands.append(Plunge(depth))
             self.commands += command_sequence.duplicate(depth).commands
 
-        self.commands.append(Rapid(cq.Vector(end.x, end.y, self.clearance_height)))
+        self.commands.append(Rapid(end.x, end.y, self.clearance_height))
 
         self.job.tasks.append(self)

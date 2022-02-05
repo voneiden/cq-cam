@@ -1,71 +1,75 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Union, TYPE_CHECKING
+from typing import Union, TYPE_CHECKING, Tuple
 
 from cadquery import cq
 
-from cq_cam.commands.base_command import EndData, Command, Linear, Circular
+from cq_cam.commands.base_command import EndData, Command, Linear, Circular, MotionCommand
 
 if TYPE_CHECKING:
     from cq_cam.job.job import Job
 
 
-class Rapid(EndData, Command):
-    def to_gcode(self, previous: Union[Command, None], job: Job) -> str:
-        if isinstance(previous, Rapid):
-            return self.diff(previous)
+class Rapid(EndData, MotionCommand):
+    def to_gcode(self, previous_command: Union[Command, None], start: cq.Vector, job: Job) -> Tuple[str, cq.Vector]:
+        if isinstance(previous_command, Rapid):
+            return self.diff(start)
         else:
-            return f"G0{self.diff(previous)}"
+            diff, end = self.diff(start)
+            return f"G0{diff}", end
 
     def duplicate(self, z: float):
-        end = cq.Vector(self.end)
-        end.z = z
-        return Rapid(end)
+        return Rapid(self.x, self.y, z)
 
 
 class Cut(EndData, Linear):
 
-    def to_gcode(self, previous: Union[Command, None], job: Job) -> str:
-        feed = "" if isinstance(previous, Cut) else f"F{job.feed}"
-        return f"{feed}{super().to_gcode(previous, job)}{self.diff(previous)}"
+    def to_gcode(self, previous_command: Union[Command, None], start: cq.Vector, job: Job) -> Tuple[str, cq.Vector]:
+        feed = "" if isinstance(previous_command, Cut) else f"F{job.feed}"
+        diff, end = self.diff(start)
+        return f"{feed}{super().to_gcode(previous_command, start, job)}{diff}", end
 
     def duplicate(self, z: float):
-        end = cq.Vector(self.end)
-        end.z = z
-        return Cut(end)
+        return Cut(self.x, self.y, z)
 
 
 class CircularCW(Circular):
-    def to_gcode(self, previous: Union[Command, None], job: Job) -> str:
-        cmd = '' if isinstance(previous, CircularCW) else 'G2'
-        return f'{cmd}{super().to_gcode(previous, job)}'
+    def to_gcode(self, previous_command: Union[Command, None], start: cq.Vector, job: Job) -> Tuple[str, cq.Vector]:
+        cmd = '' if isinstance(previous_command, CircularCW) else 'G2'
+        diff, end = super().to_gcode(previous_command, start, job)
+        return f'{cmd}{diff}', end
 
     def duplicate(self, z: float):
-        end = cq.Vector(self.end)
-        end.z = z
-        return CircularCW(end, self.radius)
+        return CircularCW(self.x, self.y, z, self.radius)
 
 
 class CircularCCW(Circular):
-    def to_gcode(self, previous: Union[Command, None], job: Job) -> str:
-        cmd = '' if isinstance(previous, CircularCCW) else 'G3'
-        return f'{cmd}{super().to_gcode(previous, job)}'
+    def to_gcode(self, previous_command: Union[Command, None], start: cq.Vector, job: Job) -> Tuple[str, cq.Vector]:
+        cmd = '' if isinstance(previous_command, CircularCCW) else 'G3'
+        diff, end = super().to_gcode(previous_command, start, job)
+        return f'{cmd}{diff}', end
 
     def duplicate(self, z: float):
-        end = cq.Vector(self.end)
-        end.z = z
-        return CircularCCW(end, self.radius)
+        return CircularCCW(self.x, self.y, z, self.radius)
 
 
 @dataclass
-class Plunge(EndData, Linear):
+class Plunge(Linear):
+    __slots__ = ['z']
+    z: float
 
-    def to_gcode(self, previous: Union[Command, None], job: Job) -> str:
-        plunge_feed = "" if isinstance(previous, Plunge) else f"F{job.plunge_feed}"
-        return f"{plunge_feed}{super().to_gcode(previous, job)}Z{self.end.z}"
+    def to_gcode(self, previous_command: Union[Command, None], start: cq.Vector, job: Job) -> Tuple[str, cq.Vector]:
+        plunge_feed = "" if isinstance(previous_command, Plunge) else f"F{job.plunge_feed}"
+        diff, end = self.diff(start)
+        return f"{plunge_feed}{super().to_gcode(previous_command, start, job)}{diff}", end
 
     def duplicate(self, z: float):
-        end = cq.Vector(self.end)
-        end.z = z
-        return Plunge(end)
+        return Plunge(self.z)
+
+    def end(self, start: cq.Vector) -> cq.Vector:
+        return cq.Vector(
+            start.x,
+            start.y,
+            self.z if self.z else start.z
+        )

@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Union, TYPE_CHECKING, List, Optional
+from typing import Union, TYPE_CHECKING, List, Optional, Tuple
 
 from cadquery import cq
+
+from cq_cam.commands.util_command import same_to_none, vector_same_to_none
 
 if TYPE_CHECKING:
     from cq_cam.job.job import Job
@@ -22,11 +24,11 @@ class CommandSequence:
         end = self.end
         next_end = start
 
-
         # Flip each command direction
         for i, command in enumerate(self.commands):
-            command, next_end = command.flip(next_end)
-            self.commands[i] = command
+            if isinstance(command, MotionCommand):
+                command, next_end = command.flip(next_end)
+                self.commands[i] = command
 
         # Flip the list so that we can iterate naturally
         self.commands.reverse()
@@ -41,13 +43,20 @@ class CommandSequence:
 
         # Find the smallest y, biggest x
         # https://stackoverflow.com/questions/1165647/how-to-determine-if-a-list-of-polygon-points-are-in-clockwise-order/1180256#1180256
-        commands = [command for command in self.commands if isinstance(command, EndData)]
+        motion_commands = [command for command in self.commands if isinstance(command, MotionCommand)]
+        ends = []
+        previous_end = self.start
+        for command in motion_commands:
+            end = command.end(previous_end)
+            ends.append(end)
+            previous_end = end
+
         # TODO filter also commands that don't move on XY plane?
-        b_cmd = sorted(commands, key=lambda cmd: (cmd.end.y, -cmd.end.x))[0]
-        b_i = commands.index(b_cmd)
-        b = b_cmd.end
-        a = commands[b_i - 1].end
-        c = commands[(b_i + 1) % len(commands)].end
+        b = sorted(ends, key=lambda e: (e.y, -e.x))[0]
+        b_i = ends.index(b)
+
+        a = ends[b_i - 1]
+        c = ends[(b_i + 1) % len(ends)]
 
         det = (b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y)
 
@@ -67,11 +76,8 @@ class CommandSequence:
 
 class Command(ABC):
     @abstractmethod
-    def to_gcode(self, previous: Union[Command, None], job: Job) -> str:
-        pass
-
-    @abstractmethod
-    def flip(self, new_end: cq.Vector) -> (Command, cq.Vector):
+    def to_gcode(self, previous_command: Union[Command, None], start: cq.Vector, job: Job) -> Tuple[str, cq.Vector]:
+        """ Output all the necessary G-Code required to perform the command """
         pass
 
     @abstractmethod
@@ -79,52 +85,82 @@ class Command(ABC):
         pass
 
 
-@dataclass
-class EndData(Command, ABC):
-    __slots__ = ['end']
-    end: cq.Vector
-
-    def x_equal(self, other: cq.Vector):
-        return self.end.x == other.x
-
-    def y_equal(self, other: cq.Vector):
-        return self.end.y == other.y
-
-    def z_equal(self, other: cq.Vector):
-        return self.end.z == other.z
-
-    def diff(self, other: Optional[EndData]):
-        d = []
-        if other is None or not self.x_equal(other.end):
-            d.append(f'X{self.end.x}')
-        if other is None or not self.y_equal(other.end):
-            d.append(f'Y{self.end.y}')
-        if other is None or not self.z_equal(other.end):
-            d.append(f'Z{self.end.z}')
-        return "".join(d)
-
+class MotionCommand(Command, ABC):
     def flip(self, new_end: cq.Vector) -> (Command, cq.Vector):
         from cq_cam.commands.command import Cut, Plunge
 
-        x_eq, y_eq, z_eq = self.x_equal(new_end), self.y_equal(new_end), self.z_equal(new_end)
+        # This is a bit hard to conceptualize
+        # "new_end" is the old start (so it's the previous)
+        # "start" below is actually the old end
+        new_start = self.end(new_end)
+
+        x_eq, y_eq, z_eq = new_start.x == new_end.x, new_start.y == new_end.y, new_start.z == new_end.z
         if x_eq and y_eq:
             # Going up, use Cut
-            if new_end.z > self.end.z:
-                return Cut(new_end), self.end
-            # Going down, use Plunge
+            if new_end.z > new_start.z:
+                return Cut(None, None, same_to_none(new_end.z, new_start.z)), new_start
+                # Going down, use Plunge
             else:
-                return Plunge(new_end), self.end
+                return Plunge(same_to_none(new_end.z, new_start.z)), new_start
 
         if not z_eq:
             # TODO Ramp!
             pass
-        return Cut(new_end), self.end
+        return Cut(*vector_same_to_none(new_end, new_start)), new_start
+
+    @abstractmethod
+    def end(self, start: cq.Vector) -> cq.Vector:
+        pass
+
+    def diff(self, start: Optional[cq.Vector]) -> Tuple[str, cq.Vector]:
+        """ Output X Y and Z coordinates as necessary """
+        end = self.end(start)
+
+        coordinates = []
+        if start is None or end.x != start.x:
+            coordinates.append(f'X{end.x}')
+        if start is None or end.y != start.y:
+            coordinates.append(f'Y{end.y}')
+        if start is None or end.z != start.z:
+            coordinates.append(f'Z{end.z}')
+        return "".join(coordinates), end
 
 
-class Linear(Command, ABC):
+@dataclass
+class EndData(Command, ABC):
+    __slots__ = ['x', 'y', 'z']
+    x: Optional[float]
+    y: Optional[float]
+    z: Optional[float]
 
-    def to_gcode(self, previous: Union[Command, None], job: Job) -> str:
-        if isinstance(previous, Linear):
+    def end(self, previous_end: cq.Vector) -> cq.Vector:
+        return cq.Vector(
+            self.x if self.x else previous_end.x,
+            self.y if self.y else previous_end.y,
+            self.z if self.z else previous_end.z
+        )
+
+
+@dataclass
+class InitialReference(MotionCommand):
+    __slots__ = ['reference']
+    reference: cq.Vector
+
+    def to_gcode(self, previous_command: Union[Command, None], start: cq.Vector, job: Job) -> Tuple[str, cq.Vector]:
+        raise NotImplemented('InitialReference can not output gcode')
+
+    def duplicate(self, z: float):
+        raise NotImplemented('InitialReference can not be duplicated')
+
+    def end(self, start: cq.Vector) -> cq.Vector:
+        return self.reference
+
+
+class Linear(MotionCommand, ABC):
+    """ Linear interpolation (G01) """
+
+    def to_gcode(self, previous_command: MotionCommand, start: cq.Vector, job: Job) -> str:
+        if isinstance(start, Linear):
             return ""
         else:
             return "G1"
@@ -135,16 +171,21 @@ class CircularData(EndData, ABC):
     __slots__ = ['radius']
     radius: float
 
+
+class Circular(CircularData, MotionCommand, ABC):
+    def to_gcode(self, previous_command: MotionCommand, start: cq.Vector, job: Job) -> Tuple[str, cq.Vector]:
+        end = self.end(start)
+
+        return f'X{end.x}Y{end.y}R{self.radius}', end
+
     def flip(self, new_end: cq.Vector) -> (Command, cq.Vector):
         from cq_cam.commands.command import CircularCW, CircularCCW
+
+        new_start = self.end(new_end)
+
         if isinstance(self, CircularCW):
             cls = CircularCCW
         else:
             cls = CircularCW
 
-        return cls(new_end, self.radius), self.end
-
-
-class Circular(CircularData, Command, ABC):
-    def to_gcode(self, previous: Union[Command, None], job: Job) -> str:
-        return f'X{self.end.x}Y{self.end.y}R{self.radius}'
+        return cls(*vector_same_to_none(new_end, new_start), self.radius), new_start

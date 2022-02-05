@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import List
 
+from cadquery import cq
+
 from cq_cam.commands.base_command import Command
 from cq_cam.job.job import Job
 
@@ -24,13 +26,18 @@ class Task(ABC):
         self.job.tasks.append(self)
 
     def to_gcode(self):
-        def command_gcode_generator():
-            previous = None
-            for command in self.commands:
-                yield command.to_gcode(previous, self.job)
-                previous = command
+        # TODO
 
-        return "\n".join(command_gcode_generator())
+        start = cq.Vector(10, 10, 10)
+
+        def command_gcode_generator(start):
+            previous_command = None
+            for command in self.commands:
+                gcode, start = command.to_gcode(previous_command, start, self.job)
+                yield gcode
+                previous_command = command
+
+        return "\n".join(command_gcode_generator(start))
 
 
 class Unit(Enum):
