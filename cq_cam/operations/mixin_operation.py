@@ -1,17 +1,10 @@
+from typing import List
+
+from cadquery import cq
+
 from cq_cam.operations.base_operation import OperationError, Job
+from cq_cam.utils import is_parallel_plane
 
-from dataclasses import dataclass
-from typing import List, Union
-
-import numpy as np
-import pyclipper
-from OCP.BRepTools import BRepTools_WireExplorer
-from cadquery import cq, Edge, Face
-
-from cq_cam.utils import is_parallel_plane, flatten_edges, plane_offset_distance, dot, wire_to_ordered_edges, \
-    wire_to_type_vectors, is_tvs_clockwise, cut_clockwise, reverse_type_vectors, TypeVector, LineTypeVector, \
-    CWArcTypeVector, CCWArcTypeVector
-from cq_cam.visualize import visualize_task
 
 class PlaneValidationMixin:
     @staticmethod

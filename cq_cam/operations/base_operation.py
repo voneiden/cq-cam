@@ -5,8 +5,6 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import List
 
-from cadquery import cq
-
 from cq_cam.commands.base_command import Command
 from cq_cam.job.job import Job
 
