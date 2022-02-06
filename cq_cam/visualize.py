@@ -1,12 +1,11 @@
-import math
-
 from OCP.AIS import AIS_MultipleConnectedInteractive, AIS_Line, AIS_Shape
 from OCP.Geom import Geom_CartesianPoint
 from cadquery import cq, Edge
 from cq_editor.cq_utils import to_occ_color
 
 from cq_cam.commands.base_command import MotionCommand
-from cq_cam.commands.command import Plunge, Cut, Rapid, Circular, CircularCW
+from cq_cam.commands.command import Plunge, Cut, Rapid, Circular
+from cq_cam.commands.util_command import arc_center_midpoint
 from cq_cam.job.job import Job
 from cq_cam.operations.base_operation import Task
 
@@ -40,40 +39,22 @@ def visualize_task(job: Job, task: Task):
 
                 # W
                 try:
-                    # Vector start->end
-                    se = end.sub(start)
-
-                    # Normal (TODO, this should optional param with arc commands? helix support)
-                    if isinstance(command, CircularCW):
-                        normal = cq.Vector(0, 0, -1)
+                    if command.mid:
+                        midpoint = cq.Vector(command.mid)
                     else:
-                        normal = cq.Vector(0, 0, 1)
+                        _, midpoint = arc_center_midpoint(command, start, end)
 
-                    # Midpoint unit vector
-                    # TODO CW/CCW
-                    midpoint_unit = se.cross(normal).normalized()
-                    center_to_midpoint = midpoint_unit * command.radius
+                    # radius = command.radius if isinstance(command, CircularCW) else -command.radius
+                    # wp = (
+                    #    root_workplane.workplane(offset=start.z)
+                    #        .moveTo(start.x, start.y)
+                    #        .radiusArc((end.x, end.y), radius)
+                    # )
 
-                    # Determine center
-
-                    # Calculate bisector point
-                    bisector = se / 2
-
-                    # Bisector point center distance
-                    bisect_center_distance = math.sqrt(command.radius ** 2 - abs(bisector) ** 2)
-
-                    center = start + bisector + (-midpoint_unit * bisect_center_distance)
-
-                    midpoint = center + center_to_midpoint
-
-                    radius = command.radius if isinstance(command, CircularCW) else -command.radius
-                    wp = (
-                        root_workplane.workplane(offset=start.z)
-                            .moveTo(start.x, start.y)
-                            .radiusArc((end.x, end.y), radius)
-                    )
-                    arc = Edge.makeThreePointArc(world_start, root_plane.toWorldCoords((midpoint.x, midpoint.y, midpoint.z)), world_end)
-                    #line = AIS_Shape(wp.objects[0].wrapped)
+                    arc = Edge.makeThreePointArc(world_start,
+                                                 root_plane.toWorldCoords((midpoint.x, midpoint.y, midpoint.z)),
+                                                 world_end)
+                    # line = AIS_Shape(wp.objects[0].wrapped)
                     line = AIS_Shape(arc.wrapped)
                 except:
                     line = AIS_Line(

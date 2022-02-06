@@ -17,6 +17,7 @@ class Job:
     plunge_feed: float
     unit: Unit
     rapid_height: float
+    gcode_precision: int = 3
 
     def to_gcode(self):
         task_break = "\n\n\n"

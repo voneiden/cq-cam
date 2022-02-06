@@ -14,9 +14,9 @@ if TYPE_CHECKING:
 class Rapid(EndData, MotionCommand):
     def to_gcode(self, previous_command: Union[Command, None], start: cq.Vector, job: Job) -> Tuple[str, cq.Vector]:
         if isinstance(previous_command, Rapid):
-            return self.diff(start)
+            return self.diff(start, job)
         else:
-            diff, end = self.diff(start)
+            diff, end = self.diff(start, job)
             return f"G0{diff}", end
 
     def duplicate(self, z: float):
@@ -27,7 +27,7 @@ class Cut(EndData, Linear):
 
     def to_gcode(self, previous_command: Union[Command, None], start: cq.Vector, job: Job) -> Tuple[str, cq.Vector]:
         feed = "" if isinstance(previous_command, Cut) else f"F{job.feed}"
-        diff, end = self.diff(start)
+        diff, end = self.diff(start, job)
         return f"{feed}{super().to_gcode(previous_command, start, job)}{diff}", end
 
     def duplicate(self, z: float):
@@ -41,7 +41,7 @@ class CircularCW(Circular):
         return f'{cmd}{diff}', end
 
     def duplicate(self, z: float):
-        return CircularCW(self.x, self.y, z, self.radius)
+        return CircularCW(self.x, self.y, z, self.radius, self.ijk, (self.mid[0], self.mid[1], z))
 
 
 class CircularCCW(Circular):
@@ -51,7 +51,7 @@ class CircularCCW(Circular):
         return f'{cmd}{diff}', end
 
     def duplicate(self, z: float):
-        return CircularCCW(self.x, self.y, z, self.radius)
+        return CircularCCW(self.x, self.y, z, self.radius, self.ijk, (self.mid[0], self.mid[1], z))
 
 
 @dataclass
@@ -61,7 +61,7 @@ class Plunge(Linear):
 
     def to_gcode(self, previous_command: Union[Command, None], start: cq.Vector, job: Job) -> Tuple[str, cq.Vector]:
         plunge_feed = "" if isinstance(previous_command, Plunge) else f"F{job.plunge_feed}"
-        diff, end = self.diff(start)
+        diff, end = self.diff(start, job)
         return f"{plunge_feed}{super().to_gcode(previous_command, start, job)}{diff}", end
 
     def duplicate(self, z: float):

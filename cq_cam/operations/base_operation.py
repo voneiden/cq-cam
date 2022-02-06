@@ -26,8 +26,6 @@ class Task(ABC):
         self.job.tasks.append(self)
 
     def to_gcode(self):
-        # TODO
-
         start = cq.Vector(10, 10, 10)
 
         def command_gcode_generator(start):

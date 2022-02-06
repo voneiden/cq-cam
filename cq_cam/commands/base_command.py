@@ -6,7 +6,8 @@ from typing import Union, TYPE_CHECKING, List, Optional, Tuple
 
 from cadquery import cq
 
-from cq_cam.commands.util_command import same_to_none, vector_same_to_none
+from cq_cam.commands.util_command import same_to_none, vector_same_to_none, equal_within_tolerance, \
+    normalize
 
 if TYPE_CHECKING:
     from cq_cam.job.job import Job
@@ -112,17 +113,18 @@ class MotionCommand(Command, ABC):
     def end(self, start: cq.Vector) -> cq.Vector:
         pass
 
-    def diff(self, start: Optional[cq.Vector]) -> Tuple[str, cq.Vector]:
+    def diff(self, start: Optional[cq.Vector], job: Job) -> Tuple[str, cq.Vector]:
         """ Output X Y and Z coordinates as necessary """
         end = self.end(start)
-
         coordinates = []
-        if start is None or end.x != start.x:
-            coordinates.append(f'X{end.x}')
-        if start is None or end.y != start.y:
-            coordinates.append(f'Y{end.y}')
-        if start is None or end.z != start.z:
-            coordinates.append(f'Z{end.z}')
+
+        if start is None or not equal_within_tolerance(end.x, start.x, job.gcode_precision):
+            coordinates.append(f'X{normalize(round(end.x, job.gcode_precision))}')
+        if start is None or not equal_within_tolerance(end.y, start.y, job.gcode_precision):
+            coordinates.append(f'Y{normalize(round(end.y, job.gcode_precision))}')
+        if start is None or not equal_within_tolerance(end.z, start.z, job.gcode_precision):
+            coordinates.append(f'Z{normalize(round(end.z, job.gcode_precision))}')
+
         return "".join(coordinates), end
 
 
@@ -168,15 +170,25 @@ class Linear(MotionCommand, ABC):
 
 @dataclass
 class CircularData(EndData, ABC):
-    __slots__ = ['radius']
-    radius: float
+    __slots__ = ['radius', 'ijk', 'mid']
+    # TODO in py3.10 dataclass supports __slots__ better with default values (?)
+    radius: Optional[float]
+    ijk: Optional[Tuple[float, float, float]]
+    mid: Optional[Tuple[float, float, float]]
+
+    def __post_init__(self):
+        if self.radius is None and self.ijk is None:
+            raise RuntimeError('Either radius or ijk must be given to a circular command')
 
 
 class Circular(CircularData, MotionCommand, ABC):
     def to_gcode(self, previous_command: MotionCommand, start: cq.Vector, job: Job) -> Tuple[str, cq.Vector]:
-        end = self.end(start)
+        diff, end = self.diff(start, job)
 
-        return f'X{end.x}Y{end.y}R{self.radius}', end
+        if self.ijk is not None:
+            return f'{diff}{self.diff_ijk(job)}', end
+
+        return f'{diff}R{self.radius}', end
 
     def flip(self, new_end: cq.Vector) -> (Command, cq.Vector):
         from cq_cam.commands.command import CircularCW, CircularCCW
@@ -188,4 +200,22 @@ class Circular(CircularData, MotionCommand, ABC):
         else:
             cls = CircularCW
 
-        return cls(*vector_same_to_none(new_end, new_start), self.radius), new_start
+        # TODO ijk needs to be flipped?
+        # TODO save center instead of ijk?
+        ijk = cq.Vector(self.ijk)
+        ijk = new_end.add(ijk).sub(new_start)
+        x, y, z = vector_same_to_none(new_end, new_start)
+        return cls(x, y, z, self.radius, (ijk.x, ijk.y, ijk.z), self.mid), new_start
+
+    def diff_ijk(self, job: Job):
+        ijk = []
+        i = normalize(round(self.ijk[0], job.gcode_precision))
+        j = normalize(round(self.ijk[1], job.gcode_precision))
+        k = normalize(round(self.ijk[2], job.gcode_precision))
+        if i:
+            ijk.append(f'I{i}')
+        if j:
+            ijk.append(f'J{j}')
+        if k:
+            ijk.append(f'K{k}')
+        return ''.join(ijk)
