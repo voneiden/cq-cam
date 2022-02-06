@@ -137,9 +137,9 @@ class EndData(Command, ABC):
 
     def end(self, previous_end: cq.Vector) -> cq.Vector:
         return cq.Vector(
-            self.x if self.x else previous_end.x,
-            self.y if self.y else previous_end.y,
-            self.z if self.z else previous_end.z
+            previous_end.x if self.x is None else self.x,
+            previous_end.y if self.y is None else self.y,
+            previous_end.z if self.z is None else self.z
         )
 
 
