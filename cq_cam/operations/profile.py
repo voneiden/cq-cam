@@ -18,6 +18,8 @@ from cq_cam.utils import (
 class Profile(PlaneValidationMixin, ObjectsValidationMixin, Task):
     """
     Create a profile around the outer wire of a given face
+
+    TODO profile should always work on a wire
     """
     face: cq.Workplane
     offset: float
