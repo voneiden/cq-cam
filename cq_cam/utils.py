@@ -2,8 +2,10 @@ import math
 from typing import List
 
 import numpy as np
+from OCP.BRep import BRep_Tool
 from OCP.BRepTools import BRepTools_WireExplorer
 from OCP.TopAbs import TopAbs_REVERSED
+from OCP.TopoDS import TopoDS_Shape, TopoDS_Vertex, TopoDS
 from cadquery import cq, Edge
 
 
@@ -29,6 +31,11 @@ def edge_start_end(edge: cq.Edge):
     if orientation == TopAbs_REVERSED:
         return edge.endPoint(), edge.startPoint()
     return edge.startPoint(), edge.endPoint()
+
+
+def vertex_to_vector(vertex: TopoDS_Shape) -> cq.Vector:
+    geom_point = BRep_Tool.Pnt_s(TopoDS.Vertex_s(vertex))
+    return cq.Vector(geom_point.X(), geom_point.Y(), geom_point.Z())
 
 
 def orient_vector(vector: cq.Vector, plane: cq.Plane):
