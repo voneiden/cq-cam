@@ -1,7 +1,8 @@
 import math
-from typing import List
+from typing import List, Tuple, Iterable
 
 import numpy as np
+import pyclipper
 from OCP.BRep import BRep_Tool
 from OCP.BRepTools import BRepTools_WireExplorer
 from OCP.TopAbs import TopAbs_REVERSED
@@ -9,7 +10,7 @@ from OCP.TopoDS import TopoDS_Shape, TopoDS_Vertex, TopoDS
 from cadquery import cq, Edge
 
 
-def end_point(edge: cq.Edge):
+def end_point(edge: cq.Edge) -> cq.Vector:
     # https://github.com/CadQuery/cadquery/issues/831
     orientation = edge.wrapped.Orientation()
     if orientation == TopAbs_REVERSED:
@@ -17,7 +18,7 @@ def end_point(edge: cq.Edge):
     return edge.endPoint()
 
 
-def start_point(edge: cq.Edge):
+def start_point(edge: cq.Edge) -> cq.Vector:
     # https://github.com/CadQuery/cadquery/issues/831
     orientation = edge.wrapped.Orientation()
     if orientation == TopAbs_REVERSED:
@@ -25,7 +26,7 @@ def start_point(edge: cq.Edge):
     return edge.startPoint()
 
 
-def edge_start_end(edge: cq.Edge):
+def edge_start_end(edge: cq.Edge) -> Tuple[cq.Vector, cq.Vector]:
     # https://github.com/CadQuery/cadquery/issues/831
     orientation = edge.wrapped.Orientation()
     if orientation == TopAbs_REVERSED:
@@ -40,6 +41,10 @@ def vertex_to_vector(vertex: TopoDS_Shape) -> cq.Vector:
 
 def orient_vector(vector: cq.Vector, plane: cq.Plane):
     return cq.Vector(plane.xDir.dot(vector), plane.yDir.dot(vector), plane.zDir.dot(vector))
+
+
+def drop_z(vector: cq.Vector) -> Tuple[float, float]:
+    return vector.x, vector.y
 
 
 def vectors_to_xy(plane: cq.Plane, *vectors: cq.Vector):
@@ -63,9 +68,14 @@ def flatten_edges(edges: List[cq.Edge]):
         if edge.geomType() == "LINE":
             vxs.append(end_point(edge))
         elif edge.geomType() in ["ARC", "CIRCLE"]:
+            # TODO handle full circles
             positions = edge.positions(position_space(edge))
             vxs += positions
     return vxs
+
+
+def flatten_wire(wire: cq.Wire) -> List[cq.Vector]:
+    return flatten_edges(wire_to_ordered_edges(wire))
 
 
 def is_arc_clockwise(start: cq.Vector, mid: cq.Vector, end: cq.Vector):
@@ -146,3 +156,25 @@ def cut_clockwise(positive_offset: bool, spindle_clockwise: bool, climb: bool):
     :return: cut clockwise (or counter-clockwise)
     """
     return bool((positive_offset + spindle_clockwise + climb) % 2)
+
+
+class WireClipper:
+    def __init__(self):
+        self.clipper = pyclipper.Pyclipper()
+        # TODO return information about clipping wires!
+        # TODO cache wires somehow to enable reuse with Clear()
+
+    def _pt(self, subject):
+        return pyclipper.PT_SUBJECT if subject else pyclipper.PT_CLIP
+
+    def add_wire(self, plane: cq.Plane, wire: cq.Wire, subject=False):
+        polygon = [drop_z(orient_vector(v, plane)) for v in flatten_wire(wire)]
+        self.clipper.AddPath(pyclipper.scale_to_clipper(polygon), self._pt(subject), True)
+
+    def add_polygon(self, polygon: Iterable[Tuple[float, float]], subject=False):
+        self.clipper.AddPath(pyclipper.scale_to_clipper(polygon), self._pt(subject), False)
+
+    def execute(self):
+        polytree = self.clipper.Execute2(pyclipper.CT_INTERSECTION)
+        paths = pyclipper.scale_from_clipper(pyclipper.PolyTreeToPaths(polytree))
+        return paths
