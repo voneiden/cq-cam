@@ -160,21 +160,69 @@ def cut_clockwise(positive_offset: bool, spindle_clockwise: bool, climb: bool):
 
 class WireClipper:
     def __init__(self):
-        self.clipper = pyclipper.Pyclipper()
-        # TODO return information about clipping wires!
-        # TODO cache wires somehow to enable reuse with Clear()
+        self._clipper = pyclipper.Pyclipper()
+        self._pt_clip_cache = []
 
-    def _pt(self, subject):
-        return pyclipper.PT_SUBJECT if subject else pyclipper.PT_CLIP
+    def add_clip_wire(self, plane: cq.Plane, wire: cq.Wire):
+        return self._add_wire(plane, wire, pyclipper.PT_CLIP)
 
-    def add_wire(self, plane: cq.Plane, wire: cq.Wire, subject=False):
+    def add_subject_wire(self, plane: cq.Plane, wire: cq.Wire):
+        return self._add_wire(plane, wire, pyclipper.PT_SUBJECT)
+
+    def _add_wire(self, plane: cq.Plane, wire: cq.Wire, pt):
         polygon = [drop_z(orient_vector(v, plane)) for v in flatten_wire(wire)]
-        self.clipper.AddPath(pyclipper.scale_to_clipper(polygon), self._pt(subject), True)
+        self._add_path(pyclipper.scale_to_clipper(polygon), pt, wire.IsClosed())
 
-    def add_polygon(self, polygon: Iterable[Tuple[float, float]], subject=False):
-        self.clipper.AddPath(pyclipper.scale_to_clipper(polygon), self._pt(subject), False)
+    def add_clip_polygon(self, polygon: Iterable[Tuple[float, float]], is_closed=False):
+        return self._add_polygon(polygon, pyclipper.PT_CLIP, is_closed)
+
+    def add_subject_polygon(self, polygon: Iterable[Tuple[float, float]], is_closed=False):
+        return self._add_polygon(polygon, pyclipper.PT_SUBJECT, is_closed)
+
+    def _add_polygon(self, polygon: Iterable[Tuple[float, float]], pt, is_closed=False):
+        self._add_path(pyclipper.scale_to_clipper(polygon), pt, is_closed)
+
+    def _add_path(self, path, pt, closed):
+        if pt == pyclipper.PT_CLIP:
+            self._pt_clip_cache.append((path, pt, closed))
+        self._clipper.AddPath(path, pt, closed)
+
+    def reset(self):
+        self._clipper.Clear()
+        for cached in self._pt_clip_cache:
+            self._clipper.AddPath(*cached)
+
+    def bounds(self):
+        bounds: pyclipper.PyIntRect = self._clipper.GetBounds()
+        return {
+            'left': pyclipper.scale_from_clipper(bounds.left),
+            'top': pyclipper.scale_from_clipper(bounds.top),
+            'right': pyclipper.scale_from_clipper(bounds.right),
+            'bottom': pyclipper.scale_from_clipper(bounds.bottom),
+        }
+
+    def max_bounds(self):
+        bounds = self.bounds()
+        diagonal_length = self._bounds_diagonal_length(bounds)
+        half_diagonal = diagonal_length / 2
+        x_center = (bounds['left'] + bounds['right']) / 2
+        y_center = (bounds['top'] + bounds['bottom']) / 2
+
+        return {
+            'left': math.floor(x_center - half_diagonal),
+            'top': math.ceil(y_center + half_diagonal),
+            'right': math.ceil(x_center + half_diagonal),
+            'bottom': math.floor(y_center - half_diagonal),
+        }
+
+    def _bounds_diagonal_length(self, bounds=None):
+        bounds = bounds if bounds else self.bounds()
+        top_left = cq.Vector(bounds['left'], bounds['top'])
+        bottom_right = cq.Vector(bounds['right'], bounds['bottom'])
+        diagonal = top_left.sub(bottom_right)
+        return diagonal.Length
 
     def execute(self):
-        polytree = self.clipper.Execute2(pyclipper.CT_INTERSECTION)
+        polytree = self._clipper.Execute2(pyclipper.CT_INTERSECTION)
         paths = pyclipper.scale_from_clipper(pyclipper.PolyTreeToPaths(polytree))
         return paths
