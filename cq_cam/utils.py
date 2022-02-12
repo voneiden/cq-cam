@@ -1,4 +1,6 @@
+import itertools
 import math
+from timeit import timeit
 from typing import List, Tuple, Iterable
 
 import numpy as np
@@ -69,7 +71,8 @@ def flatten_edges(edges: List[cq.Edge]):
             vxs.append(end_point(edge))
         elif edge.geomType() in ["ARC", "CIRCLE"]:
             # TODO handle full circles
-            positions = edge.positions(position_space(edge))
+            # TODO make sure position_space ends up returning something (really tiny arcs?)
+            positions = edge.positions(position_space(edge)[1:])
             vxs += positions
     return vxs
 
@@ -158,20 +161,26 @@ def cut_clockwise(positive_offset: bool, spindle_clockwise: bool, climb: bool):
     return bool((positive_offset + spindle_clockwise + climb) % 2)
 
 
+def flatten_list(lst: List[Iterable]) -> List:
+    return [element for nested_lst in lst for element in nested_lst]
+
+
 class WireClipper:
-    def __init__(self):
+    def __init__(self, job_plane: cq.Plane):
+        self._plane = job_plane
         self._clipper = pyclipper.Pyclipper()
         self._pt_clip_cache = []
 
-    def add_clip_wire(self, plane: cq.Plane, wire: cq.Wire):
-        return self._add_wire(plane, wire, pyclipper.PT_CLIP)
+    def add_clip_wire(self, wire: cq.Wire):
+        return self._add_wire(wire, pyclipper.PT_CLIP)
 
-    def add_subject_wire(self, plane: cq.Plane, wire: cq.Wire):
-        return self._add_wire(plane, wire, pyclipper.PT_SUBJECT)
+    def add_subject_wire(self, wire: cq.Wire):
+        return self._add_wire(wire, pyclipper.PT_SUBJECT)
 
-    def _add_wire(self, plane: cq.Plane, wire: cq.Wire, pt):
-        polygon = [drop_z(orient_vector(v, plane)) for v in flatten_wire(wire)]
+    def _add_wire(self, wire: cq.Wire, pt):
+        polygon = [drop_z(orient_vector(v, self._plane)) for v in flatten_wire(wire)]
         self._add_path(pyclipper.scale_to_clipper(polygon), pt, wire.IsClosed())
+        return polygon
 
     def add_clip_polygon(self, polygon: Iterable[Tuple[float, float]], is_closed=False):
         return self._add_polygon(polygon, pyclipper.PT_CLIP, is_closed)
@@ -225,4 +234,29 @@ class WireClipper:
     def execute(self):
         polytree = self._clipper.Execute2(pyclipper.CT_INTERSECTION)
         paths = pyclipper.scale_from_clipper(pyclipper.PolyTreeToPaths(polytree))
-        return paths
+
+        return tuple(tuple(tuple(point) for point in path) for path in paths)
+
+
+def dist2(v, w):
+    return (v[0] - w[0]) ** 2 + (v[1] - w[1]) ** 2
+
+
+def dist_to_segment_squared(p, v, w):
+    """https://stackoverflow.com/a/1501725"""
+    l2 = dist2(v, w)
+    t = ((p[0] - v[0]) * (w[0] - v[0]) + (p[1] - v[1]) * (w[1] - v[1])) / l2
+    t = max(0, min(1, t))
+    closest_point = (v[0] + t * (w[0] - v[0]), v[1] + t * (w[1] - v[1]))
+    return dist2(p, closest_point)
+
+
+def pairwise(iterable):
+    """s -> (s0,s1), (s1,s2), (s2, s3), ...
+    builtin in py3.10"""
+    a, b = itertools.tee(iterable)
+    next(b, None)
+    return zip(a, itertools.chain(b, [iterable[0]]))
+
+
+#dist_to_segment_squared((2, 1), (-200, 0), (1, 0))
