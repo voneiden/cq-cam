@@ -189,14 +189,16 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, Task):
 
         cut_sequences.append(cut_sequence)
         # TODO multiple depths
-        self.commands.append(Rapid(None, None, self.clearance_height))
+
         for cut_sequence in cut_sequences:
             cut_start = cut_sequence[0]
+            self.commands.append(Rapid(None, None, self.clearance_height))
             self.commands.append(Rapid(*cut_start, None))
             self.commands.append(Rapid(None, None, self.top_height))  # TODO plunge or rapid?
             self.commands.append(Plunge(bottom_height))
             for cut in cut_sequence[1:]:
                 self.commands.append(Cut(*cut, None))
+
 
 
         self._wires = [*outer_profiles, *inner_profiles]
