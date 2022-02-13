@@ -7,13 +7,13 @@ from OCP.GeomAbs import GeomAbs_SurfaceType
 from cadquery import cq
 
 from cq_cam.commands.base_command import Unit
-from cq_cam.commands.command import Rapid, Cut
+from cq_cam.commands.command import Rapid, Cut, Plunge
 from cq_cam.job import Job
 from cq_cam.operations.base_operation import Task
 from cq_cam.operations.mixin_operation import PlaneValidationMixin, ObjectsValidationMixin
 from cq_cam.utils.linked_polygon import LinkedPolygon
 from cq_cam.utils.utils import WireClipper, flatten_list, pairwise, \
-    dist_to_segment_squared
+    dist_to_segment_squared, plane_offset_distance
 from cq_cam.visualize import visualize_task
 
 
@@ -66,24 +66,29 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, Task):
     def __post_init__(self):
 
         # Practice with single face
-
         f = self.faces[0]
+        for face in self.faces:
+            self.process_face(face)
 
-        # All the faces should be flat!
-        adaptor = BRepAdaptor_Surface(f.wrapped)
-        if adaptor.GetType() != GeomAbs_SurfaceType.GeomAbs_Plane:
-            raise RuntimeError("no plane no game")
+    def process_face(self, face: cq.Face):
 
+        # Perform validations
+        self.validate_face_plane(face)
+        face_workplane = cq.Workplane(obj=face)
+        self.validate_plane(self.job, face_workplane)
+        bottom_height = plane_offset_distance(self.job.workplane.plane, face_workplane.workplane().plane)
+
+        # Prepare profile paths
         job_plane = self.job.workplane.plane
-
         tool_radius = self.tool_diameter / 2
         outer_wire_offset = tool_radius * self.outer_boundary_stepover
         inner_wire_offset = tool_radius * self.inner_boundary_stepover
 
-        # These are the profile paths. They are done last as a finishing pass
-        outer_profiles = f.outerWire().offset2D(outer_wire_offset)
-        inner_profiles = flatten_list([wire.offset2D(inner_wire_offset) for wire in f.innerWires()])
+        # These are the profile paths. They are done very last as a finishing pass
+        outer_profiles = face.outerWire().offset2D(outer_wire_offset)
+        inner_profiles = flatten_list([wire.offset2D(inner_wire_offset) for wire in face.innerWires()])
 
+        # Prepare primary clearing regions
         if self.boundary_final_pass_stepover is None:
             self.boundary_final_pass_stepover = self.stepover
         final_pass_offset = tool_radius * self.boundary_final_pass_stepover
@@ -92,6 +97,10 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, Task):
         outer_regions = flatten_list([wire.offset2D(-final_pass_offset) for wire in outer_profiles])
         inner_regions = flatten_list([wire.offset2D(final_pass_offset) for wire in inner_profiles])
 
+        # TODO: Scanline orientation
+        # Here we could rotate the regions so that we can keep the scanlines in standard XY plane
+
+        # Vectorize regions and prepare scanline clipper
         clipper = WireClipper(job_plane)
         outer_polygons = []
         for outer_region in outer_regions:
@@ -105,30 +114,18 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, Task):
 
         max_bounds = clipper.max_bounds()
 
-        # Ziggy zaggy
-        # Generate scanlines
+        # Generate ZigZag scanlines
         y_scanpoints = list(np.arange(max_bounds['bottom'], max_bounds['top'], self.tool_diameter * self.stepover))
         scanline_templates = [((max_bounds['left'], y), (max_bounds['right'], y)) for y in y_scanpoints]
 
-        # Feed the scanlines to clipper
         for scanline_template in scanline_templates:
             clipper.add_subject_polygon(scanline_template)
 
         scanlines = clipper.execute()
 
-        # OK, the war plan for zigzag is
-        # 1) Create a map scanpoints -> scanline
-        # 2) Create a map of polygons -> scanpoints -> polygons
-        # 3) Pick top left scanline
-        # 4) Cut scanline
-        # 5) Find nearest unused scanpoint neighbour from mapped polygon - if none, rapid to highest unused scanline and #4
-        # 6) Repeat until all scanlines done
-        # 7) Do finishing pass
-
+        # Do a mapping of scanpoints to scanlines
         scanpoint_to_scanline = {}
         scanpoints = []
-        # Generate a map of scanlines and boundary polygons
-        print("Mapping scanpoints")
         for scanline in scanlines:
             sp1, sp2 = scanline
             scanpoint_to_scanline[sp1] = scanline
@@ -136,8 +133,7 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, Task):
             scanpoints.append(sp1)
             scanpoints.append(sp2)
 
-        print("Done")
-        print("Mapping scanlines")
+        # Link scanpoints to the boundary regions
         remaining_scanpoints = scanpoints[:]
         scanpoint_to_polynode = {}
         linked_polygons = []
@@ -155,12 +151,15 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, Task):
 
         assert not remaining_scanpoints
 
-        # Reset
+        # Prepare to route the zigzag
         for linked_polygon in linked_polygons:
             linked_polygon.reset()
 
-        # Setup
         scanlines = list(scanlines)
+
+        # Pick a starting position. Clipper makes no guarantees about the orientation
+        # of polylines it returns, so figure the top left scanpoint as the
+        # starting position.
         starting_scanline = scanlines.pop(0)
         start_position, cut_position = starting_scanline
         if start_position[0] > cut_position[0]:
@@ -169,20 +168,36 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, Task):
         scanpoint_to_polynode[start_position].drop(start_position)
         cut_sequence = [start_position, cut_position]
         cut_sequences = []
+
+        # Primary routing loop
         while scanlines:
             linked_polygon = scanpoint_to_polynode[cut_position]
             path = linked_polygon.nearest_linked(cut_position)
             if path is None:
-                break  # TODO
+                cut_sequences.append(cut_sequence)
+                # TODO some optimization potential in picking the nearest scanpoint
+                start_position, cut_position = scanlines.pop(0)
+                # TODO some optimization potential in picking a direction
+                cut_sequence = [start_position, cut_position]
+                continue
 
             cut_sequence += path
             scanline = scanpoint_to_scanline[path[-1]]
             cut_sequence.append(scanline[1] if scanline[0] == path[-1] else scanline[0])
             cut_position = cut_sequence[-1]
+            scanlines.remove(scanline)
 
-        self.commands.append(Rapid(*cut_sequence[0], -1))
-        for cut in cut_sequence[1:]:
-            self.commands.append(Cut(*cut, None))
+        cut_sequences.append(cut_sequence)
+        # TODO multiple depths
+        self.commands.append(Rapid(None, None, self.clearance_height))
+        for cut_sequence in cut_sequences:
+            cut_start = cut_sequence[0]
+            self.commands.append(Rapid(*cut_start, None))
+            self.commands.append(Rapid(None, None, self.top_height))  # TODO plunge or rapid?
+            self.commands.append(Plunge(bottom_height))
+            for cut in cut_sequence[1:]:
+                self.commands.append(Cut(*cut, None))
+
 
         self._wires = [*outer_profiles, *inner_profiles]
 

@@ -1,5 +1,7 @@
 from typing import List
 
+from OCP.BRepAdaptor import BRepAdaptor_Surface
+from OCP.GeomAbs import GeomAbs_SurfaceType
 from cadquery import cq
 
 from cq_cam.operations.base_operation import OperationError, Job
@@ -23,6 +25,18 @@ class PlaneValidationMixin:
         except ValueError as ex:
             raise OperationError(*ex.args)
 
+    @staticmethod
+    def validate_face_plane(face: cq.Face):
+        adaptor = BRepAdaptor_Surface(face.wrapped)
+        if adaptor.GetType() != GeomAbs_SurfaceType.GeomAbs_Plane:
+            raise OperationError("2D operations can only work on flat faces. Given face is not of GeomAbs_Plane")
+
+    @staticmethod
+    def validate_face_planar(face: cq.Face):
+        if not face.geomType() in ("PLANE", "CIRCLE"):
+            raise OperationError(
+                "Given face is not planar"
+            )
 
 class ObjectsValidationMixin:
     @staticmethod
