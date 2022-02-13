@@ -6,7 +6,7 @@ from cq_editor.cq_utils import to_occ_color
 from cq_cam.commands.base_command import MotionCommand
 from cq_cam.commands.command import Plunge, Cut, Rapid, Circular
 from cq_cam.commands.util_command import arc_center_midpoint
-from cq_cam.job.job import Job
+from cq_cam.job import Job
 from cq_cam.operations.base_operation import Task
 
 

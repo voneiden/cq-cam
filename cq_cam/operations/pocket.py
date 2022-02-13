@@ -1,23 +1,19 @@
-from dataclasses import dataclass, field
-from enum import Enum
-from functools import cache
-from typing import List, Union, Optional, Tuple
+from dataclasses import dataclass
+from typing import List, Union, Optional
 
 import numpy as np
-import pyclipper
 from OCP.BRepAdaptor import BRepAdaptor_Surface
 from OCP.GeomAbs import GeomAbs_SurfaceType
-from OCP.TopAbs import TopAbs_VERTEX
-from OCP.TopExp import TopExp_Explorer
 from cadquery import cq
 
+from cq_cam.commands.base_command import Unit
 from cq_cam.commands.command import Rapid, Cut
-from cq_cam.operations.base_operation import Job, Unit
+from cq_cam.job import Job
 from cq_cam.operations.base_operation import Task
 from cq_cam.operations.mixin_operation import PlaneValidationMixin, ObjectsValidationMixin
-from cq_cam.utils.utils import vertex_to_vector, orient_vector, flatten_wire, WireClipper, flatten_list, pairwise, \
-    dist_to_segment_squared, dist2, cached_dist2
 from cq_cam.utils.linked_polygon import LinkedPolygon
+from cq_cam.utils.utils import WireClipper, flatten_list, pairwise, \
+    dist_to_segment_squared
 from cq_cam.visualize import visualize_task
 
 
@@ -26,13 +22,16 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, Task):
     """ 2.5D Pocket operation
 
     All faces involved must be planes and parallel.
+
+    TODO
+    * Support low rapids?
     """
 
     faces: List[cq.Face]
     """ List of faces to operate on"""
 
     avoid: Optional[List[cq.Face]]
-    """ List of faces that the tool may not enter. This option
+    """ [INOP] List of faces that the tool may not enter. This option
     can be relevant when using an `outer_boundary_offset` that
     would otherwise cause the tool to enter features you do
     not want to cut."""
@@ -174,37 +173,25 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, Task):
             linked_polygon = scanpoint_to_polynode[cut_position]
             path = linked_polygon.nearest_linked(cut_position)
             if path is None:
-                break # TODO
+                break  # TODO
 
             cut_sequence += path
             scanline = scanpoint_to_scanline[path[-1]]
             cut_sequence.append(scanline[1] if scanline[0] == path[-1] else scanline[0])
             cut_position = cut_sequence[-1]
 
-
         self.commands.append(Rapid(*cut_sequence[0], -1))
         for cut in cut_sequence[1:]:
             self.commands.append(Cut(*cut, None))
 
-        #for (p1, p2) in scanlines:
-        #    self.commands.append(Rapid(*p1, -1))
-        #    self.commands.append(Rapid(None, None, -4))
-        #    self.commands.append(Cut(*p2, -4))
-        #    self.commands.append(Rapid(None, None, -1))
-
-        # Assemble the scanlines into suitable work sequences with some nice algorithm
-
-        # Determine face depths
-
-        # Construct profile polygons
-
-        # Generate operation layers
         self._wires = [*outer_profiles, *inner_profiles]
+
 
 def pick_other_scanline_end(scanline, scanpoint):
     if scanline[0] == scanpoint:
         return scanline[1]
     return scanline[0]
+
 
 def demo():
     job_plane = cq.Workplane().box(10, 10, 10).faces('>Z').workplane()

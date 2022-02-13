@@ -1,14 +1,11 @@
-from __future__ import annotations
-
 from abc import ABC
 from dataclasses import dataclass, field
-from enum import Enum
 from typing import List
 
 from cadquery import cq
 
 from cq_cam.commands.base_command import Command
-from cq_cam.job.job import Job
+from cq_cam.job import Job
 
 
 class OperationError(Exception):
@@ -18,9 +15,21 @@ class OperationError(Exception):
 @dataclass
 class Task(ABC):
     job: Job
+    """ The `Job` which this task belongs to.
+    """
+
     commands: List[Command] = field(init=False, default_factory=list)
+    """List of commands that this task wants to perform.
+    """
+
     clearance_height: float
+    """ Safe height for rapids inside the task (relative to `Job` surface).
+    Note: A task may perform rapids still at lower depths if it deems safe to do so. 
+    """
+
     top_height: float
+    """ Height of cut layer (relative to `Job` surface).
+    """
 
     def __post_init__(self):
         self.job.tasks.append(self)
@@ -36,14 +45,3 @@ class Task(ABC):
                 previous_command = command
 
         return "\n".join(command_gcode_generator(start))
-
-
-class Unit(Enum):
-    METRIC = 20
-    IMPERIAL = 21
-
-    def to_gcode(self) -> str:
-        if self == Unit.METRIC:
-            return "G20"
-        else:
-            return "G21"

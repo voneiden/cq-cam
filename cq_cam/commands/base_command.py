@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from enum import Enum
 from typing import Union, TYPE_CHECKING, List, Optional, Tuple
 
 from cadquery import cq
@@ -10,7 +11,7 @@ from cq_cam.commands.util_command import same_to_none, vector_same_to_none, equa
     normalize
 
 if TYPE_CHECKING:
-    from cq_cam.job.job import Job
+    from cq_cam.job import Job
 
 
 @dataclass
@@ -219,3 +220,14 @@ class Circular(CircularData, MotionCommand, ABC):
         if k:
             ijk.append(f'K{k}')
         return ''.join(ijk)
+
+
+class Unit(Enum):
+    METRIC = 20
+    IMPERIAL = 21
+
+    def to_gcode(self) -> str:
+        if self == Unit.METRIC:
+            return "G20"
+        else:
+            return "G21"

@@ -39,5 +39,6 @@ Outside of scope
 
 Contributions
 ---
-Feedback is welcome. Please open an issue and discuss 
-before submitting a PR.
+Feedback is welcome, but please no spontaneous code contributions.
+Open an issue, discuss and get an approval before submitting a PR.
+

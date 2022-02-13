@@ -2,7 +2,7 @@ from cadquery import cq
 
 from cq_cam.operations.base_operation import Unit, Job
 from cq_cam.operations.profile import Profile
-from visualize import visualize_task
+from cq_cam.visualize import visualize_task
 
 L = cq.Workplane('YZ').lineTo(20, -5).lineTo(20, 10).lineTo(15, 10).lineTo(15, 5).lineTo(0, 5).close().extrude(10)
 L_top = L.faces('<X').workplane()

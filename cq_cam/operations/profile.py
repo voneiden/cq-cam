@@ -8,7 +8,7 @@ from cq_cam.commands.command import Rapid, Plunge
 from cq_cam.commands.util_command import wire_to_command_sequence
 from cq_cam.operations.base_operation import Task
 from cq_cam.operations.mixin_operation import PlaneValidationMixin, ObjectsValidationMixin
-from cq_cam.utils import (
+from cq_cam.utils.utils import (
     plane_offset_distance,
     cut_clockwise
 )

@@ -8,7 +8,7 @@ from cadquery import cq
 from cq_cam.commands.base_command import EndData, Command, Linear, Circular, MotionCommand
 
 if TYPE_CHECKING:
-    from cq_cam.job.job import Job
+    from cq_cam.job import Job
 
 
 class Rapid(EndData, MotionCommand):
