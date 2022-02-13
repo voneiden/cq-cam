@@ -164,8 +164,11 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, Task):
         scanlines = list(scanlines)
         starting_scanline = scanlines.pop(0)
         start_position, cut_position = starting_scanline
+        if start_position[0] > cut_position[0]:
+            start_position, cut_position = cut_position, start_position
+
         scanpoint_to_polynode[start_position].drop(start_position)
-        cut_sequence = [*starting_scanline]
+        cut_sequence = [start_position, cut_position]
         cut_sequences = []
         while scanlines:
             linked_polygon = scanpoint_to_polynode[cut_position]
@@ -214,7 +217,7 @@ def demo():
 
     toolpath = visualize_task(job, op)
     print(op.to_gcode())
-    
+
     show_object(obj)
     # show_object(op_plane)
     show_object(toolpath, 'g')
