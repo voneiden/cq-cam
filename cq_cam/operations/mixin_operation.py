@@ -3,7 +3,7 @@ from typing import List
 from cadquery import cq
 
 from cq_cam.operations.base_operation import OperationError, Job
-from cq_cam.utils import is_parallel_plane
+from cq_cam.utils.utils import is_parallel_plane
 
 
 class PlaneValidationMixin:

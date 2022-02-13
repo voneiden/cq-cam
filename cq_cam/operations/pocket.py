@@ -1,5 +1,6 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
+from functools import cache
 from typing import List, Union, Optional, Tuple
 
 import numpy as np
@@ -14,8 +15,9 @@ from cq_cam.commands.command import Rapid, Cut
 from cq_cam.operations.base_operation import Job, Unit
 from cq_cam.operations.base_operation import Task
 from cq_cam.operations.mixin_operation import PlaneValidationMixin, ObjectsValidationMixin
-from cq_cam.utils import vertex_to_vector, orient_vector, flatten_wire, WireClipper, flatten_list, pairwise, \
-    dist_to_segment_squared
+from cq_cam.utils.utils import vertex_to_vector, orient_vector, flatten_wire, WireClipper, flatten_list, pairwise, \
+    dist_to_segment_squared, dist2, cached_dist2
+from cq_cam.utils.linked_polygon import LinkedPolygon
 from cq_cam.visualize import visualize_task
 
 
@@ -138,38 +140,54 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, Task):
         print("Done")
         print("Mapping scanlines")
         remaining_scanpoints = scanpoints[:]
-        scanpoint_to_polygon = {}
+        scanpoint_to_polynode = {}
+        linked_polygons = []
         for polygon in outer_polygons + inner_polygons:
+            linked_polygon = LinkedPolygon(polygon[:])
+            linked_polygons.append(linked_polygon)
             for p1, p2 in pairwise(polygon):
                 for scanpoint in remaining_scanpoints[:]:
                     d = dist_to_segment_squared(scanpoint, p1, p2)
                     # Todo pick a good number. Tests show values between 1.83e-19 and 1.38e-21
                     if d < 0.0000001:
-                        print("Pretty close", d)
                         remaining_scanpoints.remove(scanpoint)
+                        linked_polygon.link_point(scanpoint, p1, p2)
+                        scanpoint_to_polynode[scanpoint] = linked_polygon
 
-        print("Remaining scanpoints", remaining_scanpoints)
+        assert not remaining_scanpoints
 
+        # Reset
+        for linked_polygon in linked_polygons:
+            linked_polygon.reset()
+
+        # Setup
+        scanlines = list(scanlines)
+        starting_scanline = scanlines.pop(0)
+        start_position, cut_position = starting_scanline
+        scanpoint_to_polynode[start_position].drop(start_position)
+        cut_sequence = [*starting_scanline]
         cut_sequences = []
-        # Pick the first scanline and execute it
-        """
         while scanlines:
-            sequence = []
-            scanline = scanlines.pop(0)  # TODO find nearest to last
-            start, position = scanline
-            sequence.append(start)
-            sequence.append(position)
+            linked_polygon = scanpoint_to_polynode[cut_position]
+            path = linked_polygon.nearest_linked(cut_position)
+            if path is None:
+                break # TODO
 
-            while scanlines:
-                break
+            cut_sequence += path
+            scanline = scanpoint_to_scanline[path[-1]]
+            cut_sequence.append(scanline[1] if scanline[0] == path[-1] else scanline[0])
+            cut_position = cut_sequence[-1]
 
-        """
 
-        for (p1, p2) in scanlines:
-            self.commands.append(Rapid(*p1, -1))
-            self.commands.append(Rapid(None, None, -4))
-            self.commands.append(Cut(*p2, -4))
-            self.commands.append(Rapid(None, None, -1))
+        self.commands.append(Rapid(*cut_sequence[0], -1))
+        for cut in cut_sequence[1:]:
+            self.commands.append(Cut(*cut, None))
+
+        #for (p1, p2) in scanlines:
+        #    self.commands.append(Rapid(*p1, -1))
+        #    self.commands.append(Rapid(None, None, -4))
+        #    self.commands.append(Cut(*p2, -4))
+        #    self.commands.append(Rapid(None, None, -1))
 
         # Assemble the scanlines into suitable work sequences with some nice algorithm
 
@@ -180,19 +198,10 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, Task):
         # Generate operation layers
         self._wires = [*outer_profiles, *inner_profiles]
 
-
-@dataclass
-class PolyNode:
-    polygon: List[Tuple[float, float]]
-    scanpoints: List[Tuple[float, float]]
-
-    # TODO distance cache
-    def link_scanpoint(self, scanpoint, p1, p2):
-        # Get the nearest point on segment p1-p2 and add it to the polygon
-        self.polygon.insert(self.polygon.index(p1), scanpoint)
-        self.scanpoints.append(scanpoint)
-        pass
-
+def pick_other_scanline_end(scanline, scanpoint):
+    if scanline[0] == scanpoint:
+        return scanline[1]
+    return scanline[0]
 
 def demo():
     job_plane = cq.Workplane().box(10, 10, 10).faces('>Z').workplane()
@@ -204,6 +213,8 @@ def demo():
     op = Pocket(job, 2, 0, op_plane.objects, None, 1, 0.33)
 
     toolpath = visualize_task(job, op)
+    print(op.to_gcode())
+    
     show_object(obj)
     # show_object(op_plane)
     show_object(toolpath, 'g')

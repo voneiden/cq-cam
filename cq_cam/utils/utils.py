@@ -1,5 +1,6 @@
 import itertools
 import math
+from functools import cache
 from timeit import timeit
 from typing import List, Tuple, Iterable
 
@@ -242,6 +243,11 @@ def dist2(v, w):
     return (v[0] - w[0]) ** 2 + (v[1] - w[1]) ** 2
 
 
+@cache
+def cached_dist2(p1: Tuple[float, float], p2: Tuple[float, float]):
+    return dist2(p1, p2)
+
+
 def dist_to_segment_squared(p, v, w):
     """https://stackoverflow.com/a/1501725"""
     l2 = dist2(v, w)
@@ -258,5 +264,4 @@ def pairwise(iterable):
     next(b, None)
     return zip(a, itertools.chain(b, [iterable[0]]))
 
-
-#dist_to_segment_squared((2, 1), (-200, 0), (1, 0))
+# dist_to_segment_squared((2, 1), (-200, 0), (1, 0))

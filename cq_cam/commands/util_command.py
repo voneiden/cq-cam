@@ -3,7 +3,7 @@ from typing import Optional, Tuple, TYPE_CHECKING
 
 from cadquery import cq
 
-from cq_cam.utils import (
+from cq_cam.utils.utils import (
     wire_to_ordered_edges,
     start_point, orient_vector,
     end_point,
