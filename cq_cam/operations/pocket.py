@@ -1,9 +1,15 @@
+import itertools
+from collections import defaultdict
 from dataclasses import dataclass
-from typing import List, Union, Optional
+from typing import List, Union, Optional, Tuple, Dict
 
 import numpy as np
 from OCP.BRepAdaptor import BRepAdaptor_Surface
+from OCP.BRepFeat import BRepFeat
 from OCP.GeomAbs import GeomAbs_SurfaceType
+from OCP.ShapeAnalysis import ShapeAnalysis_Edge
+from OCP.TopAbs import TopAbs_FACE
+from OCP.TopExp import TopExp_Explorer
 from cadquery import cq
 
 from cq_cam.commands.base_command import Unit
@@ -13,7 +19,7 @@ from cq_cam.operations.base_operation import Task
 from cq_cam.operations.mixin_operation import PlaneValidationMixin, ObjectsValidationMixin
 from cq_cam.utils.linked_polygon import LinkedPolygon
 from cq_cam.utils.utils import WireClipper, flatten_list, pairwise, \
-    dist_to_segment_squared, plane_offset_distance
+    dist_to_segment_squared, plane_offset_distance, orient_vector
 from cq_cam.visualize import visualize_task
 
 
@@ -64,19 +70,93 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, Task):
     # todo angle
 
     def __post_init__(self):
+        faces = [(i, face.copy()) for i, face in enumerate(self.faces)]
+        features, coplanar_faces, depth_info = self._discover_pocket_features(faces)
+        groups = self._group_faces_by_features(features, faces)
 
-        # Practice with single face
-        f = self.faces[0]
-        for face in self.faces:
-            self.process_face(face)
+        for group_faces in groups.values():
+            boundaries = self._boundaries_by_group(group_faces, coplanar_faces, depth_info)
+            for boundary, start_depth, end_depth in boundaries:
+                self.process_boundary(boundary, start_depth, end_depth)
 
-    def process_face(self, face: cq.Face):
+    @staticmethod
+    def _group_faces_by_features(features: List[cq.Face], faces: List[Tuple[int, cq.Face]]):
+        feat = BRepFeat()
+        remaining = faces[:]
+        groups = defaultdict(lambda: [])
+        for feature in features:
+            for i, face in remaining[:]:
+                if feat.IsInside_s(face.wrapped, feature.wrapped):
+                    groups[feature].append((i, face))
+                    remaining.remove((i, face))
 
+        assert not remaining
+        return groups
+
+    def _discover_pocket_features(self, faces: List[Tuple[int, cq.Face]]):
+
+        # Move everything on the same plane
+        coplanar_faces = []
+        job_zdir = self.job.workplane.plane.zDir
+        job_height = job_zdir.dot(self.job.workplane.plane.origin)
+        depth_info = {}
+        for i, face in faces:
+            face_depth = job_zdir.dot(face.Center())
+            height_diff = job_height - face_depth
+            depth_info[i] = height_diff
+            translated_face = face.translate(job_zdir.multiply(height_diff))
+            coplanar_faces.append((i, translated_face))
+
+        features = self._combine_coplanar_faces([f[1] for f in coplanar_faces])
+
+        return features, coplanar_faces, depth_info
+
+    @staticmethod
+    def _combine_coplanar_faces(faces: List[cq.Face]) -> List[cq.Face]:
+        # This works also as a sanity check as it will
+        # raise if the faces are not coplanar
+        wp = cq.Workplane().add(faces).combine()
+        features = []
+        explorer = TopExp_Explorer(wp.objects[0].wrapped, TopAbs_FACE)
+        while explorer.More():
+            face = explorer.Current()
+            features.append(cq.Face(face))
+            explorer.Next()
+        return features
+
+    def _boundaries_by_group(self,
+                             group_faces: List[Tuple[int, cq.Face]],
+                             coplanar_faces: List[Tuple[int, cq.Face]],
+                             depth_info: Dict[int, float]):
+        face_depths = list(set(depth_info.values()))
+        face_depths.sort()
+        current_depth = 0
+        boundaries = []
+        group_i = [i for i, _ in group_faces]
+        for face_depth in face_depths:
+            depth_i = [i for i, depth in depth_info.items() if depth >= face_depth and i in group_i]
+            features = self._combine_coplanar_faces([f for i, f in coplanar_faces if i in depth_i and i in group_i])
+            assert len(features) == 1
+            boundary = features[0]
+            boundaries.append((boundary, current_depth, face_depth))
+            current_depth = face_depth
+        return boundaries
+
+    def process_boundary(self, face: cq.Face, start_depth: float, end_depth: float):
+        # TODO break this function down into easily testable sections
         # Perform validations
         self.validate_face_plane(face)
         face_workplane = cq.Workplane(obj=face)
         self.validate_plane(self.job, face_workplane)
-        bottom_height = plane_offset_distance(self.job.workplane.plane, face_workplane.workplane().plane)
+        # bottom_height = plane_offset_distance(self.job.workplane.plane, face_workplane.workplane().plane)
+        bottom_height = -end_depth
+
+        if self.stepdown:
+            depths = list(np.arange(-start_depth + self.stepdown, bottom_height, self.stepdown))
+            if depths[-1] != bottom_height:
+                depths.append(bottom_height)
+        else:
+            depths = [bottom_height]
 
         # Prepare profile paths
         job_plane = self.job.workplane.plane
@@ -188,20 +268,16 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, Task):
             scanlines.remove(scanline)
 
         cut_sequences.append(cut_sequence)
-        # TODO multiple depths
 
-        for cut_sequence in cut_sequences:
-            cut_start = cut_sequence[0]
-            self.commands.append(Rapid(None, None, self.clearance_height))
-            self.commands.append(Rapid(*cut_start, None))
-            self.commands.append(Rapid(None, None, self.top_height))  # TODO plunge or rapid?
-            self.commands.append(Plunge(bottom_height))
-            for cut in cut_sequence[1:]:
-                self.commands.append(Cut(*cut, None))
-
-
-
-        self._wires = [*outer_profiles, *inner_profiles]
+        for i, depth in enumerate(depths):
+            for cut_sequence in cut_sequences:
+                cut_start = cut_sequence[0]
+                self.commands.append(Rapid(None, None, self.clearance_height))
+                self.commands.append(Rapid(*cut_start, None))
+                self.commands.append(Rapid(None, None, self.top_height))  # TODO plunge or rapid?
+                self.commands.append(Plunge(depth))
+                for cut in cut_sequence[1:]:
+                    self.commands.append(Cut(*cut, None))
 
 
 def pick_other_scanline_end(scanline, scanpoint):
@@ -211,13 +287,25 @@ def pick_other_scanline_end(scanline, scanpoint):
 
 
 def demo():
-    job_plane = cq.Workplane().box(10, 10, 10).faces('>Z').workplane()
-    obj = job_plane.rect(7.5, 7.5).cutBlind(-4).faces('>Z[1]').rect(2, 2).extrude(2)
+    job_plane = cq.Workplane().box(15, 15, 10).faces('>Z').workplane()
+    obj = (
+        job_plane
+            .rect(7.5, 7.5)
+            .cutBlind(-4)
+            .faces('>Z[1]')
+            .rect(2, 2)
+            .extrude(2)
+            .faces('>Z').workplane()
+            .moveTo(-5.75, 0)
+            .rect(4, 2)
+            .cutBlind(-6)
+    )
     op_plane = obj.faces('>Z[1]')
+    test = obj.faces('>Z[-3] or >Z[-2] or >Z[-4]')
     # obj = op_plane.workplane().rect(2, 2).extrude(4)
 
     job = Job(job_plane, 300, 100, Unit.METRIC, 5)
-    op = Pocket(job, 2, 0, op_plane.objects, None, 1, 0.33)
+    op = Pocket(job, 2, 0, test.objects, None, 1, 0.33, stepdown=-1)
 
     toolpath = visualize_task(job, op)
     print(op.to_gcode())
@@ -225,8 +313,10 @@ def demo():
     show_object(obj)
     # show_object(op_plane)
     show_object(toolpath, 'g')
-    for w in op._wires:
-        show_object(w)
+    # for w in op._wires:
+    #    show_object(w)
+
+    show_object(test, 'test')
 
 
 if 'show_object' in locals() or __name__ == '__main__':
