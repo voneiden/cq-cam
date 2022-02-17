@@ -93,10 +93,12 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, Task):
         job_height = job_zdir.dot(self.job.workplane.plane.origin)
         depth_info = {}
         for i, face in faces:
-            face_depth = job_zdir.dot(face.Center())
-            height_diff = job_height - face_depth
-            depth_info[i] = height_diff
-            translated_face = face.translate(job_zdir.multiply(height_diff))
+            face_height = job_zdir.dot(face.Center())
+            face_depth = face_height - job_height
+            depth_info[i] = face_depth
+
+            # Move face to same level with job plane
+            translated_face = face.translate(job_zdir.multiply(-face_depth))
             coplanar_faces.append((i, translated_face))
 
         features = self._combine_coplanar_faces([f[1] for f in coplanar_faces])
@@ -122,11 +124,12 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, Task):
                              depth_info: Dict[int, float]):
         face_depths = list(set(depth_info.values()))
         face_depths.sort()
+        face_depths.reverse()
         current_depth = 0
         boundaries = []
         group_i = [i for i, _ in group_faces]
         for face_depth in face_depths:
-            depth_i = [i for i, depth in depth_info.items() if depth >= face_depth and i in group_i]
+            depth_i = [i for i, depth in depth_info.items() if depth <= face_depth and i in group_i]
             features = self._combine_coplanar_faces([f for i, f in coplanar_faces if i in depth_i and i in group_i])
             assert len(features) == 1
             boundary = features[0]
@@ -141,14 +144,14 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, Task):
         face_workplane = cq.Workplane(obj=face)
         self.validate_plane(self.job, face_workplane)
         # bottom_height = plane_offset_distance(self.job.workplane.plane, face_workplane.workplane().plane)
-        bottom_height = -end_depth
+        #bottom_height = -end_depth
 
         if self.stepdown:
-            depths = list(np.arange(-start_depth + self.stepdown, bottom_height, self.stepdown))
-            if depths[-1] != bottom_height:
-                depths.append(bottom_height)
+            depths = list(np.arange(start_depth - self.stepdown, end_depth, -self.stepdown))
+            if depths[-1] != end_depth:
+                depths.append(end_depth)
         else:
-            depths = [bottom_height]
+            depths = [end_depth]
 
         # Prepare profile paths
         job_plane = self.job.workplane.plane
@@ -297,7 +300,7 @@ def demo():
     # obj = op_plane.workplane().rect(2, 2).extrude(4)
 
     job = Job(job_plane, 300, 100, Unit.METRIC, 5)
-    op = Pocket(job, 2, 0, test.objects, None, 1, 0.33, stepdown=-1)
+    op = Pocket(job, 2, 0, test.objects, None, 1, 0.33, stepdown=1)
 
     toolpath = visualize_task(job, op)
     print(op.to_gcode())
