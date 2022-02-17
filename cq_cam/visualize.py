@@ -1,3 +1,5 @@
+import logging
+
 from OCP.AIS import AIS_MultipleConnectedInteractive, AIS_Line, AIS_Shape
 from OCP.Geom import Geom_CartesianPoint
 from cadquery import cq, Edge
@@ -8,6 +10,8 @@ from cq_cam.commands.command import Plunge, Cut, Rapid, Circular
 from cq_cam.commands.util_command import arc_center_midpoint
 from cq_cam.job import Job
 from cq_cam.operations.base_operation import Task
+
+logger = logging.getLogger(__name__)
 
 
 class VisualizeError(Exception):
@@ -63,6 +67,9 @@ def visualize_task(job: Job, task: Task):
                     )
                     line.SetColor(to_occ_color('yellow'))
             else:
+                if world_start == world_end:
+                    logger.warning("encountered zero length")
+                    continue
                 line = AIS_Line(
                     Geom_CartesianPoint(world_start.x, world_start.y, world_start.z),
                     Geom_CartesianPoint(world_end.x, world_end.y, world_end.z)

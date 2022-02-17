@@ -1,17 +1,12 @@
-import itertools
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import List, Union, Optional, Tuple, Dict
 
 import numpy as np
-from OCP.BRepAdaptor import BRepAdaptor_Surface
 from OCP.BRepFeat import BRepFeat
-from OCP.GeomAbs import GeomAbs_SurfaceType
-from OCP.ShapeAnalysis import ShapeAnalysis_Edge
 from OCP.TopAbs import TopAbs_FACE
 from OCP.TopExp import TopExp_Explorer
 from cadquery import cq
-
 from cq_cam.commands.base_command import Unit
 from cq_cam.commands.command import Rapid, Cut, Plunge
 from cq_cam.job import Job
@@ -19,7 +14,7 @@ from cq_cam.operations.base_operation import Task
 from cq_cam.operations.mixin_operation import PlaneValidationMixin, ObjectsValidationMixin
 from cq_cam.utils.linked_polygon import LinkedPolygon
 from cq_cam.utils.utils import WireClipper, flatten_list, pairwise, \
-    dist_to_segment_squared, plane_offset_distance, orient_vector
+    dist_to_segment_squared
 from cq_cam.visualize import visualize_task
 
 
@@ -28,9 +23,6 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, Task):
     """ 2.5D Pocket operation
 
     All faces involved must be planes and parallel.
-
-    TODO
-    * Support low rapids?
     """
 
     faces: List[cq.Face]
