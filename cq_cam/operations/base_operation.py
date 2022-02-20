@@ -3,17 +3,9 @@ from dataclasses import dataclass, field
 from typing import List, Union, Optional, Tuple, Dict
 
 from OCP.BRepFeat import BRepFeat
-from OCP.BRepLib import BRepLib
-from OCP.BRepMesh import BRepMesh_IncrementalMesh
-from OCP.HLRAlgo import HLRAlgo_Projector
-from OCP.HLRBRep import HLRBRep_PolyAlgo, HLRBRep_PolyHLRToShape, HLRBRep_HLRToShape, HLRBRep_Algo, HLRBRep_OutLine
-from OCP.ShapeAnalysis import ShapeAnalysis_FreeBounds
 from OCP.TopAbs import TopAbs_FACE
 from OCP.TopExp import TopExp_Explorer
-from OCP.TopTools import TopTools_HSequenceOfShape
-from OCP.gp import gp_Ax2, gp_Pnt, gp_Dir
 from cadquery import cq
-from cadquery.occ_impl.shapes import TOLERANCE
 
 from cq_cam.commands.base_command import Command
 from cq_cam.job import Job
@@ -27,6 +19,7 @@ class OperationError(Exception):
 
 Scanpoint = Tuple[float, float]
 Scanline = List[Scanpoint]
+
 
 @dataclass
 class Task(ABC):
@@ -95,8 +88,12 @@ class Task(ABC):
         matrix = self.job.workplane.plane.fG
         return [face.transformShape(matrix) for face in faces]
 
+
 @dataclass
 class FaceBaseOperation(Task, ABC):
+    """ Base class for any operation that operates primarily on face(s)
+    """
+
     faces: List[cq.Face]
     """ List of faces to operate on"""
 
@@ -138,7 +135,6 @@ class FaceBaseOperation(Task, ABC):
     """
 
     def offset_boundary(self, boundary: cq.Face) -> List[cq.Face]:
-        # TODO assert face is planar
         assert boundary.geomType() in ("PLANE", "CIRCLE")
 
         outer_offset = self.tool_diameter * self.outer_boundary_offset

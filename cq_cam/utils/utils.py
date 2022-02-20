@@ -1,23 +1,17 @@
 import itertools
 import math
 from functools import cache
-from timeit import timeit
 from typing import List, Tuple, Iterable
 
 import numpy as np
 import pyclipper
 from OCP.BRep import BRep_Tool
-from OCP.BRepLib import BRepLib, BRepLib_FuseEdges
-from OCP.BRepMesh import BRepMesh_IncrementalMesh
+from OCP.BRepLib import BRepLib
 from OCP.BRepTools import BRepTools_WireExplorer
 from OCP.HLRAlgo import HLRAlgo_Projector
-from OCP.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape, HLRBRep_PolyAlgo, HLRBRep_PolyHLRToShape
-from OCP.ShapeAnalysis import ShapeAnalysis_Wire
-from OCP.ShapeFix import ShapeFix_Face
+from OCP.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape
 from OCP.TopAbs import TopAbs_REVERSED
-from OCP.TopOpeBRepTool import TopOpeBRepTool_PurgeInternalEdges
-from OCP.TopTools import TopTools_SequenceOfShape
-from OCP.TopoDS import TopoDS_Shape, TopoDS_Vertex, TopoDS
+from OCP.TopoDS import TopoDS_Shape, TopoDS
 from OCP.gp import gp_Ax2, gp_Pnt, gp_Dir
 from cadquery import cq, Edge
 from cadquery.occ_impl.shapes import TOLERANCE

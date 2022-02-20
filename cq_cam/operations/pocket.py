@@ -1,22 +1,20 @@
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import List, Union, Optional, Tuple, Dict, TypeVar
+from typing import List, Tuple, Dict
 
 import numpy as np
 from OCP.BRepFeat import BRepFeat
 from OCP.TopAbs import TopAbs_FACE
 from OCP.TopExp import TopExp_Explorer
 from cadquery import cq
+
 from cq_cam.commands.base_command import Unit
 from cq_cam.commands.command import Rapid, Cut, Plunge
 from cq_cam.job import Job
-from cq_cam.operations.base_operation import Task, FaceBaseOperation
+from cq_cam.operations.base_operation import FaceBaseOperation
 from cq_cam.operations.mixin_operation import PlaneValidationMixin, ObjectsValidationMixin
-from cq_cam.utils.linked_polygon import LinkedPolygon
-from cq_cam.utils.utils import WireClipper, flatten_list, pairwise, \
-    dist_to_segment_squared
+from cq_cam.utils.utils import WireClipper, flatten_list
 from cq_cam.visualize import visualize_task
-
 
 
 @dataclass
