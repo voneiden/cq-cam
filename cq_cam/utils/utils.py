@@ -7,10 +7,20 @@ from typing import List, Tuple, Iterable
 import numpy as np
 import pyclipper
 from OCP.BRep import BRep_Tool
+from OCP.BRepLib import BRepLib, BRepLib_FuseEdges
+from OCP.BRepMesh import BRepMesh_IncrementalMesh
 from OCP.BRepTools import BRepTools_WireExplorer
+from OCP.HLRAlgo import HLRAlgo_Projector
+from OCP.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape, HLRBRep_PolyAlgo, HLRBRep_PolyHLRToShape
+from OCP.ShapeAnalysis import ShapeAnalysis_Wire
+from OCP.ShapeFix import ShapeFix_Face
 from OCP.TopAbs import TopAbs_REVERSED
+from OCP.TopOpeBRepTool import TopOpeBRepTool_PurgeInternalEdges
+from OCP.TopTools import TopTools_SequenceOfShape
 from OCP.TopoDS import TopoDS_Shape, TopoDS_Vertex, TopoDS
+from OCP.gp import gp_Ax2, gp_Pnt, gp_Dir
 from cadquery import cq, Edge
+from cadquery.occ_impl.shapes import TOLERANCE
 
 
 def end_point(edge: cq.Edge) -> cq.Vector:
@@ -179,6 +189,7 @@ class WireClipper:
         return self._add_wire(wire, pyclipper.PT_SUBJECT)
 
     def _add_wire(self, wire: cq.Wire, pt):
+        # TODO get rid of orient vector
         polygon = [drop_z(orient_vector(v, self._plane)) for v in flatten_wire(wire)]
         self._add_path(pyclipper.scale_to_clipper(polygon), pt, wire.IsClosed())
         return polygon
@@ -264,4 +275,52 @@ def pairwise(iterable):
     next(b, None)
     return zip(a, itertools.chain(b, [iterable[0]]))
 
-# dist_to_segment_squared((2, 1), (-200, 0), (1, 0))
+
+def project_face(face: cq.Face, projection_dir=(0, 0, 1)) -> cq.Face:
+    """
+    Based on CQ SVG export function, thanks to adam-urbanczyk.
+    """
+
+    hlr = HLRBRep_Algo()
+    hlr.Add(face.wrapped)
+
+    projector = HLRAlgo_Projector(gp_Ax2(gp_Pnt(), gp_Dir(*projection_dir)))
+
+    hlr.Projector(projector)
+    hlr.ShowAll()
+    hlr.Update()
+    hlr.Hide()
+
+    hlr_shapes = HLRBRep_HLRToShape(hlr)
+
+    visible_shapes = []
+
+    # VCompound contains the hard edges
+    # Rg1LineVCompound contains soft edges
+    # * Not interested
+    # OutLineVCompound contains outline edges
+    # * These are not edges on the original shape but edges created by the projection
+
+    visible_edges = hlr_shapes.VCompound()
+    if not visible_edges.IsNull():
+        visible_shapes.append(visible_edges)
+
+    visible_outlines = hlr_shapes.OutLineVCompound()
+    if not visible_outlines.IsNull():
+        visible_shapes.append(visible_outlines)
+
+    # Fix the underlying geometry - otherwise we will get segfaults
+    for el in visible_shapes:
+        BRepLib.BuildCurves3d_s(el, TOLERANCE)
+
+    # convert to native CQ objects
+    visible_shapes = list(map(cq.Shape, visible_shapes))
+    visible_wires = cq.Wire.combine(visible_shapes)
+
+    # Calculate Area for each wire and use the biggest as the outer wire of the final result
+    wires_with_area = [(cq.Face.makeFromWires(wire).Area(), wire) for wire in visible_wires]
+    wires_with_area.sort(key=lambda v: v[0], reverse=True)
+
+    wires = [wire for (_, wire) in wires_with_area]
+
+    return cq.Face.makeFromWires(wires[0], wires[1:])

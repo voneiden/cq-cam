@@ -37,8 +37,11 @@ def visualize_task(job: Job, task: Task):
             # cy = command.end.y
             # cz = command.end.z
 
+            # New viz method coords are in world
             world_start = root_plane.toWorldCoords((start.x, start.y, start.z))
             world_end = root_plane.toWorldCoords((end.x, end.y, end.z))
+            #world_start = start
+            #world_end = end
             if isinstance(command, Circular):
 
                 # W

@@ -1,6 +1,6 @@
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import List, Union, Optional, Tuple, Dict
+from typing import List, Union, Optional, Tuple, Dict, TypeVar
 
 import numpy as np
 from OCP.BRepFeat import BRepFeat
@@ -10,7 +10,7 @@ from cadquery import cq
 from cq_cam.commands.base_command import Unit
 from cq_cam.commands.command import Rapid, Cut, Plunge
 from cq_cam.job import Job
-from cq_cam.operations.base_operation import Task
+from cq_cam.operations.base_operation import Task, FaceBaseOperation
 from cq_cam.operations.mixin_operation import PlaneValidationMixin, ObjectsValidationMixin
 from cq_cam.utils.linked_polygon import LinkedPolygon
 from cq_cam.utils.utils import WireClipper, flatten_list, pairwise, \
@@ -18,53 +18,22 @@ from cq_cam.utils.utils import WireClipper, flatten_list, pairwise, \
 from cq_cam.visualize import visualize_task
 
 
+
 @dataclass
-class Pocket(PlaneValidationMixin, ObjectsValidationMixin, Task):
+class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
     """ 2.5D Pocket operation
 
     All faces involved must be planes and parallel.
     """
 
-    faces: List[cq.Face]
-    """ List of faces to operate on"""
-
-    avoid: Optional[List[cq.Face]]
-    """ [INOP] List of faces that the tool may not enter. This option
-    can be relevant when using an `outer_boundary_offset` that
-    would otherwise cause the tool to enter features you do
-    not want to cut."""
-
-    tool_diameter: float
-    """ Diameter of the tool that will be used to perform the operation.
-    """
-
-    stepover: float = 0.8
-    """ Stepover (cut width) as a fraction of tool diameter (0..1]. 
-    For example a value of 0.5 means the operation tries to use 
-    50% of the tool width."""
-
-    outer_boundary_stepover: float = -1
-    """ Typically -1 for closed pockets and 0 for open pockets.
-    Setting `avoid` is generally necessary when doing open pockets.
-    """
-
-    inner_boundary_stepover: float = 1
-    """ Typically 1 for any kind of pocket.  """
-
-    boundary_final_pass_stepover: Union[float, None] = None
-    """ Stepover for a final boundary (profile) pass.
-    """
-
-    stepdown: Union[float, None] = None
-    """ Maximum distance to step down on each pass 
-    """
 
     # todo angle
 
     def __post_init__(self):
+        # Give each face an ID
         faces = [(i, face.copy()) for i, face in enumerate(self.faces)]
         features, coplanar_faces, depth_info = self._discover_pocket_features(faces)
-        groups = self._group_faces_by_features(features, faces)
+        groups = self._group_faces_by_features(features, coplanar_faces)
 
         for group_faces in groups.values():
             boundaries = self._boundaries_by_group(group_faces, coplanar_faces, depth_info)
@@ -78,6 +47,7 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, Task):
         groups = defaultdict(lambda: [])
         for feature in features:
             for i, face in remaining[:]:
+                # IsInside_s works regardless the faces are co-planar
                 if feat.IsInside_s(face.wrapped, feature.wrapped):
                     groups[feature].append((i, face))
                     remaining.remove((i, face))
@@ -86,7 +56,7 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, Task):
         return groups
 
     def _discover_pocket_features(self, faces: List[Tuple[int, cq.Face]]):
-
+        """ Given a list of faces, creates fused feature faces and returns depth information """
         # Move everything on the same plane
         coplanar_faces = []
         job_zdir = self.job.workplane.plane.zDir
@@ -107,6 +77,9 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, Task):
 
     @staticmethod
     def _combine_coplanar_faces(faces: List[cq.Face]) -> List[cq.Face]:
+        """ Given a list of (coplanar) faces, fuse them together to form
+         bigger faces """
+
         # This works also as a sanity check as it will
         # raise if the faces are not coplanar
         wp = cq.Workplane().add(faces).combine()
@@ -137,27 +110,29 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, Task):
             current_depth = face_depth
         return boundaries
 
+    def _generate_depths(self, start_depth: float, end_depth: float):
+        if self.stepdown:
+            depths = list(np.arange(start_depth - self.stepdown, end_depth, -self.stepdown))
+            if depths[-1] != end_depth:
+                depths.append(end_depth)
+            return depths
+        else:
+            return [end_depth]
+
+
+
     def process_boundary(self, face: cq.Face, start_depth: float, end_depth: float):
         # TODO break this function down into easily testable sections
         # Perform validations
         self.validate_face_plane(face)
         face_workplane = cq.Workplane(obj=face)
         self.validate_plane(self.job, face_workplane)
-        # bottom_height = plane_offset_distance(self.job.workplane.plane, face_workplane.workplane().plane)
-        #bottom_height = -end_depth
-
-        if self.stepdown:
-            depths = list(np.arange(start_depth - self.stepdown, end_depth, -self.stepdown))
-            if depths[-1] != end_depth:
-                depths.append(end_depth)
-        else:
-            depths = [end_depth]
 
         # Prepare profile paths
         job_plane = self.job.workplane.plane
         tool_radius = self.tool_diameter / 2
-        outer_wire_offset = tool_radius * self.outer_boundary_stepover
-        inner_wire_offset = tool_radius * self.inner_boundary_stepover
+        outer_wire_offset = tool_radius * self.outer_boundary_offset
+        inner_wire_offset = tool_radius * self.inner_boundary_offset
 
         # These are the profile paths. They are done very last as a finishing pass
         outer_profiles = face.outerWire().offset2D(outer_wire_offset)
@@ -198,73 +173,17 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, Task):
 
         scanlines = clipper.execute()
 
-        # Do a mapping of scanpoints to scanlines
-        scanpoint_to_scanline = {}
-        scanpoints = []
-        for scanline in scanlines:
-            sp1, sp2 = scanline
-            scanpoint_to_scanline[sp1] = scanline
-            scanpoint_to_scanline[sp2] = scanline
-            scanpoints.append(sp1)
-            scanpoints.append(sp2)
+        scanpoint_to_scanline, scanpoints = self._scanline_end_map(scanlines)
 
-        # Link scanpoints to the boundary regions
-        remaining_scanpoints = scanpoints[:]
-        scanpoint_to_polynode = {}
-        linked_polygons = []
-        for polygon in outer_polygons + inner_polygons:
-            linked_polygon = LinkedPolygon(polygon[:])
-            linked_polygons.append(linked_polygon)
-            for p1, p2 in pairwise(polygon):
-                for scanpoint in remaining_scanpoints[:]:
-                    d = dist_to_segment_squared(scanpoint, p1, p2)
-                    # Todo pick a good number. Tests show values between 1.83e-19 and 1.38e-21
-                    if d < 0.0000001:
-                        remaining_scanpoints.remove(scanpoint)
-                        linked_polygon.link_point(scanpoint, p1, p2)
-                        scanpoint_to_polynode[scanpoint] = linked_polygon
+        linked_polygons, scanpoint_to_linked_polygon = self._link_scanpoints_to_boundaries(
+            scanpoints, outer_polygons + inner_polygons)
 
-        assert not remaining_scanpoints
+        cut_sequences = self._route_zig_zag(linked_polygons,
+                                            scanlines,
+                                            scanpoint_to_linked_polygon,
+                                            scanpoint_to_scanline)
 
-        # Prepare to route the zigzag
-        for linked_polygon in linked_polygons:
-            linked_polygon.reset()
-
-        scanlines = list(scanlines)
-
-        # Pick a starting position. Clipper makes no guarantees about the orientation
-        # of polylines it returns, so figure the top left scanpoint as the
-        # starting position.
-        starting_scanline = scanlines.pop(0)
-        start_position, cut_position = starting_scanline
-        if start_position[0] > cut_position[0]:
-            start_position, cut_position = cut_position, start_position
-
-        scanpoint_to_polynode[start_position].drop(start_position)
-        cut_sequence = [start_position, cut_position]
-        cut_sequences = []
-
-        # Primary routing loop
-        while scanlines:
-            linked_polygon = scanpoint_to_polynode[cut_position]
-            path = linked_polygon.nearest_linked(cut_position)
-            if path is None:
-                cut_sequences.append(cut_sequence)
-                # TODO some optimization potential in picking the nearest scanpoint
-                start_position, cut_position = scanlines.pop(0)
-                # TODO some optimization potential in picking a direction
-                cut_sequence = [start_position, cut_position]
-                continue
-
-            cut_sequence += path
-            scanline = scanpoint_to_scanline[path[-1]]
-            cut_sequence.append(scanline[1] if scanline[0] == path[-1] else scanline[0])
-            cut_position = cut_sequence[-1]
-            scanlines.remove(scanline)
-
-        cut_sequences.append(cut_sequence)
-
-        for i, depth in enumerate(depths):
+        for i, depth in enumerate(self._generate_depths(start_depth, end_depth)):
             for cut_sequence in cut_sequences:
                 cut_start = cut_sequence[0]
                 self.commands.append(Rapid(None, None, self.clearance_height))
