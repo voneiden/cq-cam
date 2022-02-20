@@ -28,7 +28,11 @@ from cq_cam.visualize import visualize_task
 
 @dataclass
 class Surface3D(FaceBaseOperation):
-    tool: ocl.MillingCutter = None
+    tool: ocl.MillingCutter = ocl.CylCutter(3.175, 15)
+
+    @property
+    def _tool_diameter(self) -> float:
+        return self.tool.getDiameter()
 
     def __post_init__(self):
         """
@@ -68,7 +72,7 @@ class Surface3D(FaceBaseOperation):
             max_bounds = clipper.max_bounds()
 
             # Generate ZigZag scanlines
-            y_scanpoints = list(np.arange(max_bounds['bottom'], max_bounds['top'], self.tool_diameter * self.stepover))
+            y_scanpoints = list(np.arange(max_bounds['bottom'], max_bounds['top'], self._tool_diameter * self.stepover))
             scanline_templates = [((max_bounds['left'], y), (max_bounds['right'], y)) for y in y_scanpoints]
 
             for scanline_template in scanline_templates:
@@ -120,10 +124,8 @@ class Surface3D(FaceBaseOperation):
 
             # TODO add post optimization for the moves (detect linear sequences)
 
-            cutter = ocl.CylCutter(self.tool_diameter, 100)
-
             op = ocl.BatchDropCutter()
-            op.setCutter(cutter)
+            op.setCutter(self.tool)
             for cl_point in cl_points:
                 op.appendPoint(cl_point)
             op.setSTL(stl_surf)
@@ -253,7 +255,7 @@ def demo():
 
     faces = wp.faces('(not +X) and (not -X) and (not -Y) and (not +Y) and (not -Z)')
     op = Surface3D(job=job, clearance_height=2, top_height=0, faces=faces.objects, tool=ocl.CylCutter(3.175, 10),
-                   avoid=[], tool_diameter=3.175)
+                   avoid=[])
 
     toolpath = visualize_task(job, op)
     show_object(wp, 'part')

@@ -1,4 +1,4 @@
-from abc import ABC
+from abc import ABC, abstractproperty, abstractmethod
 from dataclasses import dataclass, field
 from typing import List, Union, Optional, Tuple, Dict
 
@@ -103,10 +103,6 @@ class FaceBaseOperation(Task, ABC):
     would otherwise cause the tool to enter features you do
     not want to cut."""
 
-    tool_diameter: float
-    """ Diameter of the tool that will be used to perform the operation.
-    """
-
     stepover: float = 0.8
     """ Stepover (cut width) as a fraction of tool diameter (0..1]. 
     For example a value of 0.5 means the operation tries to use 
@@ -134,11 +130,16 @@ class FaceBaseOperation(Task, ABC):
     """ Maximum distance to step down on each pass 
     """
 
+    @property
+    @abstractmethod
+    def _tool_diameter(self) -> float:
+        pass
+
     def offset_boundary(self, boundary: cq.Face) -> List[cq.Face]:
         assert boundary.geomType() in ("PLANE", "CIRCLE")
 
-        outer_offset = self.tool_diameter * self.outer_boundary_offset
-        inner_offset = self.tool_diameter * self.inner_boundary_offset
+        outer_offset = self._tool_diameter * self.outer_boundary_offset
+        inner_offset = self._tool_diameter * self.inner_boundary_offset
 
         outer_wires = boundary.outerWire().offset2D(outer_offset)
         inner_wires = [] if inner_offset is None else flatten_list(

@@ -24,8 +24,15 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
     All faces involved must be planes and parallel.
     """
 
+    tool_diameter: float = 3.175
+    """ Diameter of the tool that will be used to perform the operation.
+    """
 
-    # todo angle
+    # TODO rotation angle for zigzag
+
+    @property
+    def _tool_diameter(self) -> float:
+        return self.tool_diameter
 
     def __post_init__(self):
         # Give each face an ID
@@ -128,7 +135,7 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
 
         # Prepare profile paths
         job_plane = self.job.workplane.plane
-        tool_radius = self.tool_diameter / 2
+        tool_radius = self._tool_diameter / 2
         outer_wire_offset = tool_radius * self.outer_boundary_offset
         inner_wire_offset = tool_radius * self.inner_boundary_offset
 
@@ -163,7 +170,7 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
         max_bounds = clipper.max_bounds()
 
         # Generate ZigZag scanlines
-        y_scanpoints = list(np.arange(max_bounds['bottom'], max_bounds['top'], self.tool_diameter * self.stepover))
+        y_scanpoints = list(np.arange(max_bounds['bottom'], max_bounds['top'], self._tool_diameter * self.stepover))
         scanline_templates = [((max_bounds['left'], y), (max_bounds['right'], y)) for y in y_scanpoints]
 
         for scanline_template in scanline_templates:
