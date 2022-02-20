@@ -24,9 +24,9 @@ class ProfileTest(unittest.TestCase):
         """
         box = cq.Workplane().box(10, 10, 10)
         box_top = box.faces('<Z').workplane()
-
+        self.maxDiff = None
         job = Job(workplane=box_top, feed=300, plunge_feed=50, unit=Unit.METRIC, rapid_height=10)
-        profile = Profile(job=job, clearance_height=5, top_height=0, face=box.faces('>Z'), offset=4, stepdown=-7.5)
+        profile = Profile(job=job, clearance_height=5, top_height=0, faces=box.faces('>Z').objects, tool_diameter=4, stepdown=-7.5)
         make_three_point_arc = Edge.makeThreePointArc
         geom_cartesian_point = Geom_CartesianPoint
         with patch('cq_cam.visualize.Edge.makeThreePointArc',

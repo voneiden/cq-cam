@@ -33,6 +33,7 @@ def wire_to_command_sequence(wire: cq.Wire, plane: cq.Plane) -> 'CommandSequence
     sequence_end = orient_vector(end_point(ordered_edges[-1]), plane)
 
     for edge in ordered_edges:
+        # TODO refactor the use of orient_vector to shapeTransform
         command_end = orient_vector(end_point(edge), plane)
         if edge.geomType() == "LINE":
             commands.append(Cut(command_end.x, command_end.y, None))

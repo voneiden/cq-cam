@@ -1,6 +1,7 @@
 from cadquery import cq
 
-from cq_cam.operations.base_operation import Unit, Job
+from cq_cam.commands.base_command import Unit
+from cq_cam.operations.base_operation import Job
 from cq_cam.operations.profile import Profile
 from cq_cam.visualize import visualize_task
 
@@ -11,7 +12,7 @@ box = cq.Workplane().box(10, 10, 10)
 box_top = box.faces('<X').workplane()
 
 job = Job(workplane=box_top, feed=300, plunge_feed=50, unit=Unit.METRIC, rapid_height=10)
-profile = Profile(job=job, clearance_height=5, top_height=0, face=box.faces('>X'), offset=4, stepdown=-2.77)
+profile = Profile(job=job, clearance_height=5, top_height=0, faces=box.faces('>X').objects, outer_offset=4, stepdown=-2.77)
 
 print(job.to_gcode())
 
