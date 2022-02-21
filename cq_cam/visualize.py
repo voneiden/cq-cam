@@ -57,13 +57,25 @@ def visualize_task(job: Job, task: Task):
                     #        .moveTo(start.x, start.y)
                     #        .radiusArc((end.x, end.y), radius)
                     # )
+                    if world_start == world_end:
+                        # TODO this will blow up circles that are not flat in world coodinates
+                        ijk = cq.Vector(command.ijk)
+                        assert ijk.Length > 0
+                        center = start + ijk
+                        world_center = root_plane.toWorldCoords((center.x, center.y, center.z))
+                        circle = Edge.makeCircle(ijk.Length, world_center)
+                        line = AIS_Shape(circle.wrapped)
 
-                    arc = Edge.makeThreePointArc(world_start,
-                                                 root_plane.toWorldCoords((midpoint.x, midpoint.y, midpoint.z)),
-                                                 world_end)
-                    # line = AIS_Shape(wp.objects[0].wrapped)
-                    line = AIS_Shape(arc.wrapped)
+                    else:
+                        arc = Edge.makeThreePointArc(world_start,
+                                                     root_plane.toWorldCoords((midpoint.x, midpoint.y, midpoint.z)),
+                                                     world_end)
+                        # line = AIS_Shape(wp.objects[0].wrapped)
+                        line = AIS_Shape(arc.wrapped)
                 except:
+                    if world_start == world_end:
+                        logger.warning("encountered zero length")
+                        continue
                     line = AIS_Line(
                         Geom_CartesianPoint(world_start.x, world_start.y, world_start.z),
                         Geom_CartesianPoint(world_end.x, world_end.y, world_end.z)

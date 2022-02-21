@@ -7,6 +7,7 @@ from typing import Union, TYPE_CHECKING, List, Optional, Tuple
 
 from cadquery import cq
 
+
 from cq_cam.commands.util_command import same_to_none, vector_same_to_none, equal_within_tolerance, \
     normalize
 
@@ -40,8 +41,20 @@ class CommandSequence:
     def is_clockwise(self):
         """ Only works on sequences that form a simple polygon! """
         # TODO implement logic for circles or some other weird stuff
+
+        if len(self.commands) == 1:
+            from cq_cam.commands.command import CircularCW, CircularCCW
+            cmd = self.commands[0]
+
+            if isinstance(cmd, CircularCW):
+                return True
+            elif isinstance(cmd, CircularCCW):
+                return False
+            else:
+                raise NotImplementedError('Unable to determine if path is clockwise')
+
         if len(self.commands) < 3:
-            raise NotImplemented
+            raise NotImplementedError('Unable to determine if path is clockwise')
 
         # Find the smallest y, biggest x
         # https://stackoverflow.com/questions/1165647/how-to-determine-if-a-list-of-polygon-points-are-in-clockwise-order/1180256#1180256
