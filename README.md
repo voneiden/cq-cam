@@ -4,6 +4,14 @@ CQ-CAM
 CQ-CAM aims to become a free, parametric CAM solution for
 3-axis CNC mills closely integrating with CadQuery. 
 
+Requirements
+---
+
+* Visualization: cq-editor=master=py3.10
+* 3D toolpaths: opencamlib=2019.07
+* Python packages in requirements.txt
+
+
 Contributions
 ---
 Feedback is welcome, but please no spontaneous code contributions.

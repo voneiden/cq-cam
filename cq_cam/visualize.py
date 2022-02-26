@@ -72,7 +72,8 @@ def visualize_task(job: Job, task: Task):
                                                      world_end)
                         # line = AIS_Shape(wp.objects[0].wrapped)
                         line = AIS_Shape(arc.wrapped)
-                except:
+                except Exception as ex:
+                    logger.error("Failed circular render", ex)
                     if world_start == world_end:
                         logger.warning("encountered zero length")
                         continue

@@ -17,14 +17,14 @@ from cq_cam.utils.utils import WireClipper, flatten_list
 from cq_cam.visualize import visualize_task
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
     """ 2.5D Pocket operation
 
     All faces involved must be planes and parallel.
     """
 
-    tool_diameter: float = 3.175
+    tool_diameter: float
     """ Diameter of the tool that will be used to perform the operation.
     """
 
@@ -224,7 +224,7 @@ def demo():
     # obj = op_plane.workplane().rect(2, 2).extrude(4)
 
     job = Job(job_plane, 300, 100, Unit.METRIC, 5)
-    op = Pocket(job, 2, 0, test.objects, None, 1, 0.33, stepdown=1)
+    op = Pocket(job=job, clearance_height=2, faces=test.objects, stepdown=1, tool_diameter=3.175)
 
     toolpath = visualize_task(job, op)
     print(op.to_gcode())

@@ -21,7 +21,7 @@ Scanpoint = Tuple[float, float]
 Scanline = List[Scanpoint]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Task(ABC):
     job: Job
     """ The `Job` which this task belongs to.
@@ -36,7 +36,7 @@ class Task(ABC):
     Note: A task may perform rapids still at lower depths if it deems safe to do so. 
     """
 
-    top_height: float
+    top_height: float = 0
     """ Height of cut layer (relative to `Job` surface).
     """
 
@@ -89,7 +89,7 @@ class Task(ABC):
         return [face.transformShape(matrix) for face in faces]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FaceBaseOperation(Task, ABC):
     """ Base class for any operation that operates primarily on face(s)
     """
@@ -97,7 +97,7 @@ class FaceBaseOperation(Task, ABC):
     faces: List[cq.Face]
     """ List of faces to operate on"""
 
-    avoid: Optional[List[cq.Face]]
+    avoid: Optional[List[cq.Face]] = None
     """ [INOP] List of faces that the tool may not enter. This option
     can be relevant when using an `outer_boundary_offset` that
     would otherwise cause the tool to enter features you do
