@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 class Rapid(EndData, MotionCommand):
     def to_gcode(self, previous_command: Union[Command, None], start: cq.Vector, job: Job) -> Tuple[str, cq.Vector]:
-        if isinstance(previous_command, Rapid):
+        if isinstance(previous_command, Rapid) or isinstance(previous_command, Retract):
             return self.diff(start, job)
         else:
             diff, end = self.diff(start, job)
@@ -73,3 +73,14 @@ class Plunge(Linear):
             start.y,
             self.z if self.z else start.z
         )
+
+
+@dataclass
+class Retract(Plunge):
+    """ Rapid retract """
+    def to_gcode(self, previous_command: Union[Command, None], start: cq.Vector, job: Job) -> Tuple[str, cq.Vector]:
+        if isinstance(previous_command, Rapid) or isinstance(previous_command, Retract):
+            return self.diff(start, job)
+        else:
+            diff, end = self.diff(start, job)
+            return f"G0{diff}", end

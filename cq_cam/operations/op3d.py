@@ -131,19 +131,36 @@ class Surface3D(FaceBaseOperation):
             op.setSTL(stl_surf)
             op.run()
 
+            # Merge bottom height data
             result_points = [cl_point_to_tuple(point) for point in op.getCLPoints()]
-            tmp_i = 0
-            for i, depth in enumerate([bb.zmin]):
-                for cut_sequence in interpolated_cut_sequences:
+            i = 0
+            for cut_sequence in interpolated_cut_sequences:
+                for j, point in enumerate(cut_sequence):
+                    cut_sequence[j] = (*point, result_points[i][2])
+                    i += 1
+
+            bottom_height = bb.zmin
+            if self.stepdown:
+                depths = list(np.arange(self.top_height + self.stepdown, bottom_height, self.stepdown))
+                if depths[-1] != bottom_height:
+                    depths.append(bottom_height)
+            else:
+                depths = [bottom_height]
+
+            for i, depth in enumerate(depths):
+                last_depth = depths[i-1] if i > 0 else 0
+                depth_cut_sequences = self._chop_sequences_by_depth(interpolated_cut_sequences, last_depth)
+                # TODO optimize order of cut sequences to minimize rapid distances
+                # note to self: in zigzag, I guess maintaining the order is the best bet
+                # TODO if there is a new cut sequence within radius of max_step then use it without retracting
+                for cut_sequence in depth_cut_sequences:
                     cut_start = cut_sequence[0]
                     self.commands.append(Rapid(None, None, self.clearance_height))
-                    self.commands.append(Rapid(*cut_start, result_points[tmp_i][2]))
+                    self.commands.append(Rapid(cut_start[0], cut_start[1], None))
                     self.commands.append(Rapid(None, None, self.top_height))  # TODO plunge or rapid?
-                    self.commands.append(Plunge(depth))
-                    tmp_i += 1
+                    self.commands.append(Plunge(cut_start[2]))
                     for cut in cut_sequence[1:]:
-                        self.commands.append(Cut(*cut, result_points[tmp_i][2]))
-                        tmp_i += 1
+                        self.commands.append(Cut(cut[0], cut[1], max(depth, cut[2])))
 
         for i, base_boundary in enumerate(base_boundaries):
             show_object(base_boundary, f'base_boundary-{i}')
@@ -185,6 +202,22 @@ class Surface3D(FaceBaseOperation):
             explorer.Next()
 
         return triangles
+
+    @staticmethod
+    def _chop_sequences_by_depth(sequences: List[List[Tuple[float, float, float]]], last_depth: float):
+        new_sequences = []
+        for sequence in sequences:
+            new_sequence = []
+            for point in sequence:
+                if point[2] > last_depth:
+                    if new_sequence:
+                        new_sequences.append(new_sequence)
+                        new_sequence = []
+                else:
+                    new_sequence.append(point)
+            if new_sequence:
+                new_sequences.append(new_sequence)
+        return new_sequences
 
 
 def point_to_tuple(point: gp_Pnt) -> Tuple[float, float, float]:
@@ -254,8 +287,8 @@ def demo():
               rapid_height=10)
 
     faces = wp.faces('(not +X) and (not -X) and (not -Y) and (not +Y) and (not -Z)')
-    op = Surface3D(job=job, clearance_height=2, top_height=0, faces=faces.objects, tool=ocl.CylCutter(3.175, 10),
-                   avoid=[])
+    op = Surface3D(job=job, clearance_height=2, top_height=0, wp=faces, tool=ocl.CylCutter(3.175, 10),
+                   avoid=None, stepdown=-5)
 
     toolpath = visualize_task(job, op)
     show_object(wp, 'part')

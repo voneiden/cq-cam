@@ -150,6 +150,8 @@ class FaceBaseOperation(Task, ABC):
         if not faces:
             raise OperationError(f'{name} selection must contain at least one face or wire')
 
+        return faces
+
     @property
     def _faces(self):
         return self._wp_to_faces('wp', self.wp)

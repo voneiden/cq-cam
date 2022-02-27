@@ -102,7 +102,7 @@ class Command(ABC):
 
 class MotionCommand(Command, ABC):
     def flip(self, new_end: cq.Vector) -> (Command, cq.Vector):
-        from cq_cam.commands.command import Cut, Plunge
+        from cq_cam.commands.command import Cut, Plunge, Retract
 
         # This is a bit hard to conceptualize
         # "new_end" is the old start (so it's the previous)
@@ -113,7 +113,7 @@ class MotionCommand(Command, ABC):
         if x_eq and y_eq:
             # Going up, use Cut
             if new_end.z > new_start.z:
-                return Cut(None, None, same_to_none(new_end.z, new_start.z)), new_start
+                return Retract(same_to_none(new_end.z, new_start.z)), new_start
                 # Going down, use Plunge
             else:
                 return Plunge(same_to_none(new_end.z, new_start.z)), new_start
