@@ -20,8 +20,12 @@ logger = logging.getLogger(__name__)
 @dataclass
 class Profile(PlaneValidationMixin, ObjectsValidationMixin, Task):
     """
-    Create a profiles based on wires and faces
+    Create a profiles based on selected wires and faces in a Workplane.
+    """
 
+    wp: cq.Workplane = None
+    """ The cadquery Workplane containing faces and/or
+    wires that the profile will operate on. 
     """
     wires: List[cq.Wire] = field(default_factory=list)
     """ List of wires to profile
@@ -38,7 +42,7 @@ class Profile(PlaneValidationMixin, ObjectsValidationMixin, Task):
 
     tool_diameter: float = 3.175
 
-    outer_offset: Optional[float] = 1
+    face_offset_outer: Optional[float] = 1
     """ Offset is in multiples of tool diameter
       * -1 for closed pockets and inside profiles
       * 0 for open pockets
@@ -48,39 +52,45 @@ class Profile(PlaneValidationMixin, ObjectsValidationMixin, Task):
     given to the operation.
     """
 
-    inner_offset: Optional[float] = None
+    face_offset_inner: Optional[float] = None
     """ See `outer_offset`  """
 
-    def __post_init__(self):
-        if not self.faces and not self.wires:
-            raise OperationError("At least one face or wire must be defined")
+    wire_offset: Optional[float] = 1
 
-        faces = [self.faces] if isinstance(self.faces, cq.Face) else self.faces
-        wires = [self.wires] if isinstance(self.wires, cq.Wire) else self.wires
+    def __post_init__(self):
+        if not self.wp:
+            raise OperationError("wp must be defined")
+
+        faces: List[cq.Face] = []
+        wires: List[cq.Wire] = []
+        for obj in self.wp.objects:
+            if isinstance(obj, cq.Face):
+                faces.append(obj)
+            elif isinstance(obj, cq.Wire):
+                wires.append(obj)
+            else:
+                raise OperationError(f'Object type "{type(obj)}" not supported by Profile operation')
+
+        if not faces and not wires:
+            raise OperationError('wp selection must contain at least one face or wire')
 
         for face in faces:
-            if isinstance(face, cq.Face):
-                if self.outer_offset is None and self.inner_offset is None:
-                    raise OperationError("Define at least one of 'outer_boundary_offset' and 'inner_boundary_offset'")
+            if self.face_offset_outer is None and self.face_offset_inner is None:
+                raise OperationError("Define at least one of 'face_offset_outer' and 'face_offset_inner'")
 
-                if self.outer_offset is not None:
-                    self.profile(face.outerWire(), self.outer_offset * self.tool_diameter)
-                if self.inner_offset is not None:
-                    inner_wires = face.innerWires()
-                    if not inner_wires:
-                        logger.warning("Face had no innerWires but inner_boundary_offset was set")
-                    for wire in inner_wires:
-                        self.profile(wire, self.inner_offset * self.tool_diameter)
-            else:
-                raise OperationError("'faces' may only contain cq.Face objects")
+            if self.face_offset_outer is not None:
+                self.profile(face.outerWire(), self.face_offset_outer * self.tool_diameter)
+            if self.face_offset_inner is not None:
+                inner_wires = face.innerWires()
+                if not inner_wires:
+                    logger.warning("Face had no innerWires but inner_boundary_offset was set")
+                for wire in inner_wires:
+                    self.profile(wire, self.face_offset_inner * self.tool_diameter)
 
         for wire in wires:
-            if isinstance(wire, cq.Wire):
-                if self.outer_offset is None:
-                    raise OperationError("'outer_offset' must be defined when profiling wires")
-                self.profile(wire, self.outer_offset * self.tool_diameter)
-            else:
-                raise OperationError("'wires' may only contain cq.Wire objects")
+            if self.face_offset_outer is None:
+                raise OperationError("'wire_offset' must be defined when profiling wires")
+            self.profile(wire, self.wire_offset * self.tool_diameter)
 
     def profile(self, wire: cq.Wire, offset: float):
 

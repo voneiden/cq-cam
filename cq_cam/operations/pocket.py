@@ -24,7 +24,7 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
     All faces involved must be planes and parallel.
     """
 
-    tool_diameter: float
+    tool_diameter: float = 3.175
     """ Diameter of the tool that will be used to perform the operation.
     """
 
@@ -36,7 +36,7 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
 
     def __post_init__(self):
         # Give each face an ID
-        faces = [(i, face.copy()) for i, face in enumerate(self.faces)]
+        faces = [(i, face.copy()) for i, face in enumerate(self._faces)]
         features, coplanar_faces, depth_info = self._discover_pocket_features(faces)
         groups = self._group_faces_by_features(features, coplanar_faces)
 
@@ -220,22 +220,24 @@ def demo():
             .cutBlind(-6)
     )
     op_plane = obj.faces('>Z[1]')
-    test = obj.faces('>Z[-3] or >Z[-2] or >Z[-4]')
+    #test = obj.faces('>Z[-3] or >Z[-2] or >Z[-4]')
     # obj = op_plane.workplane().rect(2, 2).extrude(4)
 
     job = Job(job_plane, 300, 100, Unit.METRIC, 5)
-    op = Pocket(job=job, clearance_height=2, faces=test.objects, stepdown=1, tool_diameter=3.175)
+    op = Pocket(job=job, wp=op_plane, clearance_height=2, stepdown=1, tool_diameter=0.5)
 
     toolpath = visualize_task(job, op)
     print(op.to_gcode())
 
     show_object(obj)
+    show_object(cq.Workplane().box(15, 15, 10).faces('>Z'), 'job')
+    show_object(op_plane, 'op')
     # show_object(op_plane)
     show_object(toolpath, 'g')
     # for w in op._wires:
     #    show_object(w)
 
-    show_object(test, 'test')
+    #show_object(test, 'test')
 
 
 if 'show_object' in locals() or __name__ == '__main__':

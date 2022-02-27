@@ -21,7 +21,7 @@ Scanpoint = Tuple[float, float]
 Scanline = List[Scanpoint]
 
 
-@dataclass(kw_only=True)
+@dataclass
 class Task(ABC):
     job: Job
     """ The `Job` which this task belongs to.
@@ -31,12 +31,12 @@ class Task(ABC):
     """List of commands that this task wants to perform.
     """
 
-    clearance_height: float
+    clearance_height: float = field(default=20, kw_only=True)
     """ Safe height for rapids inside the task (relative to `Job` surface).
     Note: A task may perform rapids still at lower depths if it deems safe to do so. 
     """
 
-    top_height: float = 0
+    top_height: float = field(default=0, kw_only=True)
     """ Height of cut layer (relative to `Job` surface).
     """
 
@@ -89,15 +89,17 @@ class Task(ABC):
         return [face.transformShape(matrix) for face in faces]
 
 
-@dataclass(kw_only=True)
+@dataclass
 class FaceBaseOperation(Task, ABC):
     """ Base class for any operation that operates primarily on face(s)
     """
 
-    faces: List[cq.Face]
-    """ List of faces to operate on"""
+    wp: cq.Workplane = None
+    """ The cadquery Workplane containing faces and/or
+    wires that the profile will operate on. 
+    """
 
-    avoid: Optional[List[cq.Face]] = None
+    avoid: Optional[cq.Workplane] = None
     """ [INOP] List of faces that the tool may not enter. This option
     can be relevant when using an `outer_boundary_offset` that
     would otherwise cause the tool to enter features you do
@@ -134,6 +136,27 @@ class FaceBaseOperation(Task, ABC):
     @abstractmethod
     def _tool_diameter(self) -> float:
         pass
+
+    def _wp_to_faces(self, name, wp):
+        faces: List[cq.Face] = []
+        for obj in self.wp.objects:
+            if isinstance(obj, cq.Face):
+                faces.append(obj)
+            elif isinstance(obj, cq.Wire):
+                faces.append(cq.Face.makeFromWires(obj))
+            else:
+                raise OperationError(f'Object type "{type(obj)}" not supported by a face operation')
+
+        if not faces:
+            raise OperationError(f'{name} selection must contain at least one face or wire')
+
+    @property
+    def _faces(self):
+        return self._wp_to_faces('wp', self.wp)
+
+    @property
+    def _avoid(self):
+        return self._wp_to_faces('avoid', self.avoid)
 
     def offset_boundary(self, boundary: cq.Face) -> List[cq.Face]:
         assert boundary.geomType() in ("PLANE", "CIRCLE")

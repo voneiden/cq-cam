@@ -46,7 +46,7 @@ class Surface3D(FaceBaseOperation):
         :return:
         """
 
-        faces = self.transform_shapes_to_global(self.faces)
+        faces = self.transform_shapes_to_global(self._faces)
         compound = cq.Workplane().add(faces).combine().objects[0]
         bb = compound.BoundingBox()
 

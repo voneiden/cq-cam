@@ -238,6 +238,7 @@ class WireClipper:
         return diagonal.Length
 
     def execute(self):
+        # TODO detect if there's nothing to do?
         polytree = self._clipper.Execute2(pyclipper.CT_INTERSECTION)
         paths = pyclipper.scale_from_clipper(pyclipper.PolyTreeToPaths(polytree))
 
