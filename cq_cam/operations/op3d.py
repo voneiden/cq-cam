@@ -21,6 +21,7 @@ from cq_cam.commands.base_command import Unit
 from cq_cam.commands.command import Rapid, Plunge, Cut
 from cq_cam.job import Job
 from cq_cam.operations.base_operation import FaceBaseOperation
+from cq_cam.operations.strategy import ZigZagStrategy
 from cq_cam.utils import utils
 from cq_cam.utils.utils import flatten_list, WireClipper
 from cq_cam.visualize import visualize_task
@@ -62,33 +63,8 @@ class Surface3D(FaceBaseOperation):
         for op_boundary in op_boundaries:
             outer_boundary = op_boundary.outerWire()
             inner_boundaries = op_boundary.innerWires()
-            clipper = WireClipper(cq.Workplane().plane)
-            outer_polygon = clipper.add_clip_wire(outer_boundary)
-            inner_polygons = []
-            for inner_boundary in inner_boundaries:
-                polygon = clipper.add_clip_wire(inner_boundary)
-                inner_polygons.append(polygon)
 
-            max_bounds = clipper.max_bounds()
-
-            # Generate ZigZag scanlines
-            y_scanpoints = list(np.arange(max_bounds['bottom'], max_bounds['top'], self._tool_diameter * self.stepover))
-            scanline_templates = [((max_bounds['left'], y), (max_bounds['right'], y)) for y in y_scanpoints]
-
-            for scanline_template in scanline_templates:
-                clipper.add_subject_polygon(scanline_template)
-
-            scanlines = clipper.execute()
-
-            scanpoint_to_scanline, scanpoints = self._scanline_end_map(scanlines)
-
-            linked_polygons, scanpoint_to_linked_polygon = self._link_scanpoints_to_boundaries(
-                scanpoints, [outer_polygon] + inner_polygons)
-
-            cut_sequences = self._route_zig_zag(linked_polygons,
-                                                scanlines,
-                                                scanpoint_to_linked_polygon,
-                                                scanpoint_to_scanline)
+            cut_sequences = ZigZagStrategy.process(self, [outer_boundary], inner_boundaries)
 
             # Get depths for
             max_step = 1
@@ -108,6 +84,9 @@ class Surface3D(FaceBaseOperation):
                     v1 = v2
                 return interpolated
 
+            # Note, this interpolation doesn't consider depth at all
+            # Ideally we'd have a point at every depth boundary  (TODO?)
+            # Should be kinda easy?
             interpolated_cut_sequences = [interpolate_cut_sequence(cut_sequence) for cut_sequence in cut_sequences]
             cl_points = []
             for cut_sequence in interpolated_cut_sequences:
@@ -148,8 +127,10 @@ class Surface3D(FaceBaseOperation):
                 depths = [bottom_height]
 
             for i, depth in enumerate(depths):
-                last_depth = depths[i-1] if i > 0 else 0
-                depth_cut_sequences = self._chop_sequences_by_depth(interpolated_cut_sequences, last_depth)
+
+                # We want to include i-2 - otherwise we get gaps between depths
+                last_last_depth = depths[i - 2] if i > 1 else 0
+                depth_cut_sequences = self._chop_sequences_by_depth(interpolated_cut_sequences, last_last_depth)
                 # TODO optimize order of cut sequences to minimize rapid distances
                 # note to self: in zigzag, I guess maintaining the order is the best bet
                 # TODO if there is a new cut sequence within radius of max_step then use it without retracting
@@ -247,35 +228,8 @@ def shape_to_triangles(shape: cq.Shape,
     return triangles
 
 
-box = cq.Workplane().box(10, 10, 10)
-face: cq.Face = box.faces('>Z').objects[0]
-
-triangles = shape_to_triangles(face)
-# print(triangles)
-# CL point should be below surface!
-clpoint = ocl.CLPoint(1, 1, -20)
-stl_surf = ocl.STLSurf()
-for triangle in triangles:
-    # print(triangle)
-    points = (ocl.Point(*vertex) for vertex in triangle)
-    tri = ocl.Triangle(*points)
-    stl_surf.addTriangle(tri)
-
-cutter = ocl.CylCutter(2, 10)
-
-op = ocl.BatchDropCutter()
-op.setCutter(cutter)
-op.appendPoint(clpoint)
-op.setSTL(stl_surf)
-
-
-# op.run()
-
 def cl_point_to_tuple(point: ocl.CLPoint) -> Tuple[float, float, float]:
     return point.x, point.y, point.z
-
-
-print("points", [cl_point_to_tuple(point) for point in op.getCLPoints()])
 
 
 def demo():
@@ -293,18 +247,6 @@ def demo():
     toolpath = visualize_task(job, op)
     show_object(wp, 'part')
     show_object(toolpath, 'toolpath')
-    # show_object(wp)
-    # show_object(faces)
-
-    # jobplane = wp.faces('>X').workplane()
-    ##boink = wp.objects[0].transformShape(jobplane.plane.fG)
-    # x = cq.Workplane(obj=wp.objects[0])
-    # x.plane = jobplane.plane.rotated((180, 0 ,0))
-    # show_object(wp, 'wp')
-    # f = wp.faces('>X')
-    # show_object(f, 'f')
-    # show_object(boink, 'boink')
-    # show_object(x, 'x')
 
 
 if 'show_object' in locals() or __name__ == '__main__':

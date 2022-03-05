@@ -237,11 +237,13 @@ class WireClipper:
         diagonal = top_left.sub(bottom_right)
         return diagonal.Length
 
-    def execute(self):
+    def execute(self) -> Tuple[Tuple[Tuple[float, float], Tuple[float, float]]]:
         # TODO detect if there's nothing to do?
         polytree = self._clipper.Execute2(pyclipper.CT_INTERSECTION)
+
         paths = pyclipper.scale_from_clipper(pyclipper.PolyTreeToPaths(polytree))
 
+        # noinspection PyTypeChecker
         return tuple(tuple(tuple(point) for point in path) for path in paths)
 
 

@@ -23,6 +23,7 @@ def wire_to_command_sequence(wire: cq.Wire, plane: cq.Plane) -> 'CommandSequence
     :param wire: wire to convert
     :return:
     """
+    print("wire_to_command_sequence is deprecated")
     from cq_cam.commands.base_command import CommandSequence
     from cq_cam.commands.command import Cut, CircularCW, CircularCCW
 
@@ -69,6 +70,62 @@ def wire_to_command_sequence(wire: cq.Wire, plane: cq.Plane) -> 'CommandSequence
 
     return CommandSequence(sequence_start, commands, sequence_end)
 
+
+
+def wire_to_command_sequence2(wire: cq.Wire) -> 'CommandSequence':
+    """
+    Convert a wire into ordered sequence of commands.
+
+    :param wire: wire to convert
+    :return:
+    """
+    from cq_cam.commands.base_command import CommandSequence
+    from cq_cam.commands.command import Cut, CircularCW, CircularCCW
+
+    ordered_edges = wire_to_ordered_edges(wire)
+    commands = []
+
+    sequence_start = start_point(ordered_edges[0])
+    sequence_end = end_point(ordered_edges[-1])
+
+    for edge in ordered_edges:
+        # TODO refactor the use of orient_vector to shapeTransform
+        command_end = end_point(edge)
+        if edge.geomType() == "LINE":
+            commands.append(Cut(command_end.x, command_end.y, None))
+
+        elif edge.geomType() in ["CIRCLE"]:
+            # TODO put some safe lower limit for arc length
+            # TODO support 3d arcs
+            # grbl for example can do completely unexpected things
+            # with tiny arcs
+            command_start = start_point(edge)
+            command_mid = edge.positionAt(0.5)
+            command_mid_relative = command_mid.sub(command_start)
+            command_center = edge.arcCenter()
+            # radius = abs(command_start.sub(command_center))
+            ijk = command_center.sub(command_start)
+
+            if command_start.x == command_end.x and command_start.y == command_end.y:
+                raise NotImplemented('Full circles are not implemented')
+
+            if is_arc_clockwise(command_start, command_mid, command_end):
+                commands.append(CircularCW(command_end.x, command_end.y, None, None, vector_to_tuple(ijk),
+                                           vector_to_tuple(command_mid_relative)))
+            else:
+                commands.append(CircularCCW(command_end.x, command_end.y, None, None, vector_to_tuple(ijk),
+                                            vector_to_tuple(command_mid_relative)))
+
+        elif edge.geomType() == 'ARC':
+            raise NotImplemented('ARC geom type is not implemented')
+
+        elif edge.geomType() == 'SPLINE':
+            raise NotImplemented('SPLINE geom type is not implemented')
+
+        else:
+            raise NotImplemented(f'Unknown geom type "{edge.geomType()}"')
+
+    return CommandSequence(sequence_start, commands, sequence_end)
 
 def same_to_none(result: float, compare: float) -> Optional[float]:
     if result == compare:

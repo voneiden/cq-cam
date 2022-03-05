@@ -13,6 +13,7 @@ from cq_cam.commands.command import Rapid, Cut, Plunge
 from cq_cam.job import Job
 from cq_cam.operations.base_operation import FaceBaseOperation
 from cq_cam.operations.mixin_operation import PlaneValidationMixin, ObjectsValidationMixin
+from cq_cam.operations.strategy import ZigZagStrategy, ContourStrategy
 from cq_cam.utils.utils import WireClipper, flatten_list
 from cq_cam.visualize import visualize_task
 
@@ -124,8 +125,6 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
         else:
             return [end_depth]
 
-
-
     def process_boundary(self, face: cq.Face, start_depth: float, end_depth: float):
         # TODO break this function down into easily testable sections
         # Perform validations
@@ -149,54 +148,35 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
         final_pass_offset = tool_radius * self.boundary_final_pass_stepover
 
         # Generate the primary clearing regions with stepover from the above profiles
-        outer_regions = flatten_list([wire.offset2D(-final_pass_offset) for wire in outer_profiles])
-        inner_regions = flatten_list([wire.offset2D(final_pass_offset) for wire in inner_profiles])
+        outer_boundaries = flatten_list([wire.offset2D(-final_pass_offset) for wire in outer_profiles])
+        inner_boundaries = flatten_list([wire.offset2D(final_pass_offset) for wire in inner_profiles])
 
-        # TODO: Scanline orientation
-        # Here we could rotate the regions so that we can keep the scanlines in standard XY plane
+        #cut_sequences = ZigZagStrategy.process(self, outer_boundaries, inner_boundaries)
+        show_object = lambda *args: 0
+        contour_strat = ContourStrategy.process(self, outer_boundaries, inner_boundaries, show_object)
+        contour_cut_sequences = ContourStrategy.flatten(contour_strat, self.job, show_object)
 
-        # Vectorize regions and prepare scanline clipper
-        clipper = WireClipper(job_plane)
-        outer_polygons = []
-        for outer_region in outer_regions:
-            polygon = clipper.add_clip_wire(outer_region)
-            outer_polygons.append(polygon)
 
-        inner_polygons = []
-        for inner_region in inner_regions:
-            polygon = clipper.add_clip_wire(inner_region)
-            inner_polygons.append(polygon)
-
-        max_bounds = clipper.max_bounds()
-
-        # Generate ZigZag scanlines
-        y_scanpoints = list(np.arange(max_bounds['bottom'], max_bounds['top'], self._tool_diameter * self.stepover))
-        scanline_templates = [((max_bounds['left'], y), (max_bounds['right'], y)) for y in y_scanpoints]
-
-        for scanline_template in scanline_templates:
-            clipper.add_subject_polygon(scanline_template)
-
-        scanlines = clipper.execute()
-
-        scanpoint_to_scanline, scanpoints = self._scanline_end_map(scanlines)
-
-        linked_polygons, scanpoint_to_linked_polygon = self._link_scanpoints_to_boundaries(
-            scanpoints, outer_polygons + inner_polygons)
-
-        cut_sequences = self._route_zig_zag(linked_polygons,
-                                            scanlines,
-                                            scanpoint_to_linked_polygon,
-                                            scanpoint_to_scanline)
+        #for i, depth in enumerate(self._generate_depths(start_depth, end_depth)):
+        #    for cut_sequence in cut_sequences:
+        #        cut_start = cut_sequence[0]
+        #        self.commands.append(Rapid(None, None, self.clearance_height))
+        #        self.commands.append(Rapid(*cut_start, None))
+        #        self.commands.append(Rapid(None, None, self.top_height))  # TODO plunge or rapid?
+        #        self.commands.append(Plunge(depth))
+        #        for cut in cut_sequence[1:]:
+        #            self.commands.append(Cut(*cut, None))
 
         for i, depth in enumerate(self._generate_depths(start_depth, end_depth)):
-            for cut_sequence in cut_sequences:
-                cut_start = cut_sequence[0]
+            for cut_sequence in contour_cut_sequences:
+                cut_start = cut_sequence.start
                 self.commands.append(Rapid(None, None, self.clearance_height))
-                self.commands.append(Rapid(*cut_start, None))
+                self.commands.append(Rapid(cut_start.x, cut_start.y, None))
                 self.commands.append(Rapid(None, None, self.top_height))  # TODO plunge or rapid?
                 self.commands.append(Plunge(depth))
-                for cut in cut_sequence[1:]:
-                    self.commands.append(Cut(*cut, None))
+                self.commands += cut_sequence.commands
+                #for cut in cut_sequence[1:]:
+                #    self.commands.append(Cut(*cut, None))
 
 
 def pick_other_scanline_end(scanline, scanpoint):
@@ -219,19 +199,19 @@ def demo():
             .rect(4, 2)
             .cutBlind(-6)
     )
-    op_plane = obj.faces('>Z[1]')
+    op_plane = obj.faces('>Z[1] or >Z[2]')
     #test = obj.faces('>Z[-3] or >Z[-2] or >Z[-4]')
     # obj = op_plane.workplane().rect(2, 2).extrude(4)
 
     job = Job(job_plane, 300, 100, Unit.METRIC, 5)
-    op = Pocket(job=job, wp=op_plane, clearance_height=2, stepdown=1, tool_diameter=0.5)
+    op = Pocket(job=job, wp=op_plane, clearance_height=2, stepdown=None, tool_diameter=0.5)
 
     toolpath = visualize_task(job, op)
     print(op.to_gcode())
 
     show_object(obj)
-    show_object(cq.Workplane().box(15, 15, 10).faces('>Z'), 'job')
-    show_object(op_plane, 'op')
+    #show_object(cq.Workplane().box(15, 15, 10).faces('>Z'), 'job')
+    #show_object(op_plane, 'op')
     # show_object(op_plane)
     show_object(toolpath, 'g')
     # for w in op._wires:

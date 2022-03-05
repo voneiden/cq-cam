@@ -46,9 +46,11 @@ def visualize_task(job: Job, task: Task):
 
                 # W
                 try:
+                    # TODO one way of doing things, please
                     if command.mid:
-                        midpoint = cq.Vector(command.mid)
+                        relative_midpoint = cq.Vector(command.mid)
                     else:
+                        raise RuntimeError('who is using this?')
                         _, midpoint = arc_center_midpoint(command, start, end)
 
                     # radius = command.radius if isinstance(command, CircularCW) else -command.radius
@@ -67,6 +69,7 @@ def visualize_task(job: Job, task: Task):
                         line = AIS_Shape(circle.wrapped)
 
                     else:
+                        midpoint = relative_midpoint.add(start)
                         arc = Edge.makeThreePointArc(world_start,
                                                      root_plane.toWorldCoords((midpoint.x, midpoint.y, midpoint.z)),
                                                      world_end)
