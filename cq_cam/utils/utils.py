@@ -171,21 +171,19 @@ def flatten_list(lst: List[Iterable]) -> List:
 
 
 class WireClipper:
-    def __init__(self, job_plane: cq.Plane):
-        self._plane = job_plane
+    def __init__(self):
         self._clipper = pyclipper.Pyclipper()
         self._pt_clip_cache = []
 
-    def add_clip_wire(self, wire: cq.Wire):
-        return self._add_wire(wire, pyclipper.PT_CLIP)
+    def add_clip_wire(self, wire: cq.Wire, cache=True):
+        return self._add_wire(wire, pyclipper.PT_CLIP, cache=cache)
 
     def add_subject_wire(self, wire: cq.Wire):
-        return self._add_wire(wire, pyclipper.PT_SUBJECT)
+        return self._add_wire(wire, pyclipper.PT_SUBJECT, False)
 
-    def _add_wire(self, wire: cq.Wire, pt):
-        # TODO get rid of orient vector
-        polygon = [drop_z(orient_vector(v, self._plane)) for v in flatten_wire(wire)]
-        self._add_path(pyclipper.scale_to_clipper(polygon), pt, wire.IsClosed())
+    def _add_wire(self, wire: cq.Wire, pt, cache):
+        polygon = [drop_z(v) for v in flatten_wire(wire)]
+        self._add_path(pyclipper.scale_to_clipper(polygon), pt, wire.IsClosed(), cache)
         return polygon
 
     def add_clip_polygon(self, polygon: Iterable[Tuple[float, float]], is_closed=False):
@@ -195,10 +193,10 @@ class WireClipper:
         return self._add_polygon(polygon, pyclipper.PT_SUBJECT, is_closed)
 
     def _add_polygon(self, polygon: Iterable[Tuple[float, float]], pt, is_closed=False):
-        self._add_path(pyclipper.scale_to_clipper(polygon), pt, is_closed)
+        self._add_path(pyclipper.scale_to_clipper(polygon), pt, is_closed, False)
 
-    def _add_path(self, path, pt, closed):
-        if pt == pyclipper.PT_CLIP:
+    def _add_path(self, path, pt, closed, cache):
+        if pt == pyclipper.PT_CLIP and cache:
             self._pt_clip_cache.append((path, pt, closed))
         self._clipper.AddPath(path, pt, closed)
 
@@ -241,10 +239,13 @@ class WireClipper:
         # TODO detect if there's nothing to do?
         polytree = self._clipper.Execute2(pyclipper.CT_INTERSECTION)
 
-        paths = pyclipper.scale_from_clipper(pyclipper.PolyTreeToPaths(polytree))
-
+        open_paths = pyclipper.scale_from_clipper(pyclipper.OpenPathsFromPolyTree(polytree))
+        closed_paths = pyclipper.scale_from_clipper(pyclipper.ClosedPathsFromPolyTree(polytree))
         # noinspection PyTypeChecker
-        return tuple(tuple(tuple(point) for point in path) for path in paths)
+        for closed_path in closed_paths:
+            closed_path.append(closed_path[0])
+
+        return tuple(tuple(tuple(point) for point in path) for path in (closed_paths + open_paths))
 
 
 def dist2(v, w):

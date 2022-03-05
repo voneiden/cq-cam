@@ -135,45 +135,31 @@ class ZigZagStrategy:
         cut_sequences.append(cut_sequence)
         return cut_sequences
 
-ContourDefinition = Tuple[cq.Wire, List['ContourDefinition']]
 
 class ContourStrategy:
     """
     Contour strategy uses the outer boundary to generate incrementally shrinking contours.
     """
-    #class Contour:
 
     @classmethod
-    def process(cls, task, outer_boundaries: List[cq.Wire], inner_boundaries: List[cq.Wire], show_object) -> List[ContourDefinition]:
+    def process(cls, task, outer_boundaries: List[cq.Wire], inner_boundaries: List[cq.Wire], show_object):
         # We generate shrinking contours from all the outer boundaries
         offset_step = -abs(task._tool_diameter * task.stepover)
-        # TODO we gotta clip them!
+        clipper = WireClipper()
 
-        cut_groups: List[ContourDefinition] = []
+        for outer_boundary in outer_boundaries:
+            clipper.add_clip_wire(outer_boundary)
+        for inner_boundary in inner_boundaries:
+            clipper.add_clip_wire(inner_boundary)
+
         for obi, outer_boundary in enumerate(outer_boundaries):
-            show_object(outer_boundary, f"outerboundary-{obi}-{random()}")
-            root = (outer_boundary, [])
-            cut_groups.append(root)
+            queue = [outer_boundary]
 
-            queue = [root]
             while queue:
-                contour, sub_contours = queue.pop(0)
+                contour = queue.pop(0)
                 new_sub_contours = contour.offset2D(offset_step)
                 for new_sub_contour in new_sub_contours:
-                    new_sub_contour_definition = (new_sub_contour, [])
-                    sub_contours.append(new_sub_contour_definition)
-                    queue.append(new_sub_contour_definition)
+                    clipper.add_subject_wire(new_sub_contour)
+                    queue.append(new_sub_contour)
 
-        return cut_groups
-
-    @staticmethod
-    def flatten(cut_groups: List[ContourDefinition], job: Job, show_object) -> List[CommandSequence]:
-        # wire_to_command_sequence
-
-        def _wires(cd: ContourDefinition):
-            c, scs = cd
-            return [c, *flatten_list([_wires(sc) for sc in scs])]
-        wires = flatten_list([_wires(cut_group) for cut_group in cut_groups])
-        for i, wire in enumerate(wires):
-            show_object(wire, f"wire-{i}-{random()}")
-        return [wire_to_command_sequence2(wire) for wire in wires]
+        return clipper.execute()

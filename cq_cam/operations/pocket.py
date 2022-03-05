@@ -154,7 +154,7 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
         #cut_sequences = ZigZagStrategy.process(self, outer_boundaries, inner_boundaries)
         show_object = lambda *args: 0
         contour_strat = ContourStrategy.process(self, outer_boundaries, inner_boundaries, show_object)
-        contour_cut_sequences = ContourStrategy.flatten(contour_strat, self.job, show_object)
+        #contour_cut_sequences = ContourStrategy.flatten(contour_strat, self.job, show_object)
 
 
         #for i, depth in enumerate(self._generate_depths(start_depth, end_depth)):
@@ -168,15 +168,16 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
         #            self.commands.append(Cut(*cut, None))
 
         for i, depth in enumerate(self._generate_depths(start_depth, end_depth)):
-            for cut_sequence in contour_cut_sequences:
-                cut_start = cut_sequence.start
+            for cut_sequence in contour_strat:
+                cut_start = cut_sequence[0]
                 self.commands.append(Rapid(None, None, self.clearance_height))
-                self.commands.append(Rapid(cut_start.x, cut_start.y, None))
+                self.commands.append(Rapid(cut_start[0], cut_start[1], None))
                 self.commands.append(Rapid(None, None, self.top_height))  # TODO plunge or rapid?
                 self.commands.append(Plunge(depth))
-                self.commands += cut_sequence.commands
-                #for cut in cut_sequence[1:]:
-                #    self.commands.append(Cut(*cut, None))
+                #self.commands += cut_sequence.commands
+                for cut in cut_sequence[1:]:
+                    self.commands.append(Cut(*cut, None))
+                #self.commands.append(Cut(*cut_start, None))
 
 
 def pick_other_scanline_end(scanline, scanpoint):
