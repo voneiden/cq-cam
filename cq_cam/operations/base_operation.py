@@ -10,7 +10,7 @@ from cadquery import cq
 from cq_cam.commands.base_command import Command
 from cq_cam.job import Job
 from cq_cam.utils.linked_polygon import LinkedPolygon
-from cq_cam.utils.utils import flatten_list, pairwise, dist_to_segment_squared
+from cq_cam.utils.utils import flatten_list, pairwise, dist_to_segment_squared, cached_dist2
 
 
 class OperationError(Exception):
