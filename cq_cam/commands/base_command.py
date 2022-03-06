@@ -218,8 +218,12 @@ class Circular(CircularData, MotionCommand, ABC):
         # TODO save center instead of ijk?
         ijk = cq.Vector(self.ijk)
         ijk = new_end.add(ijk).sub(new_start)
+
+        mid = cq.Vector(self.mid)
+        mid = new_end.add(mid).sub(new_start)
+
         x, y, z = vector_same_to_none(new_end, new_start)
-        return cls(x, y, z, self.radius, (ijk.x, ijk.y, ijk.z), self.mid), new_start
+        return cls(x, y, z, self.radius, (ijk.x, ijk.y, ijk.z), (mid.x, mid.y, mid.z)), new_start
 
     def diff_ijk(self, job: Job):
         ijk = []

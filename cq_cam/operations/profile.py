@@ -6,7 +6,7 @@ import numpy as np
 from cadquery import cq
 
 from cq_cam.commands.command import Rapid, Plunge
-from cq_cam.commands.util_command import wire_to_command_sequence
+from cq_cam.commands.util_command import wire_to_command_sequence, wire_to_command_sequence2
 from cq_cam.operations.base_operation import Task, OperationError
 from cq_cam.operations.mixin_operation import PlaneValidationMixin, ObjectsValidationMixin
 from cq_cam.utils.utils import (
@@ -26,15 +26,6 @@ class Profile(PlaneValidationMixin, ObjectsValidationMixin, Task):
     wp: cq.Workplane = None
     """ The cadquery Workplane containing faces and/or
     wires that the profile will operate on. 
-    """
-    wires: List[cq.Wire] = field(default_factory=list)
-    """ List of wires to profile
-    Note: Will use outer_offset as the offset value
-    """
-
-    faces: List[cq.Face] = field(default_factory=list)
-    """ List of faces to profile
-    Note: Will use outer_offset for the outer wire and inner_offset for the inner wires
     """
 
     stepdown: Union[float, None] = None
@@ -104,11 +95,13 @@ class Profile(PlaneValidationMixin, ObjectsValidationMixin, Task):
         offset_wires = wire.offset2D(offset, 'arc')
         assert len(offset_wires) == 1
 
-        command_sequence = wire_to_command_sequence(offset_wires[0], self.job.workplane.plane)
+        command_sequence = wire_to_command_sequence2(offset_wires[0])
 
         if command_sequence.is_clockwise() != cut_clockwise(True, True, True):
             command_sequence.reverse()
             pass
+
+
 
         start = command_sequence.start
         end = command_sequence.end

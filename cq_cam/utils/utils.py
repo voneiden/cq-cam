@@ -89,7 +89,7 @@ def flatten_wire(wire: cq.Wire) -> List[cq.Vector]:
 def is_arc_clockwise(start: cq.Vector, mid: cq.Vector, end: cq.Vector):
     # https://stackoverflow.com/questions/33960924/is-arc-clockwise-or-counter-clockwise
     if start.z != mid.z:
-        raise NotImplemented('Helical arcs not supported yet')
+        raise NotImplementedError('Helical arcs not supported yet')
 
     # start -> end
     se = (end.x - start.x, end.y - start.y)

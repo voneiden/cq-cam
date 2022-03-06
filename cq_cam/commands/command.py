@@ -41,7 +41,7 @@ class CircularCW(Circular):
         return f'{cmd}{diff}', end
 
     def duplicate(self, z: float):
-        return CircularCW(self.x, self.y, z, self.radius, self.ijk, (self.mid[0], self.mid[1], z))
+        return CircularCW(self.x, self.y, z, self.radius, self.ijk, (self.mid[0], self.mid[1], self.mid[2]))
 
 
 class CircularCCW(Circular):
@@ -51,7 +51,7 @@ class CircularCCW(Circular):
         return f'{cmd}{diff}', end
 
     def duplicate(self, z: float):
-        return CircularCCW(self.x, self.y, z, self.radius, self.ijk, (self.mid[0], self.mid[1], z))
+        return CircularCCW(self.x, self.y, z, self.radius, self.ijk, (self.mid[0], self.mid[1], self.mid[2]))
 
 
 @dataclass
