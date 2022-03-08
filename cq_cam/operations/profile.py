@@ -5,14 +5,17 @@ from typing import Union, List, Optional
 import numpy as np
 from cadquery import cq
 
+
 from cq_cam.commands.command import Rapid, Plunge
-from cq_cam.commands.util_command import wire_to_command_sequence, wire_to_command_sequence2
+from cq_cam.commands.util_command import wire_to_command_sequence2
+
 from cq_cam.operations.base_operation import Task, OperationError
 from cq_cam.operations.mixin_operation import PlaneValidationMixin, ObjectsValidationMixin
 from cq_cam.utils.utils import (
     plane_offset_distance,
     cut_clockwise
 )
+from cq_cam.visualize import visualize_task
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +98,7 @@ class Profile(PlaneValidationMixin, ObjectsValidationMixin, Task):
         offset_wires = wire.offset2D(offset, 'arc')
         assert len(offset_wires) == 1
 
+        # TODO, apply tabs here
         command_sequence = wire_to_command_sequence2(offset_wires[0])
 
         if command_sequence.is_clockwise() != cut_clockwise(True, True, True):
@@ -107,7 +111,7 @@ class Profile(PlaneValidationMixin, ObjectsValidationMixin, Task):
         end = command_sequence.end
 
         # Rapid to clearance height
-        self.commands.append(Rapid(start.x, start.y, self.clearance_height))
+        self.commands.append(Rapid(x=start.x, y=start.y, z=self.clearance_height))
         bottom_height = plane_offset_distance(self.job.workplane.plane, workplane.plane)
         if self.stepdown:
             depths = list(np.arange(self.top_height + self.stepdown, bottom_height, self.stepdown))
@@ -119,8 +123,26 @@ class Profile(PlaneValidationMixin, ObjectsValidationMixin, Task):
         for i, depth in enumerate(depths):
             # self.commands.append(profile[0])
             self.commands.append(Plunge(depth))
-            self.commands += command_sequence.duplicate(depth).commands
+            # TODO apply tabs
+            self.commands += command_sequence.duplicate(depth, tab_z=-8).commands
 
-        self.commands.append(Rapid(end.x, end.y, self.clearance_height))
+        self.commands.append(Rapid(x=end.x, y=end.y, z=self.clearance_height))
 
         self.job.tasks.append(self)
+
+
+
+def demo():
+    from cq_cam.job import Job
+    from cq_cam.commands.base_command import Unit
+    wp = cq.Workplane().box(10, 20, 10)
+    job = Job(wp.faces('>Z').workplane(), 300, 50, Unit.METRIC, 5)
+    profile = Profile(job, wp=wp.wires('<Z'), clearance_height=2, top_height=0)
+    print("OK")
+    viz = visualize_task(job, profile)
+    show_object(wp, 'wp')
+    show_object(viz,'viz' )
+
+
+if 'show_object' in locals() or __name__ == '__main__':
+    demo()

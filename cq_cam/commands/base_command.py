@@ -77,19 +77,36 @@ class CommandSequence:
 
         return det < 0
 
-    def duplicate(self, z: float):
-        # TODO tab support here?
+    def duplicate(self, z: float, tab_z=None):
+        from cq_cam.commands.command import Retract, Plunge
+
         start = cq.Vector(self.start)
         end = cq.Vector(self.end)
         start.z = z
         end.z = z
         commands = []
+        tabbing = False
         for command in self.commands:
-            commands.append(command.duplicate(z))
+            if tab_z is not None and getattr(command, 'tab', False) and z < tab_z:
+                if not tabbing:
+                    commands.append(Retract(tab_z))
+                    tabbing = True
+                commands.append(command.duplicate(tab_z))
+            else:
+                if tabbing:
+                    commands.append(Plunge(z))
+                    tabbing = False
+                commands.append(command.duplicate(z))
+
         return CommandSequence(start, commands, end)
 
 
 class Command(ABC):
+    max_depth: Optional[float]
+
+    def __init__(self):
+        self.max_depth = None
+
     @abstractmethod
     def to_gcode(self, previous_command: Union[Command, None], start: cq.Vector, job: Job) -> Tuple[str, cq.Vector]:
         """ Output all the necessary G-Code required to perform the command """
@@ -121,7 +138,8 @@ class MotionCommand(Command, ABC):
         if not z_eq:
             # TODO Ramp!
             pass
-        return Cut(*vector_same_to_none(new_end, new_start)), new_start
+        x, y, z = vector_same_to_none(new_end, new_start)
+        return Cut(x=x, y=y, z=z, tab=self.tab), new_start
 
     @abstractmethod
     def end(self, start: cq.Vector) -> cq.Vector:
@@ -142,12 +160,12 @@ class MotionCommand(Command, ABC):
         return "".join(coordinates), end
 
 
-@dataclass
+@dataclass(kw_only=True, slots=True)
 class EndData(Command, ABC):
-    __slots__ = ['x', 'y', 'z']
-    x: Optional[float]
-    y: Optional[float]
-    z: Optional[float]
+    x: Optional[float] = None
+    y: Optional[float] = None
+    z: Optional[float] = None
+    tab: bool = False
 
     def end(self, previous_end: cq.Vector) -> cq.Vector:
         return cq.Vector(
@@ -182,13 +200,12 @@ class Linear(MotionCommand, ABC):
             return "G1"
 
 
-@dataclass
+@dataclass(kw_only=True, slots=True)
 class CircularData(EndData, ABC):
-    __slots__ = ['radius', 'ijk', 'mid']
     # TODO in py3.10 dataclass supports __slots__ better with default values (?)
-    radius: Optional[float]
-    ijk: Optional[Tuple[float, float, float]]
-    mid: Optional[Tuple[float, float, float]]
+    radius: Optional[float] = None
+    ijk: Optional[Tuple[float, float, float]] = None
+    mid: Optional[Tuple[float, float, float]] = None
 
     def __post_init__(self):
         if self.radius is None and self.ijk is None:
@@ -214,8 +231,6 @@ class Circular(CircularData, MotionCommand, ABC):
         else:
             cls = CircularCW
 
-        # TODO ijk needs to be flipped?
-        # TODO save center instead of ijk?
         ijk = cq.Vector(self.ijk)
         ijk = new_end.add(ijk).sub(new_start)
 
@@ -223,7 +238,7 @@ class Circular(CircularData, MotionCommand, ABC):
         mid = new_end.add(mid).sub(new_start)
 
         x, y, z = vector_same_to_none(new_end, new_start)
-        return cls(x, y, z, self.radius, (ijk.x, ijk.y, ijk.z), (mid.x, mid.y, mid.z)), new_start
+        return cls(x=x, y=y, z=z, radius=self.radius, ijk=(ijk.x, ijk.y, ijk.z), mid=(mid.x, mid.y, mid.z)), new_start
 
     def diff_ijk(self, job: Job):
         ijk = []

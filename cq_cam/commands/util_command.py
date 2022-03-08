@@ -3,6 +3,7 @@ from typing import Optional, Tuple, TYPE_CHECKING
 
 from cadquery import cq
 
+from cq_cam.operations.tabs import WireTabs
 from cq_cam.utils.utils import (
     wire_to_ordered_edges,
     start_point, orient_vector,
@@ -88,11 +89,20 @@ def wire_to_command_sequence2(wire: cq.Wire) -> 'CommandSequence':
     sequence_start = start_point(ordered_edges[0])
     sequence_end = end_point(ordered_edges[-1])
 
-    for edge in ordered_edges:
-        # TODO refactor the use of orient_vector to shapeTransform
+    # Experimental tabs
+    tabs = WireTabs()
+    tabs.load_ordered_edges(ordered_edges)
+    tabs.wire_tab_count(wire, 4)
+
+
+    for edge_i, edge in enumerate(ordered_edges):
+
+        edge_transitions = tabs.edge_tab_transitions(edge_i)
+
         command_end = end_point(edge)
         if edge.geomType() == "LINE":
-            commands.append(Cut(command_end.x, command_end.y, None))
+            commands += Cut.from_edge(edge, edge_transitions)
+            #commands.append(Cut(x=command_end.x, y=command_end.y, z=None))
 
         elif edge.geomType() in ["CIRCLE"]:
             # TODO put some safe lower limit for arc length
@@ -110,11 +120,11 @@ def wire_to_command_sequence2(wire: cq.Wire) -> 'CommandSequence':
                 raise NotImplemented('Full circles are not implemented')
 
             if is_arc_clockwise(command_start, command_mid, command_end):
-                commands.append(CircularCW(command_end.x, command_end.y, None, None, vector_to_tuple(ijk),
-                                           vector_to_tuple(command_mid_relative)))
+                commands.append(CircularCW(x=command_end.x, y=command_end.y, ijk=vector_to_tuple(ijk),
+                                           mid=vector_to_tuple(command_mid_relative)))
             else:
-                commands.append(CircularCCW(command_end.x, command_end.y, None, None, vector_to_tuple(ijk),
-                                            vector_to_tuple(command_mid_relative)))
+                commands.append(CircularCCW(x=command_end.x, y=command_end.y, ijk=vector_to_tuple(ijk),
+                                            mid=vector_to_tuple(command_mid_relative)))
 
         elif edge.geomType() == 'ARC':
             raise NotImplemented('ARC geom type is not implemented')

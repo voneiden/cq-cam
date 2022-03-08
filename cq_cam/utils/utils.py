@@ -176,14 +176,18 @@ class WireClipper:
         self._pt_clip_cache = []
 
     def add_clip_wire(self, wire: cq.Wire, cache=True):
-        return self._add_wire(wire, pyclipper.PT_CLIP, cache=cache)
+        return self._add_wire(wire, pyclipper.PT_CLIP, cache=cache, is_closed=wire.IsClosed())
 
-    def add_subject_wire(self, wire: cq.Wire):
-        return self._add_wire(wire, pyclipper.PT_SUBJECT, False)
+    def add_subject_wire(self, wire: cq.Wire, is_closed=None):
+        is_closed = is_closed if is_closed is not None else wire.IsClosed()
+        return self._add_wire(wire, pyclipper.PT_SUBJECT, False, is_closed)
 
-    def _add_wire(self, wire: cq.Wire, pt, cache):
+    def _add_wire(self, wire: cq.Wire, pt, cache, is_closed):
         polygon = [drop_z(v) for v in flatten_wire(wire)]
-        self._add_path(pyclipper.scale_to_clipper(polygon), pt, wire.IsClosed(), cache)
+        # Not sure if i'll shoot myself in the leg with this
+        if not is_closed:
+            polygon.append(polygon[0])
+        self._add_path(pyclipper.scale_to_clipper(polygon), pt, is_closed, cache)
         return polygon
 
     def add_clip_polygon(self, polygon: Iterable[Tuple[float, float]], is_closed=False):
@@ -235,9 +239,9 @@ class WireClipper:
         diagonal = top_left.sub(bottom_right)
         return diagonal.Length
 
-    def execute(self) -> Tuple[Tuple[Tuple[float, float], Tuple[float, float]]]:
+    def execute(self, clip_type=pyclipper.CT_INTERSECTION) -> Tuple[Tuple[Tuple[float, float], Tuple[float, float]]]:
         # TODO detect if there's nothing to do?
-        polytree = self._clipper.Execute2(pyclipper.CT_INTERSECTION)
+        polytree = self._clipper.Execute2(clip_type)
 
         open_paths = pyclipper.scale_from_clipper(pyclipper.OpenPathsFromPolyTree(polytree))
         closed_paths = pyclipper.scale_from_clipper(pyclipper.ClosedPathsFromPolyTree(polytree))
@@ -246,6 +250,9 @@ class WireClipper:
             closed_path.append(closed_path[0])
 
         return tuple(tuple(tuple(point) for point in path) for path in (closed_paths + open_paths))
+
+    def execute_difference(self):
+        return self.execute(pyclipper.CT_DIFFERENCE)
 
 
 def dist2(v, w):
@@ -272,6 +279,13 @@ def pairwise(iterable):
     a, b = itertools.tee(iterable)
     next(b, None)
     return zip(a, itertools.chain(b, [iterable[0]]))
+
+def pairwise_open(iterable):
+    """s -> (s0,s1), (s1,s2), (s2, s3), ...
+    builtin in py3.10"""
+    a, b = itertools.tee(iterable)
+    next(b, None)
+    return zip(a, b)
 
 
 def project_face(face: cq.Face, projection_dir=(0, 0, 1)) -> cq.Face:
