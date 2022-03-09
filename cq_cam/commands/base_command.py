@@ -5,11 +5,14 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Union, TYPE_CHECKING, List, Optional, Tuple
 
+from OCP.TopAbs import TopAbs_REVERSED
 from cadquery import cq
 
 
 from cq_cam.commands.util_command import same_to_none, vector_same_to_none, equal_within_tolerance, \
-    normalize
+    normalize, vector_to_tuple
+from cq_cam.operations.tabs import Transition
+from cq_cam.utils.utils import pairwise_open, is_arc_clockwise
 
 if TYPE_CHECKING:
     from cq_cam.job import Job
@@ -252,6 +255,40 @@ class Circular(CircularData, MotionCommand, ABC):
         if k:
             ijk.append(f'K{k}')
         return ''.join(ijk)
+
+    @classmethod
+    def from_edge(cls, edge: cq.Edge, transitions):
+        orientation = edge.wrapped.Orientation()
+        reversed = orientation == TopAbs_REVERSED
+        commands = []
+        for start, end in pairwise_open(transitions):
+            start_d, transition = start
+            end_d, _ = end
+            mid_d = (end_d + start_d) / 2
+
+            start = edge.positionAt((1 - start_d) if reversed else start_d)
+            mid = edge.positionAt((1 - mid_d) if reversed else mid_d)
+            end = edge.positionAt((1 - end_d) if reversed else end_d)
+            center = edge.Center()
+
+            commands.append(cls._from_vectors(start, mid, end, center, tab=transition == Transition.TAB))
+        return commands
+
+    @staticmethod
+    def _from_vectors(start, mid, end, center, tab):
+        from cq_cam.commands.command import CircularCW, CircularCCW
+        mid_relative = mid.sub(start)
+        ijk = center.sub(start)
+
+        if start.x == end.x and start.y == end.y:
+            raise NotImplemented('Full circles are not implemented')
+
+        if is_arc_clockwise(start, mid, end):
+            return CircularCW(x=end.x, y=end.y, ijk=vector_to_tuple(ijk),
+                              mid=vector_to_tuple(mid_relative), tab=tab)
+        else:
+            return CircularCCW(x=end.x, y=end.y, ijk=vector_to_tuple(ijk),
+                               mid=vector_to_tuple(mid_relative), tab=tab)
 
 
 class Unit(Enum):

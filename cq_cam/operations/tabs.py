@@ -120,7 +120,14 @@ class WireTabs:
         wire_tab_ds = []
 
         for d in np.linspace(0, 1, count, endpoint=False):
-            wire_tab_ds.append((d - half_d, d + half_d))
+            range = (d - half_d, d + half_d)
+            wire_tab_ds.append(range)
+
+            # Handle edge cases of ranges crossing 0 or 1 by adding extra range(s)
+            if range[0] < 0:
+                wire_tab_ds.append((range[0] + 1, range[1] + 1))
+            if range[1] > 1:
+                wire_tab_ds.append((range[0] - 1, range[1] - 1))
 
         self.wire_tab_ds = wire_tab_ds
 

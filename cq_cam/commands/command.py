@@ -39,7 +39,7 @@ class Cut(EndData, Linear):
     def from_edge(edge: cq.Edge, transitions):
         orientation = edge.wrapped.Orientation()
         reversed = orientation == TopAbs_REVERSED
-        d = 0
+
         commands = []
         for start, end in pairwise_open(transitions):
             _, transition = start
@@ -50,6 +50,8 @@ class Cut(EndData, Linear):
             else:
                 commands.append(Cut(x=position.x, y=position.y, z=position.z))
         return commands
+
+
 
 
 

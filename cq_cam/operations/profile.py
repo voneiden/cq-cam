@@ -122,7 +122,10 @@ class Profile(PlaneValidationMixin, ObjectsValidationMixin, Task):
 
         for i, depth in enumerate(depths):
             # self.commands.append(profile[0])
-            self.commands.append(Plunge(depth))
+            if getattr(command_sequence.commands[0], 'tab', False):
+                self.commands.append(Plunge(-8)) # TODO
+            else:
+                self.commands.append(Plunge(depth))
             # TODO apply tabs
             self.commands += command_sequence.duplicate(depth, tab_z=-8).commands
 
