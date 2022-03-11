@@ -100,6 +100,43 @@ class Tabs:
         print(paths)
 
 
+
+class EdgeTabs:
+    def __init__(self, spacing: float, width: float = 2, only=None):
+        self.edges_ds = None
+        self.spacing = spacing
+        self.only = only
+        self.width = width
+
+    def load_ordered_edges(self, ordered_edges):
+        self.edges_ds = []
+        half = self.width / 2
+        for edge in ordered_edges:
+            length = edge.Length()
+            edge_ds = []
+            self.edges_ds.append(edge_ds)
+            geom_type = edge.geomType()
+            if self.only:
+                if geom_type != self.only:
+                    continue
+            count = int(length // self.spacing)
+            if count <= 0:
+                continue
+
+            half_d = 1 / length * half
+            for d in np.linspace(0, 1, count + 2, endpoint=True)[1:-1]:
+                edge_ds.append((d - half_d, d + half_d))
+
+    def edge_tab_transitions(self, edge_index):
+        edge_ds = self.edges_ds[edge_index]
+        transitions = [(0, Transition.NORMAL)]
+        for tab_start_d, tab_end_d in edge_ds:
+            transitions.append((tab_start_d, Transition.TAB))
+            transitions.append((tab_end_d, Transition.NORMAL))
+        transitions.append((1, Transition.NORMAL))
+        return transitions
+
+
 class Transition(Enum):
     NORMAL = 0
     TAB = 1

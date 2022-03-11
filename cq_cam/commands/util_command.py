@@ -3,7 +3,7 @@ from typing import Optional, Tuple, TYPE_CHECKING
 
 from cadquery import cq
 
-from cq_cam.operations.tabs import WireTabs
+from cq_cam.operations.tabs import WireTabs, EdgeTabs
 from cq_cam.utils.utils import (
     wire_to_ordered_edges,
     start_point, orient_vector,
@@ -94,6 +94,9 @@ def wire_to_command_sequence2(wire: cq.Wire) -> 'CommandSequence':
     tabs.load_ordered_edges(ordered_edges)
     tabs.wire_tab_count(wire, 4)
 
+    # Experimental edge tabs
+    tabs = EdgeTabs(4)
+    tabs.load_ordered_edges(ordered_edges)
 
     for edge_i, edge in enumerate(ordered_edges):
 

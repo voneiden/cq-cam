@@ -140,7 +140,7 @@ def demo():
     from cq_cam.commands.base_command import Unit
     wp = cq.Workplane().box(10, 20, 10)
     job = Job(wp.faces('>Z').workplane(), 300, 50, Unit.METRIC, 5)
-    profile = Profile(job, wp=wp.wires('<Z'), clearance_height=2, top_height=0)
+    profile = Profile(job, wp=wp.wires('<Z'), stepdown=-1, clearance_height=2, top_height=0)
     print("OK")
     viz = visualize_task(job, profile)
     show_object(wp, 'wp')
