@@ -31,27 +31,28 @@ during March 2022.
 * Drill Operation
 * Release package preparation
 * Basic documentation
-* Profiling tabs
 
 
 #### In Progress
 * Migrating code from PoC to production quality
   * Tidying and unifying code
-  * Adding unit tests and refactor to more functional code to simplify testing
   * Adding integration tests
   
 #### Done
 * 2.5D Profiling
 * 2.5D Pocketing with ZigZag strategy
+* Contour strategy
 * 3D Surface with ZigZag strategy, using opencamlib
 * Visualizing toolpaths in CQ-Editor (requires master version)
 * G-Code generation
+* Profiling tabs
+* Adding unit tests and refactor to more functional code to simplify testing
+* Optimize rapid and cut order (nearest neighbour)
 
 ### After the first release?
 * Climb/Conventional
 * Bore Operation (helical drilling)
-* Optimize rapid and cut order
-* Contour strategy
+* Optimize rapid and cut order (opt-2? meanwhile if you need more optimized rapids check out https://gcode-sort.web.app/)
 * Other strategies
 * Ramps
 
