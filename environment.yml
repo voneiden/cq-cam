@@ -1,0 +1,13 @@
+name: cadquery
+channels:
+  - cadquery
+  - conda-forge
+  - defaults
+dependencies:
+  - python>=3.6
+  - cadquery=master
+  - pip
+  - pip:
+      - "--editable=."
+      - sphinxcadquery
+      - enum-tools[sphinx]
