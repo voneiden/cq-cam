@@ -3,6 +3,8 @@
 # CadQuery documentation build configuration file, created by
 # sphinx-quickstart on Sat Aug 25 21:10:53 2012.
 #
+# Borrowed from cadquery repo for CQ-CAM. Copyright CadQuery developers
+#
 # This file is execfile()d with the current directory set to its containing dir.
 #
 # Note that not all possible configuration values are present in this
