@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>cq_cam.operations.op3d &mdash; CadQuery Documentation</title>
+      <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../../_static/tables.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+        <script src="../../../_static/jquery.js"></script>
+        <script src="../../../_static/underscore.js"></script>
+        <script src="../../../_static/doctools.js"></script>
+        <script src="../../../_static/vtk.js"></script>
+        <script>
+const RENDERERS = {};
+var ID =  0;
+
+const renderWindow = vtk.Rendering.Core.vtkRenderWindow.newInstance();
+const openglRenderWindow = vtk.Rendering.OpenGL.vtkRenderWindow.newInstance();
+renderWindow.addView(openglRenderWindow);
+
+const rootContainer = document.createElement('div');
+rootContainer.style.position = 'fixed';
+//rootContainer.style.zIndex = -1;
+rootContainer.style.left = 0;
+rootContainer.style.top = 0;
+rootContainer.style.pointerEvents = 'none';
+rootContainer.style.width = '100%';
+rootContainer.style.height = '100%';
+
+openglRenderWindow.setContainer(rootContainer);
+
+const interact_style = vtk.Interaction.Style.vtkInteractorStyleManipulator.newInstance();
+
+const manips = {
+    rot: vtk.Interaction.Manipulators.vtkMouseCameraTrackballRotateManipulator.newInstance(),
+    pan: vtk.Interaction.Manipulators.vtkMouseCameraTrackballPanManipulator.newInstance(),
+    zoom1: vtk.Interaction.Manipulators.vtkMouseCameraTrackballZoomManipulator.newInstance(),
+    zoom2: vtk.Interaction.Manipulators.vtkMouseCameraTrackballZoomManipulator.newInstance(),
+    roll: vtk.Interaction.Manipulators.vtkMouseCameraTrackballRollManipulator.newInstance(),
+};
+
+manips.zoom1.setControl(true);
+manips.zoom2.setButton(3);
+manips.roll.setShift(true);
+manips.pan.setButton(2);
+
+for (var k in manips){{
+    interact_style.addMouseManipulator(manips[k]);
+}};
+
+const interactor = vtk.Rendering.Core.vtkRenderWindowInteractor.newInstance();
+interactor.setView(openglRenderWindow);
+interactor.initialize();
+interactor.setInteractorStyle(interact_style);
+
+document.addEventListener('DOMContentLoaded', function () {
+    document.body.appendChild(rootContainer);
+});
+
+function updateViewPort(element, renderer) {
+  const { innerHeight, innerWidth } = window;
+  const { x, y, width, height } = element.getBoundingClientRect();
+  const viewport = [
+    x / innerWidth,
+    1 - (y + height) / innerHeight,
+    (x + width) / innerWidth,
+    1 - y / innerHeight,
+  ];
+  renderer.setViewport(...viewport);
+}
+
+function recomputeViewports() {
+  const rendererElems = document.querySelectorAll('.renderer');
+  for (let i = 0; i < rendererElems.length; i++) {
+    const elem = rendererElems[i];
+    const { id } = elem;
+    const renderer = RENDERERS[id];
+    updateViewPort(elem, renderer);
+  }
+  renderWindow.render();
+}
+
+function resize() {
+  rootContainer.style.width = `${window.innerWidth}px`;
+  openglRenderWindow.setSize(window.innerWidth, window.innerHeight);
+  recomputeViewports();
+}
+
+window.addEventListener('resize', resize);
+document.addEventListener('scroll', recomputeViewports);
+
+
+function enterCurrentRenderer(e) {
+  interactor.bindEvents(document.body);
+  interact_style.setEnabled(true);
+  interactor.setCurrentRenderer(RENDERERS[e.target.id]);
+}
+
+function exitCurrentRenderer(e) {
+  interactor.setCurrentRenderer(null);
+  interact_style.setEnabled(false);
+  interactor.unbindEvents();
+}
+
+
+function applyStyle(element) {
+  element.classList.add('renderer');
+  element.style.width = '100%';
+  element.style.height = '100%';
+  element.style.display = 'inline-block';
+  element.style.boxSizing = 'border';
+  return element;
+}
+
+window.addEventListener('load', resize);
+
+function render(data, parent_element, ratio){
+
+    // Initial setup
+    const renderer = vtk.Rendering.Core.vtkRenderer.newInstance({ background: [1, 1, 1 ] });
+
+    // iterate over all children children
+    for (var el of data){
+        var trans = el.position;
+        var rot = el.orientation;
+        var rgba = el.color;
+        var shape = el.shape;
+
+        // load the inline data
+        var reader = vtk.IO.XML.vtkXMLPolyDataReader.newInstance();
+        const textEncoder = new TextEncoder();
+        reader.parseAsArrayBuffer(textEncoder.encode(shape));
+
+        // setup actor,mapper and add
+        const mapper = vtk.Rendering.Core.vtkMapper.newInstance();
+        mapper.setInputConnection(reader.getOutputPort());
+        mapper.setResolveCoincidentTopologyToPolygonOffset();
+        mapper.setResolveCoincidentTopologyPolygonOffsetParameters(0.5,100);
+
+        const actor = vtk.Rendering.Core.vtkActor.newInstance();
+        actor.setMapper(mapper);
+
+        // set color and position
+        actor.getProperty().setColor(rgba.slice(0,3));
+        actor.getProperty().setOpacity(rgba[3]);
+
+        actor.rotateZ(rot[2]*180/Math.PI);
+        actor.rotateY(rot[1]*180/Math.PI);
+        actor.rotateX(rot[0]*180/Math.PI);
+
+        actor.setPosition(trans);
+
+        renderer.addActor(actor);
+
+    };
+
+    //add the container
+    const container = applyStyle(document.createElement("div"));
+    parent_element.appendChild(container);
+    container.addEventListener('mouseenter', enterCurrentRenderer);
+    container.addEventListener('mouseleave', exitCurrentRenderer);
+    container.id = ID;
+
+    renderWindow.addRenderer(renderer);
+    updateViewPort(container, renderer);
+    renderer.getActiveCamera().set({ position: [1, -1, 1], viewUp: [0, 0, 1] });
+    renderer.resetCamera();
+
+    RENDERERS[ID] = renderer;
+    ID++;
+};
+</script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../../index.html" class="icon icon-home"> CadQuery
+          </a>
+              <div class="version">
+                0.1
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../algorithms.html">Algorithms</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../classreference.html">CQ-CAM Class Summary</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">CadQuery</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../../index.html">Module code</a> &raquo;</li>
+      <li>cq_cam.operations.op3d</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for cq_cam.operations.op3d</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">dataclasses</span> <span class="kn">import</span> <span class="n">dataclass</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">List</span>
+
+<span class="kn">import</span> <span class="nn">cadquery</span> <span class="k">as</span> <span class="nn">cq</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="c1"># Fiber(const Point &amp;p1, const Point &amp;p2)</span>
+<span class="c1"># MillingCutter:  ocl::BallCutter, ocl::BullCutter, ocl::CompositeCutter, ocl::ConeCutter, ocl::CylCutter</span>
+<span class="c1"># STLSurf</span>
+<span class="c1"># * addTriangle</span>
+<span class="c1"># Triangle(Point p1, Point p2, Point p3)</span>
+<span class="c1"># BatchPushCutter: use for batch jobs</span>
+<span class="kn">import</span> <span class="nn">ocl</span>
+<span class="kn">from</span> <span class="nn">OCP.BRep</span> <span class="kn">import</span> <span class="n">BRep_Tool</span>
+<span class="kn">from</span> <span class="nn">OCP.BRepMesh</span> <span class="kn">import</span> <span class="n">BRepMesh_IncrementalMesh</span>
+<span class="kn">from</span> <span class="nn">OCP.TopAbs</span> <span class="kn">import</span> <span class="n">TopAbs_FACE</span>
+<span class="kn">from</span> <span class="nn">OCP.TopExp</span> <span class="kn">import</span> <span class="n">TopExp_Explorer</span>
+<span class="kn">from</span> <span class="nn">OCP.TopLoc</span> <span class="kn">import</span> <span class="n">TopLoc_Location</span>
+<span class="kn">from</span> <span class="nn">OCP.gp</span> <span class="kn">import</span> <span class="n">gp_Pnt</span>
+
+<span class="kn">from</span> <span class="nn">cq_cam.commands.base_command</span> <span class="kn">import</span> <span class="n">Unit</span>
+<span class="kn">from</span> <span class="nn">cq_cam.commands.command</span> <span class="kn">import</span> <span class="n">Rapid</span><span class="p">,</span> <span class="n">Plunge</span><span class="p">,</span> <span class="n">Cut</span>
+<span class="kn">from</span> <span class="nn">cq_cam.job</span> <span class="kn">import</span> <span class="n">Job</span>
+<span class="kn">from</span> <span class="nn">cq_cam.operations.base_operation</span> <span class="kn">import</span> <span class="n">FaceBaseOperation</span>
+<span class="kn">from</span> <span class="nn">cq_cam.operations.strategy</span> <span class="kn">import</span> <span class="n">ZigZagStrategy</span>
+<span class="kn">from</span> <span class="nn">cq_cam.utils</span> <span class="kn">import</span> <span class="n">utils</span>
+<span class="kn">from</span> <span class="nn">cq_cam.utils.utils</span> <span class="kn">import</span> <span class="n">flatten_list</span><span class="p">,</span> <span class="n">WireClipper</span>
+<span class="kn">from</span> <span class="nn">cq_cam.visualize</span> <span class="kn">import</span> <span class="n">visualize_task</span>
+
+
+<div class="viewcode-block" id="Surface3D"><a class="viewcode-back" href="../../../classreference.html#cq_cam.operations.op3d.Surface3D">[docs]</a><span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">Surface3D</span><span class="p">(</span><span class="n">FaceBaseOperation</span><span class="p">):</span>
+    <span class="n">tool</span><span class="p">:</span> <span class="n">ocl</span><span class="o">.</span><span class="n">MillingCutter</span> <span class="o">=</span> <span class="n">ocl</span><span class="o">.</span><span class="n">CylCutter</span><span class="p">(</span><span class="mf">3.175</span><span class="p">,</span> <span class="mi">15</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">_tool_diameter</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">tool</span><span class="o">.</span><span class="n">getDiameter</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The 3D job can work very similar to 2D pocket:</span>
+
+<span class="sd">        1) Collect all the faces to get the work boundary</span>
+<span class="sd">        2) Generate cut sequences</span>
+<span class="sd">        3) Split cut sequences into sufficiently small sections</span>
+<span class="sd">        3) Use OpenCAMLib to calculate the depth for each section</span>
+<span class="sd">        4) Proceed generating multiple depths taking section depths into consideration</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">faces</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">transform_shapes_to_global</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_faces</span><span class="p">)</span>
+        <span class="n">compound</span> <span class="o">=</span> <span class="n">cq</span><span class="o">.</span><span class="n">Workplane</span><span class="p">()</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">faces</span><span class="p">)</span><span class="o">.</span><span class="n">combine</span><span class="p">()</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">bb</span> <span class="o">=</span> <span class="n">compound</span><span class="o">.</span><span class="n">BoundingBox</span><span class="p">()</span>
+
+        <span class="n">projected_faces</span> <span class="o">=</span> <span class="p">[</span><span class="n">utils</span><span class="o">.</span><span class="n">project_face</span><span class="p">(</span><span class="n">face</span><span class="p">)</span> <span class="k">for</span> <span class="n">face</span> <span class="ow">in</span> <span class="n">faces</span><span class="p">]</span>
+        <span class="n">combine_result</span> <span class="o">=</span> <span class="n">cq</span><span class="o">.</span><span class="n">Workplane</span><span class="p">()</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">projected_faces</span><span class="p">)</span><span class="o">.</span><span class="n">combine</span><span class="p">()</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">combine_result</span><span class="p">,</span> <span class="n">cq</span><span class="o">.</span><span class="n">Compound</span><span class="p">):</span>
+            <span class="n">base_boundaries</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">break_compound_to_faces</span><span class="p">(</span><span class="n">combine_result</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">base_boundaries</span> <span class="o">=</span> <span class="p">[</span><span class="n">combine_result</span><span class="p">]</span>
+
+        <span class="n">op_boundaries</span> <span class="o">=</span> <span class="n">flatten_list</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">offset_boundary</span><span class="p">(</span><span class="n">boundary</span><span class="p">)</span> <span class="k">for</span> <span class="n">boundary</span> <span class="ow">in</span> <span class="n">base_boundaries</span><span class="p">])</span>
+
+        <span class="k">for</span> <span class="n">op_boundary</span> <span class="ow">in</span> <span class="n">op_boundaries</span><span class="p">:</span>
+            <span class="n">outer_boundary</span> <span class="o">=</span> <span class="n">op_boundary</span><span class="o">.</span><span class="n">outerWire</span><span class="p">()</span>
+            <span class="n">inner_boundaries</span> <span class="o">=</span> <span class="n">op_boundary</span><span class="o">.</span><span class="n">innerWires</span><span class="p">()</span>
+
+            <span class="n">cut_sequences</span> <span class="o">=</span> <span class="n">ZigZagStrategy</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="p">[</span><span class="n">outer_boundary</span><span class="p">],</span> <span class="n">inner_boundaries</span><span class="p">)</span>
+
+            <span class="c1"># Get depths for</span>
+            <span class="n">max_step</span> <span class="o">=</span> <span class="mi">1</span>
+
+            <span class="k">def</span> <span class="nf">interpolate_cut_sequence</span><span class="p">(</span><span class="n">cut_sequence</span><span class="p">):</span>
+                <span class="n">interpolated</span> <span class="o">=</span> <span class="p">[</span><span class="n">cut_sequence</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span>
+                <span class="n">v1</span> <span class="o">=</span> <span class="n">cq</span><span class="o">.</span><span class="n">Vector</span><span class="p">(</span><span class="n">cut_sequence</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+                <span class="k">for</span> <span class="n">p2</span> <span class="ow">in</span> <span class="n">cut_sequence</span><span class="p">[</span><span class="mi">1</span><span class="p">:]:</span>
+                    <span class="n">v2</span> <span class="o">=</span> <span class="n">cq</span><span class="o">.</span><span class="n">Vector</span><span class="p">(</span><span class="n">p2</span><span class="p">)</span>
+                    <span class="n">v</span> <span class="o">=</span> <span class="n">v2</span> <span class="o">-</span> <span class="n">v1</span>
+                    <span class="n">u</span> <span class="o">=</span> <span class="n">v</span><span class="o">.</span><span class="n">normalized</span><span class="p">()</span>
+                    <span class="n">l</span> <span class="o">=</span> <span class="n">v</span><span class="o">.</span><span class="n">Length</span>
+                    <span class="k">for</span> <span class="n">step</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">l</span><span class="p">,</span> <span class="n">max_step</span><span class="p">):</span>
+                        <span class="n">step_v</span> <span class="o">=</span> <span class="n">v1</span> <span class="o">+</span> <span class="n">u</span> <span class="o">*</span> <span class="n">step</span>
+                        <span class="n">interpolated</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">step_v</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">step_v</span><span class="o">.</span><span class="n">y</span><span class="p">))</span>
+                    <span class="n">interpolated</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">p2</span><span class="p">)</span>
+                    <span class="n">v1</span> <span class="o">=</span> <span class="n">v2</span>
+                <span class="k">return</span> <span class="n">interpolated</span>
+
+            <span class="c1"># Note, this interpolation doesn&#39;t consider depth at all</span>
+            <span class="c1"># Ideally we&#39;d have a point at every depth boundary  (TODO?)</span>
+            <span class="c1"># Should be kinda easy?</span>
+            <span class="n">interpolated_cut_sequences</span> <span class="o">=</span> <span class="p">[</span><span class="n">interpolate_cut_sequence</span><span class="p">(</span><span class="n">cut_sequence</span><span class="p">)</span> <span class="k">for</span> <span class="n">cut_sequence</span> <span class="ow">in</span> <span class="n">cut_sequences</span><span class="p">]</span>
+            <span class="n">cl_points</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">cut_sequence</span> <span class="ow">in</span> <span class="n">interpolated_cut_sequences</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">point</span> <span class="ow">in</span> <span class="n">cut_sequence</span><span class="p">:</span>
+                    <span class="n">cl_point</span> <span class="o">=</span> <span class="n">ocl</span><span class="o">.</span><span class="n">CLPoint</span><span class="p">(</span><span class="n">point</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">point</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">bb</span><span class="o">.</span><span class="n">zmin</span><span class="p">)</span>
+                    <span class="n">cl_points</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">cl_point</span><span class="p">)</span>
+
+            <span class="n">triangles</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape_to_triangles</span><span class="p">(</span><span class="n">compound</span><span class="p">)</span>
+            <span class="n">stl_surf</span> <span class="o">=</span> <span class="n">ocl</span><span class="o">.</span><span class="n">STLSurf</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">triangle</span> <span class="ow">in</span> <span class="n">triangles</span><span class="p">:</span>
+                <span class="n">points</span> <span class="o">=</span> <span class="p">(</span><span class="n">ocl</span><span class="o">.</span><span class="n">Point</span><span class="p">(</span><span class="o">*</span><span class="n">vertex</span><span class="p">)</span> <span class="k">for</span> <span class="n">vertex</span> <span class="ow">in</span> <span class="n">triangle</span><span class="p">)</span>
+                <span class="n">tri</span> <span class="o">=</span> <span class="n">ocl</span><span class="o">.</span><span class="n">Triangle</span><span class="p">(</span><span class="o">*</span><span class="n">points</span><span class="p">)</span>
+                <span class="n">stl_surf</span><span class="o">.</span><span class="n">addTriangle</span><span class="p">(</span><span class="n">tri</span><span class="p">)</span>
+
+            <span class="c1"># TODO add post optimization for the moves (detect linear sequences)</span>
+
+            <span class="n">op</span> <span class="o">=</span> <span class="n">ocl</span><span class="o">.</span><span class="n">BatchDropCutter</span><span class="p">()</span>
+            <span class="n">op</span><span class="o">.</span><span class="n">setCutter</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tool</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">cl_point</span> <span class="ow">in</span> <span class="n">cl_points</span><span class="p">:</span>
+                <span class="n">op</span><span class="o">.</span><span class="n">appendPoint</span><span class="p">(</span><span class="n">cl_point</span><span class="p">)</span>
+            <span class="n">op</span><span class="o">.</span><span class="n">setSTL</span><span class="p">(</span><span class="n">stl_surf</span><span class="p">)</span>
+            <span class="n">op</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+
+            <span class="c1"># Merge bottom height data</span>
+            <span class="n">result_points</span> <span class="o">=</span> <span class="p">[</span><span class="n">cl_point_to_tuple</span><span class="p">(</span><span class="n">point</span><span class="p">)</span> <span class="k">for</span> <span class="n">point</span> <span class="ow">in</span> <span class="n">op</span><span class="o">.</span><span class="n">getCLPoints</span><span class="p">()]</span>
+            <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="k">for</span> <span class="n">cut_sequence</span> <span class="ow">in</span> <span class="n">interpolated_cut_sequences</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">j</span><span class="p">,</span> <span class="n">point</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">cut_sequence</span><span class="p">):</span>
+                    <span class="n">cut_sequence</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="o">*</span><span class="n">point</span><span class="p">,</span> <span class="n">result_points</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">2</span><span class="p">])</span>
+                    <span class="n">i</span> <span class="o">+=</span> <span class="mi">1</span>
+
+            <span class="n">bottom_height</span> <span class="o">=</span> <span class="n">bb</span><span class="o">.</span><span class="n">zmin</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">stepdown</span><span class="p">:</span>
+                <span class="n">depths</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">top_height</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">stepdown</span><span class="p">,</span> <span class="n">bottom_height</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">stepdown</span><span class="p">))</span>
+                <span class="k">if</span> <span class="n">depths</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="n">bottom_height</span><span class="p">:</span>
+                    <span class="n">depths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">bottom_height</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">depths</span> <span class="o">=</span> <span class="p">[</span><span class="n">bottom_height</span><span class="p">]</span>
+
+            <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">depth</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">depths</span><span class="p">):</span>
+
+                <span class="c1"># We want to include i-2 - otherwise we get gaps between depths</span>
+                <span class="n">last_last_depth</span> <span class="o">=</span> <span class="n">depths</span><span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="mi">2</span><span class="p">]</span> <span class="k">if</span> <span class="n">i</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="k">else</span> <span class="mi">0</span>
+                <span class="n">depth_cut_sequences</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_chop_sequences_by_depth</span><span class="p">(</span><span class="n">interpolated_cut_sequences</span><span class="p">,</span> <span class="n">last_last_depth</span><span class="p">)</span>
+                <span class="c1"># TODO optimize order of cut sequences to minimize rapid distances</span>
+                <span class="c1"># note to self: in zigzag, I guess maintaining the order is the best bet</span>
+                <span class="c1"># TODO if there is a new cut sequence within radius of max_step then use it without retracting</span>
+                <span class="k">for</span> <span class="n">cut_sequence</span> <span class="ow">in</span> <span class="n">depth_cut_sequences</span><span class="p">:</span>
+                    <span class="n">cut_start</span> <span class="o">=</span> <span class="n">cut_sequence</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">commands</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Rapid</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">clearance_height</span><span class="p">))</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">commands</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Rapid</span><span class="p">(</span><span class="n">cut_start</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">cut_start</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="kc">None</span><span class="p">))</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">commands</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Rapid</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">top_height</span><span class="p">))</span>  <span class="c1"># TODO plunge or rapid?</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">commands</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Plunge</span><span class="p">(</span><span class="n">cut_start</span><span class="p">[</span><span class="mi">2</span><span class="p">]))</span>
+                    <span class="k">for</span> <span class="n">cut</span> <span class="ow">in</span> <span class="n">cut_sequence</span><span class="p">[</span><span class="mi">1</span><span class="p">:]:</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">commands</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Cut</span><span class="p">(</span><span class="n">cut</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">cut</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="nb">max</span><span class="p">(</span><span class="n">depth</span><span class="p">,</span> <span class="n">cut</span><span class="p">[</span><span class="mi">2</span><span class="p">])))</span>
+
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">base_boundary</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">base_boundaries</span><span class="p">):</span>
+            <span class="n">show_object</span><span class="p">(</span><span class="n">base_boundary</span><span class="p">,</span> <span class="sa">f</span><span class="s1">&#39;base_boundary-</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">op_boundary</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">op_boundaries</span><span class="p">):</span>
+            <span class="n">show_object</span><span class="p">(</span><span class="n">op_boundary</span><span class="p">,</span> <span class="sa">f</span><span class="s1">&#39;op_boundary-</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+        <span class="n">show_object</span><span class="p">(</span><span class="n">faces</span><span class="p">,</span> <span class="s1">&#39;depth_boundary&#39;</span><span class="p">)</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">shape_to_triangles</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span>
+                           <span class="n">shape</span><span class="p">:</span> <span class="n">cq</span><span class="o">.</span><span class="n">Shape</span><span class="p">,</span>
+                           <span class="n">tolerance</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-3</span><span class="p">,</span>
+                           <span class="n">angular_tolerance</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">],</span> <span class="o">...</span><span class="p">]]:</span>
+
+        <span class="c1"># BRepMesh_IncrementalMesh gets mad if you try to pass a Compound to it</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">cq</span><span class="o">.</span><span class="n">Compound</span><span class="p">):</span>
+            <span class="n">faces</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">break_compound_to_faces</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span>
+            <span class="n">results</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">face</span> <span class="ow">in</span> <span class="n">faces</span><span class="p">:</span>
+                <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">shape_to_triangles</span><span class="p">(</span><span class="n">face</span><span class="p">,</span> <span class="n">tolerance</span><span class="p">,</span> <span class="n">angular_tolerance</span><span class="p">))</span>
+            <span class="k">return</span> <span class="n">flatten_list</span><span class="p">(</span><span class="n">results</span><span class="p">)</span>
+
+        <span class="n">mesh</span> <span class="o">=</span> <span class="n">BRepMesh_IncrementalMesh</span><span class="p">(</span><span class="n">shape</span><span class="o">.</span><span class="n">wrapped</span><span class="p">,</span> <span class="n">tolerance</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span> <span class="n">angular_tolerance</span><span class="p">)</span>
+        <span class="n">mesh</span><span class="o">.</span><span class="n">Perform</span><span class="p">()</span>
+
+        <span class="n">explorer</span> <span class="o">=</span> <span class="n">TopExp_Explorer</span><span class="p">(</span><span class="n">shape</span><span class="o">.</span><span class="n">wrapped</span><span class="p">,</span> <span class="n">TopAbs_FACE</span><span class="p">)</span>
+        <span class="n">triangles</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">location</span> <span class="o">=</span> <span class="n">TopLoc_Location</span><span class="p">()</span>
+        <span class="n">brep_tool</span> <span class="o">=</span> <span class="n">BRep_Tool</span><span class="p">()</span>
+        <span class="k">while</span> <span class="n">explorer</span><span class="o">.</span><span class="n">More</span><span class="p">():</span>
+            <span class="n">shape_face</span> <span class="o">=</span> <span class="n">explorer</span><span class="o">.</span><span class="n">Current</span><span class="p">()</span>
+            <span class="n">triangulation</span> <span class="o">=</span> <span class="n">brep_tool</span><span class="o">.</span><span class="n">Triangulation_s</span><span class="p">(</span><span class="n">shape</span><span class="o">.</span><span class="n">wrapped</span><span class="p">,</span> <span class="n">location</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">triangulation</span><span class="o">.</span><span class="n">NbTriangles</span><span class="p">()):</span>
+                <span class="n">triangle</span> <span class="o">=</span> <span class="n">triangulation</span><span class="o">.</span><span class="n">Triangle</span><span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+                <span class="n">face_triangles</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">point_to_tuple</span><span class="p">(</span><span class="n">triangulation</span><span class="o">.</span><span class="n">Node</span><span class="p">(</span><span class="n">node</span><span class="p">))</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">triangle</span><span class="o">.</span><span class="n">Get</span><span class="p">())</span>
+                <span class="n">triangles</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">face_triangles</span><span class="p">)</span>
+
+            <span class="n">explorer</span><span class="o">.</span><span class="n">Next</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="n">triangles</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_chop_sequences_by_depth</span><span class="p">(</span><span class="n">sequences</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]],</span> <span class="n">last_depth</span><span class="p">:</span> <span class="nb">float</span><span class="p">):</span>
+        <span class="n">new_sequences</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">sequence</span> <span class="ow">in</span> <span class="n">sequences</span><span class="p">:</span>
+            <span class="n">new_sequence</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">point</span> <span class="ow">in</span> <span class="n">sequence</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">point</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">last_depth</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">new_sequence</span><span class="p">:</span>
+                        <span class="n">new_sequences</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">new_sequence</span><span class="p">)</span>
+                        <span class="n">new_sequence</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">new_sequence</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">point</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">new_sequence</span><span class="p">:</span>
+                <span class="n">new_sequences</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">new_sequence</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">new_sequences</span></div>
+
+
+<span class="k">def</span> <span class="nf">point_to_tuple</span><span class="p">(</span><span class="n">point</span><span class="p">:</span> <span class="n">gp_Pnt</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
+    <span class="k">return</span> <span class="n">point</span><span class="o">.</span><span class="n">X</span><span class="p">(),</span> <span class="n">point</span><span class="o">.</span><span class="n">Y</span><span class="p">(),</span> <span class="n">point</span><span class="o">.</span><span class="n">Z</span><span class="p">()</span>
+
+
+<span class="k">def</span> <span class="nf">shape_to_triangles</span><span class="p">(</span><span class="n">shape</span><span class="p">:</span> <span class="n">cq</span><span class="o">.</span><span class="n">Shape</span><span class="p">,</span>
+                       <span class="n">tolerance</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-3</span><span class="p">,</span>
+                       <span class="n">angular_tolerance</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">],</span> <span class="o">...</span><span class="p">]]:</span>
+    <span class="n">mesh</span> <span class="o">=</span> <span class="n">BRepMesh_IncrementalMesh</span><span class="p">(</span><span class="n">shape</span><span class="o">.</span><span class="n">wrapped</span><span class="p">,</span> <span class="n">tolerance</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span> <span class="n">angular_tolerance</span><span class="p">)</span>
+    <span class="n">mesh</span><span class="o">.</span><span class="n">Perform</span><span class="p">()</span>
+
+    <span class="n">explorer</span> <span class="o">=</span> <span class="n">TopExp_Explorer</span><span class="p">(</span><span class="n">shape</span><span class="o">.</span><span class="n">wrapped</span><span class="p">,</span> <span class="n">TopAbs_FACE</span><span class="p">)</span>
+    <span class="n">triangles</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">location</span> <span class="o">=</span> <span class="n">TopLoc_Location</span><span class="p">()</span>
+    <span class="n">brep_tool</span> <span class="o">=</span> <span class="n">BRep_Tool</span><span class="p">()</span>
+    <span class="k">while</span> <span class="n">explorer</span><span class="o">.</span><span class="n">More</span><span class="p">():</span>
+        <span class="n">shape_face</span> <span class="o">=</span> <span class="n">explorer</span><span class="o">.</span><span class="n">Current</span><span class="p">()</span>
+        <span class="n">triangulation</span> <span class="o">=</span> <span class="n">brep_tool</span><span class="o">.</span><span class="n">Triangulation_s</span><span class="p">(</span><span class="n">shape</span><span class="o">.</span><span class="n">wrapped</span><span class="p">,</span> <span class="n">location</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">triangulation</span><span class="o">.</span><span class="n">NbTriangles</span><span class="p">()):</span>
+            <span class="n">triangle</span> <span class="o">=</span> <span class="n">triangulation</span><span class="o">.</span><span class="n">Triangle</span><span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="n">face_triangles</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">point_to_tuple</span><span class="p">(</span><span class="n">triangulation</span><span class="o">.</span><span class="n">Node</span><span class="p">(</span><span class="n">node</span><span class="p">))</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">triangle</span><span class="o">.</span><span class="n">Get</span><span class="p">())</span>
+            <span class="n">triangles</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">face_triangles</span><span class="p">)</span>
+
+        <span class="n">explorer</span><span class="o">.</span><span class="n">Next</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="n">triangles</span>
+
+
+<span class="k">def</span> <span class="nf">cl_point_to_tuple</span><span class="p">(</span><span class="n">point</span><span class="p">:</span> <span class="n">ocl</span><span class="o">.</span><span class="n">CLPoint</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
+    <span class="k">return</span> <span class="n">point</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">point</span><span class="o">.</span><span class="n">y</span><span class="p">,</span> <span class="n">point</span><span class="o">.</span><span class="n">z</span>
+
+
+<span class="k">def</span> <span class="nf">demo</span><span class="p">():</span>
+    <span class="n">wp</span> <span class="o">=</span> <span class="n">cq</span><span class="o">.</span><span class="n">Workplane</span><span class="p">(</span><span class="s1">&#39;XZ&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">lineTo</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">lineTo</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="mi">120</span><span class="p">)</span><span class="o">.</span><span class="n">lineTo</span><span class="p">(</span><span class="mi">80</span><span class="p">,</span> <span class="mi">120</span><span class="p">)</span><span class="o">.</span><span class="n">lineTo</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">close</span><span class="p">()</span><span class="o">.</span><span class="n">extrude</span><span class="p">(</span><span class="mi">50</span><span class="p">)</span>
+    <span class="n">job</span> <span class="o">=</span> <span class="n">Job</span><span class="p">(</span><span class="n">workplane</span><span class="o">=</span><span class="n">wp</span><span class="o">.</span><span class="n">faces</span><span class="p">(</span><span class="s1">&#39;&gt;Z&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">workplane</span><span class="p">(),</span>
+              <span class="n">feed</span><span class="o">=</span><span class="mi">300</span><span class="p">,</span>
+              <span class="n">plunge_feed</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
+              <span class="n">unit</span><span class="o">=</span><span class="n">Unit</span><span class="o">.</span><span class="n">METRIC</span><span class="p">,</span>
+              <span class="n">rapid_height</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+
+    <span class="n">faces</span> <span class="o">=</span> <span class="n">wp</span><span class="o">.</span><span class="n">faces</span><span class="p">(</span><span class="s1">&#39;(not +X) and (not -X) and (not -Y) and (not +Y) and (not -Z)&#39;</span><span class="p">)</span>
+    <span class="n">op</span> <span class="o">=</span> <span class="n">Surface3D</span><span class="p">(</span><span class="n">job</span><span class="o">=</span><span class="n">job</span><span class="p">,</span> <span class="n">clearance_height</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">top_height</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">wp</span><span class="o">=</span><span class="n">faces</span><span class="p">,</span> <span class="n">tool</span><span class="o">=</span><span class="n">ocl</span><span class="o">.</span><span class="n">CylCutter</span><span class="p">(</span><span class="mf">3.175</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span>
+                   <span class="n">avoid</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">stepdown</span><span class="o">=-</span><span class="mi">5</span><span class="p">)</span>
+
+    <span class="n">toolpath</span> <span class="o">=</span> <span class="n">visualize_task</span><span class="p">(</span><span class="n">job</span><span class="p">,</span> <span class="n">op</span><span class="p">)</span>
+    <span class="n">show_object</span><span class="p">(</span><span class="n">wp</span><span class="p">,</span> <span class="s1">&#39;part&#39;</span><span class="p">)</span>
+    <span class="n">show_object</span><span class="p">(</span><span class="n">toolpath</span><span class="p">,</span> <span class="s1">&#39;toolpath&#39;</span><span class="p">)</span>
+
+
+<span class="k">if</span> <span class="s1">&#39;show_object&#39;</span> <span class="ow">in</span> <span class="nb">locals</span><span class="p">()</span> <span class="ow">or</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="n">demo</span><span class="p">()</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Parametric Products Intellectual Holdings LLC, All Rights Reserved.</p>
+  </div>
+
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

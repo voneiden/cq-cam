@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>cq_cam.operations.strategy &mdash; CadQuery Documentation</title>
+      <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../../_static/tables.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+        <script src="../../../_static/jquery.js"></script>
+        <script src="../../../_static/underscore.js"></script>
+        <script src="../../../_static/doctools.js"></script>
+        <script src="../../../_static/vtk.js"></script>
+        <script>
+const RENDERERS = {};
+var ID =  0;
+
+const renderWindow = vtk.Rendering.Core.vtkRenderWindow.newInstance();
+const openglRenderWindow = vtk.Rendering.OpenGL.vtkRenderWindow.newInstance();
+renderWindow.addView(openglRenderWindow);
+
+const rootContainer = document.createElement('div');
+rootContainer.style.position = 'fixed';
+//rootContainer.style.zIndex = -1;
+rootContainer.style.left = 0;
+rootContainer.style.top = 0;
+rootContainer.style.pointerEvents = 'none';
+rootContainer.style.width = '100%';
+rootContainer.style.height = '100%';
+
+openglRenderWindow.setContainer(rootContainer);
+
+const interact_style = vtk.Interaction.Style.vtkInteractorStyleManipulator.newInstance();
+
+const manips = {
+    rot: vtk.Interaction.Manipulators.vtkMouseCameraTrackballRotateManipulator.newInstance(),
+    pan: vtk.Interaction.Manipulators.vtkMouseCameraTrackballPanManipulator.newInstance(),
+    zoom1: vtk.Interaction.Manipulators.vtkMouseCameraTrackballZoomManipulator.newInstance(),
+    zoom2: vtk.Interaction.Manipulators.vtkMouseCameraTrackballZoomManipulator.newInstance(),
+    roll: vtk.Interaction.Manipulators.vtkMouseCameraTrackballRollManipulator.newInstance(),
+};
+
+manips.zoom1.setControl(true);
+manips.zoom2.setButton(3);
+manips.roll.setShift(true);
+manips.pan.setButton(2);
+
+for (var k in manips){{
+    interact_style.addMouseManipulator(manips[k]);
+}};
+
+const interactor = vtk.Rendering.Core.vtkRenderWindowInteractor.newInstance();
+interactor.setView(openglRenderWindow);
+interactor.initialize();
+interactor.setInteractorStyle(interact_style);
+
+document.addEventListener('DOMContentLoaded', function () {
+    document.body.appendChild(rootContainer);
+});
+
+function updateViewPort(element, renderer) {
+  const { innerHeight, innerWidth } = window;
+  const { x, y, width, height } = element.getBoundingClientRect();
+  const viewport = [
+    x / innerWidth,
+    1 - (y + height) / innerHeight,
+    (x + width) / innerWidth,
+    1 - y / innerHeight,
+  ];
+  renderer.setViewport(...viewport);
+}
+
+function recomputeViewports() {
+  const rendererElems = document.querySelectorAll('.renderer');
+  for (let i = 0; i < rendererElems.length; i++) {
+    const elem = rendererElems[i];
+    const { id } = elem;
+    const renderer = RENDERERS[id];
+    updateViewPort(elem, renderer);
+  }
+  renderWindow.render();
+}
+
+function resize() {
+  rootContainer.style.width = `${window.innerWidth}px`;
+  openglRenderWindow.setSize(window.innerWidth, window.innerHeight);
+  recomputeViewports();
+}
+
+window.addEventListener('resize', resize);
+document.addEventListener('scroll', recomputeViewports);
+
+
+function enterCurrentRenderer(e) {
+  interactor.bindEvents(document.body);
+  interact_style.setEnabled(true);
+  interactor.setCurrentRenderer(RENDERERS[e.target.id]);
+}
+
+function exitCurrentRenderer(e) {
+  interactor.setCurrentRenderer(null);
+  interact_style.setEnabled(false);
+  interactor.unbindEvents();
+}
+
+
+function applyStyle(element) {
+  element.classList.add('renderer');
+  element.style.width = '100%';
+  element.style.height = '100%';
+  element.style.display = 'inline-block';
+  element.style.boxSizing = 'border';
+  return element;
+}
+
+window.addEventListener('load', resize);
+
+function render(data, parent_element, ratio){
+
+    // Initial setup
+    const renderer = vtk.Rendering.Core.vtkRenderer.newInstance({ background: [1, 1, 1 ] });
+
+    // iterate over all children children
+    for (var el of data){
+        var trans = el.position;
+        var rot = el.orientation;
+        var rgba = el.color;
+        var shape = el.shape;
+
+        // load the inline data
+        var reader = vtk.IO.XML.vtkXMLPolyDataReader.newInstance();
+        const textEncoder = new TextEncoder();
+        reader.parseAsArrayBuffer(textEncoder.encode(shape));
+
+        // setup actor,mapper and add
+        const mapper = vtk.Rendering.Core.vtkMapper.newInstance();
+        mapper.setInputConnection(reader.getOutputPort());
+        mapper.setResolveCoincidentTopologyToPolygonOffset();
+        mapper.setResolveCoincidentTopologyPolygonOffsetParameters(0.5,100);
+
+        const actor = vtk.Rendering.Core.vtkActor.newInstance();
+        actor.setMapper(mapper);
+
+        // set color and position
+        actor.getProperty().setColor(rgba.slice(0,3));
+        actor.getProperty().setOpacity(rgba[3]);
+
+        actor.rotateZ(rot[2]*180/Math.PI);
+        actor.rotateY(rot[1]*180/Math.PI);
+        actor.rotateX(rot[0]*180/Math.PI);
+
+        actor.setPosition(trans);
+
+        renderer.addActor(actor);
+
+    };
+
+    //add the container
+    const container = applyStyle(document.createElement("div"));
+    parent_element.appendChild(container);
+    container.addEventListener('mouseenter', enterCurrentRenderer);
+    container.addEventListener('mouseleave', exitCurrentRenderer);
+    container.id = ID;
+
+    renderWindow.addRenderer(renderer);
+    updateViewPort(container, renderer);
+    renderer.getActiveCamera().set({ position: [1, -1, 1], viewUp: [0, 0, 1] });
+    renderer.resetCamera();
+
+    RENDERERS[ID] = renderer;
+    ID++;
+};
+</script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../../index.html" class="icon icon-home"> CadQuery
+          </a>
+              <div class="version">
+                0.1
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../operations.html">Operations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../algorithms.html">Algorithms</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../classreference.html">CQ-CAM Class Summary</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">CadQuery</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../../index.html">Module code</a> &raquo;</li>
+      <li>cq_cam.operations.strategy</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for cq_cam.operations.strategy</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Dict</span>
+
+<span class="kn">import</span> <span class="nn">cadquery</span> <span class="k">as</span> <span class="nn">cq</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">deque</span>
+<span class="kn">from</span> <span class="nn">cq_cam.utils.linked_polygon</span> <span class="kn">import</span> <span class="n">LinkedPolygon</span>
+<span class="kn">from</span> <span class="nn">cq_cam.utils.utils</span> <span class="kn">import</span> <span class="n">WireClipper</span><span class="p">,</span> <span class="n">pairwise</span><span class="p">,</span> <span class="n">dist_to_segment_squared</span><span class="p">,</span> <span class="n">cached_dist2</span>
+
+<span class="n">Scanpoint</span> <span class="o">=</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span>
+<span class="n">Scanline</span> <span class="o">=</span> <span class="n">List</span><span class="p">[</span><span class="n">Scanpoint</span><span class="p">]</span>
+
+
+<span class="k">class</span> <span class="nc">Strategy</span><span class="p">:</span>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_pick_nearest</span><span class="p">(</span><span class="n">point</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">],</span> <span class="n">options</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]])</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
+        <span class="n">nearest</span> <span class="o">=</span> <span class="p">(</span><span class="n">cached_dist2</span><span class="p">(</span><span class="n">point</span><span class="p">,</span> <span class="n">options</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span> <span class="n">options</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="k">for</span> <span class="n">option</span> <span class="ow">in</span> <span class="n">options</span><span class="p">[</span><span class="mi">1</span><span class="p">:]:</span>
+            <span class="n">dist2</span> <span class="o">=</span> <span class="n">cached_dist2</span><span class="p">(</span><span class="n">point</span><span class="p">,</span> <span class="n">option</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">dist2</span> <span class="o">&lt;</span> <span class="n">nearest</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span>
+                <span class="n">nearest</span> <span class="o">=</span> <span class="p">(</span><span class="n">dist2</span><span class="p">,</span> <span class="n">option</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">nearest</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">_sort_clipper_output</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">output_paths</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">],</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]]):</span>
+        <span class="n">paths</span> <span class="o">=</span> <span class="p">[</span><span class="n">output_paths</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span>
+        <span class="n">point</span> <span class="o">=</span> <span class="n">output_paths</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">output_paths</span><span class="p">[</span><span class="mi">1</span><span class="p">:]:</span>
+            <span class="k">if</span> <span class="n">path</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">path</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]:</span>
+                <span class="n">closed</span> <span class="o">=</span> <span class="kc">True</span>
+                <span class="n">path</span> <span class="o">=</span> <span class="n">path</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">closed</span> <span class="o">=</span> <span class="kc">False</span>
+
+            <span class="n">nearest</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_pick_nearest</span><span class="p">(</span><span class="n">point</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>
+            <span class="n">nearest_i</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">nearest</span><span class="p">)</span>
+            <span class="n">path</span> <span class="o">=</span> <span class="n">path</span><span class="p">[</span><span class="n">nearest_i</span><span class="p">:]</span> <span class="o">+</span> <span class="n">path</span><span class="p">[:</span><span class="n">nearest_i</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">closed</span><span class="p">:</span>
+                <span class="n">path</span> <span class="o">+=</span> <span class="p">(</span><span class="n">path</span><span class="p">[</span><span class="mi">0</span><span class="p">],)</span>
+            <span class="n">paths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+            <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">paths</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">paths</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="ZigZagStrategy"><a class="viewcode-back" href="../../../classreference.html#cq_cam.operations.strategy.ZigZagStrategy">[docs]</a><span class="k">class</span> <span class="nc">ZigZagStrategy</span><span class="p">(</span><span class="n">Strategy</span><span class="p">):</span>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">process</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">task</span><span class="p">,</span> <span class="n">outer_boundaries</span><span class="p">:</span> <span class="n">List</span><span class="p">,</span> <span class="n">inner_boundaries</span><span class="p">:</span> <span class="n">List</span><span class="p">):</span>
+        <span class="c1"># TODO: Scanline orientation</span>
+        <span class="c1"># Here we could rotate the regions so that we can keep the scanlines in standard XY plane</span>
+        <span class="n">clipper</span> <span class="o">=</span> <span class="n">WireClipper</span><span class="p">()</span>
+
+        <span class="n">outer_polygons</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">outer_boundary</span> <span class="ow">in</span> <span class="n">outer_boundaries</span><span class="p">:</span>
+            <span class="n">polygon</span> <span class="o">=</span> <span class="n">clipper</span><span class="o">.</span><span class="n">add_clip_wire</span><span class="p">(</span><span class="n">outer_boundary</span><span class="p">)</span>
+            <span class="n">outer_polygons</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">polygon</span><span class="p">)</span>
+
+        <span class="n">inner_polygons</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">inner_boundary</span> <span class="ow">in</span> <span class="n">inner_boundaries</span><span class="p">:</span>
+            <span class="n">polygon</span> <span class="o">=</span> <span class="n">clipper</span><span class="o">.</span><span class="n">add_clip_wire</span><span class="p">(</span><span class="n">inner_boundary</span><span class="p">)</span>
+            <span class="n">inner_polygons</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">polygon</span><span class="p">)</span>
+
+        <span class="n">max_bounds</span> <span class="o">=</span> <span class="n">clipper</span><span class="o">.</span><span class="n">max_bounds</span><span class="p">()</span>
+
+        <span class="c1"># Generate ZigZag scanlines</span>
+        <span class="n">y_scanpoints</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">max_bounds</span><span class="p">[</span><span class="s1">&#39;bottom&#39;</span><span class="p">],</span> <span class="n">max_bounds</span><span class="p">[</span><span class="s1">&#39;top&#39;</span><span class="p">],</span> <span class="n">task</span><span class="o">.</span><span class="n">_tool_diameter</span> <span class="o">*</span> <span class="n">task</span><span class="o">.</span><span class="n">stepover</span><span class="p">))</span>
+        <span class="n">scanline_templates</span> <span class="o">=</span> <span class="p">[((</span><span class="n">max_bounds</span><span class="p">[</span><span class="s1">&#39;left&#39;</span><span class="p">],</span> <span class="n">y</span><span class="p">),</span> <span class="p">(</span><span class="n">max_bounds</span><span class="p">[</span><span class="s1">&#39;right&#39;</span><span class="p">],</span> <span class="n">y</span><span class="p">))</span> <span class="k">for</span> <span class="n">y</span> <span class="ow">in</span> <span class="n">y_scanpoints</span><span class="p">]</span>
+
+        <span class="k">for</span> <span class="n">scanline_template</span> <span class="ow">in</span> <span class="n">scanline_templates</span><span class="p">:</span>
+            <span class="n">clipper</span><span class="o">.</span><span class="n">add_subject_polygon</span><span class="p">(</span><span class="n">scanline_template</span><span class="p">)</span>
+
+        <span class="n">scanlines</span> <span class="o">=</span> <span class="n">clipper</span><span class="o">.</span><span class="n">execute</span><span class="p">()</span>
+
+        <span class="n">scanpoint_to_scanline</span><span class="p">,</span> <span class="n">scanpoints</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_scanline_end_map</span><span class="p">(</span><span class="n">scanlines</span><span class="p">)</span>
+
+        <span class="n">linked_polygons</span><span class="p">,</span> <span class="n">scanpoint_to_linked_polygon</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_link_scanpoints_to_boundaries</span><span class="p">(</span>
+            <span class="n">scanpoints</span><span class="p">,</span> <span class="n">outer_polygons</span> <span class="o">+</span> <span class="n">inner_polygons</span><span class="p">)</span>
+
+        <span class="n">cut_sequences</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_route_zig_zag</span><span class="p">(</span><span class="n">linked_polygons</span><span class="p">,</span>
+                                           <span class="n">scanlines</span><span class="p">,</span>
+                                           <span class="n">scanpoint_to_linked_polygon</span><span class="p">,</span>
+                                           <span class="n">scanpoint_to_scanline</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">cut_sequences</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_scanline_end_map</span><span class="p">(</span><span class="n">scanlines</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Scanline</span><span class="p">]):</span>
+        <span class="n">scanline_end_map</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">scanpoints</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">scanline</span> <span class="ow">in</span> <span class="n">scanlines</span><span class="p">:</span>
+            <span class="n">scanline_start</span><span class="p">,</span> <span class="n">scanline_end</span> <span class="o">=</span> <span class="n">scanline</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">scanline</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+            <span class="n">scanline_end_map</span><span class="p">[</span><span class="n">scanline_start</span><span class="p">]</span> <span class="o">=</span> <span class="n">scanline</span>
+            <span class="n">scanline_end_map</span><span class="p">[</span><span class="n">scanline_end</span><span class="p">]</span> <span class="o">=</span> <span class="n">scanline</span>
+            <span class="n">scanpoints</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">scanline_start</span><span class="p">)</span>
+            <span class="n">scanpoints</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">scanline_end</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">scanline_end_map</span><span class="p">,</span> <span class="n">scanpoints</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_link_scanpoints_to_boundaries</span><span class="p">(</span><span class="n">scanpoints</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Scanpoint</span><span class="p">],</span>
+                                       <span class="n">boundaries</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]]):</span>
+        <span class="n">remaining_scanpoints</span> <span class="o">=</span> <span class="n">scanpoints</span><span class="p">[:]</span>
+        <span class="n">scanpoint_to_linked_polygon</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">linked_polygons</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">polygon</span> <span class="ow">in</span> <span class="n">boundaries</span><span class="p">:</span>
+            <span class="n">linked_polygon</span> <span class="o">=</span> <span class="n">LinkedPolygon</span><span class="p">(</span><span class="n">polygon</span><span class="p">[:])</span>
+            <span class="n">linked_polygons</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">linked_polygon</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">p1</span><span class="p">,</span> <span class="n">p2</span> <span class="ow">in</span> <span class="n">pairwise</span><span class="p">(</span><span class="n">polygon</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">scanpoint</span> <span class="ow">in</span> <span class="n">remaining_scanpoints</span><span class="p">[:]:</span>
+                    <span class="n">d</span> <span class="o">=</span> <span class="n">dist_to_segment_squared</span><span class="p">(</span><span class="n">scanpoint</span><span class="p">,</span> <span class="n">p1</span><span class="p">,</span> <span class="n">p2</span><span class="p">)</span>
+                    <span class="c1"># Todo pick a good number. Tests show values between 1.83e-19 and 1.38e-21</span>
+                    <span class="k">if</span> <span class="n">d</span> <span class="o">&lt;</span> <span class="mf">0.0000001</span><span class="p">:</span>
+                        <span class="n">remaining_scanpoints</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">scanpoint</span><span class="p">)</span>
+                        <span class="n">linked_polygon</span><span class="o">.</span><span class="n">link_point</span><span class="p">(</span><span class="n">scanpoint</span><span class="p">,</span> <span class="n">p1</span><span class="p">,</span> <span class="n">p2</span><span class="p">)</span>
+                        <span class="n">scanpoint_to_linked_polygon</span><span class="p">[</span><span class="n">scanpoint</span><span class="p">]</span> <span class="o">=</span> <span class="n">linked_polygon</span>
+
+        <span class="k">assert</span> <span class="ow">not</span> <span class="n">remaining_scanpoints</span>
+        <span class="k">return</span> <span class="n">linked_polygons</span><span class="p">,</span> <span class="n">scanpoint_to_linked_polygon</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_route_zig_zag</span><span class="p">(</span><span class="n">linked_polygons</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">LinkedPolygon</span><span class="p">],</span>
+                       <span class="n">scanlines</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">],</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]],</span>
+                       <span class="n">scanpoint_to_linked_polygon</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">],</span> <span class="n">LinkedPolygon</span><span class="p">],</span>
+                       <span class="n">scanpoint_to_scanline</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]])</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span>
+        <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]]:</span>
+
+        <span class="c1"># Prepare to route the zigzag</span>
+        <span class="k">for</span> <span class="n">linked_polygon</span> <span class="ow">in</span> <span class="n">linked_polygons</span><span class="p">:</span>
+            <span class="n">linked_polygon</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
+
+        <span class="n">scanlines</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">scanlines</span><span class="p">)</span>
+
+        <span class="c1"># Pick a starting position. Clipper makes no guarantees about the orientation</span>
+        <span class="c1"># of polylines it returns, so figure the top left scanpoint as the</span>
+        <span class="c1"># starting position.</span>
+        <span class="n">starting_scanline</span> <span class="o">=</span> <span class="n">scanlines</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">start_position</span><span class="p">,</span> <span class="n">cut_position</span> <span class="o">=</span> <span class="n">starting_scanline</span>
+        <span class="k">if</span> <span class="n">start_position</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">cut_position</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span>
+            <span class="n">start_position</span><span class="p">,</span> <span class="n">cut_position</span> <span class="o">=</span> <span class="n">cut_position</span><span class="p">,</span> <span class="n">start_position</span>
+
+        <span class="n">scanpoint_to_linked_polygon</span><span class="p">[</span><span class="n">start_position</span><span class="p">]</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">start_position</span><span class="p">)</span>
+        <span class="n">cut_sequence</span> <span class="o">=</span> <span class="p">[</span><span class="n">start_position</span><span class="p">,</span> <span class="n">cut_position</span><span class="p">]</span>
+        <span class="n">cut_sequences</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="c1"># Primary routing loop</span>
+        <span class="k">while</span> <span class="n">scanlines</span><span class="p">:</span>
+            <span class="n">linked_polygon</span> <span class="o">=</span> <span class="n">scanpoint_to_linked_polygon</span><span class="p">[</span><span class="n">cut_position</span><span class="p">]</span>
+            <span class="n">path</span> <span class="o">=</span> <span class="n">linked_polygon</span><span class="o">.</span><span class="n">nearest_linked</span><span class="p">(</span><span class="n">cut_position</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">path</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">cut_sequences</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">cut_sequence</span><span class="p">)</span>
+                <span class="c1"># TODO some optimization potential in picking the nearest scanpoint</span>
+                <span class="n">start_position</span><span class="p">,</span> <span class="n">cut_position</span> <span class="o">=</span> <span class="n">scanlines</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+                <span class="c1"># TODO some optimization potential in picking a direction</span>
+                <span class="n">cut_sequence</span> <span class="o">=</span> <span class="p">[</span><span class="n">start_position</span><span class="p">,</span> <span class="n">cut_position</span><span class="p">]</span>
+                <span class="k">continue</span>
+
+            <span class="n">cut_sequence</span> <span class="o">+=</span> <span class="n">path</span>
+            <span class="n">scanline</span> <span class="o">=</span> <span class="n">scanpoint_to_scanline</span><span class="p">[</span><span class="n">path</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]]</span>
+            <span class="n">cut_sequence</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">scanline</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">if</span> <span class="n">scanline</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">path</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="k">else</span> <span class="n">scanline</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+            <span class="n">cut_position</span> <span class="o">=</span> <span class="n">cut_sequence</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+            <span class="n">scanlines</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">scanline</span><span class="p">)</span>
+
+        <span class="n">cut_sequences</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">cut_sequence</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">cut_sequences</span></div>
+
+
+<div class="viewcode-block" id="ContourStrategy"><a class="viewcode-back" href="../../../classreference.html#cq_cam.operations.strategy.ContourStrategy">[docs]</a><span class="k">class</span> <span class="nc">ContourStrategy</span><span class="p">(</span><span class="n">Strategy</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Contour strategy uses the outer boundary to generate incrementally shrinking contours.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">process</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">task</span><span class="p">,</span> <span class="n">outer_boundaries</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">cq</span><span class="o">.</span><span class="n">Wire</span><span class="p">],</span> <span class="n">inner_boundaries</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">cq</span><span class="o">.</span><span class="n">Wire</span><span class="p">],</span> <span class="n">show_object</span><span class="p">):</span>
+        <span class="c1"># We generate shrinking contours from all the outer boundaries</span>
+        <span class="n">offset_step</span> <span class="o">=</span> <span class="o">-</span><span class="nb">abs</span><span class="p">(</span><span class="n">task</span><span class="o">.</span><span class="n">_tool_diameter</span> <span class="o">*</span> <span class="n">task</span><span class="o">.</span><span class="n">stepover</span><span class="p">)</span>
+        <span class="n">clipper</span> <span class="o">=</span> <span class="n">WireClipper</span><span class="p">()</span>
+
+        <span class="k">for</span> <span class="n">outer_boundary</span> <span class="ow">in</span> <span class="n">outer_boundaries</span><span class="p">:</span>
+            <span class="n">clipper</span><span class="o">.</span><span class="n">add_clip_wire</span><span class="p">(</span><span class="n">outer_boundary</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">inner_boundary</span> <span class="ow">in</span> <span class="n">inner_boundaries</span><span class="p">:</span>
+            <span class="n">clipper</span><span class="o">.</span><span class="n">add_clip_wire</span><span class="p">(</span><span class="n">inner_boundary</span><span class="p">)</span>
+        <span class="c1"># TODO sane failure here if we have empty clipper</span>
+        <span class="k">for</span> <span class="n">obi</span><span class="p">,</span> <span class="n">outer_boundary</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">outer_boundaries</span><span class="p">):</span>
+            <span class="n">queue</span> <span class="o">=</span> <span class="p">[</span><span class="n">outer_boundary</span><span class="p">]</span>
+
+            <span class="k">while</span> <span class="n">queue</span><span class="p">:</span>
+                <span class="n">contour</span> <span class="o">=</span> <span class="n">queue</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+                <span class="n">new_sub_contours</span> <span class="o">=</span> <span class="n">contour</span><span class="o">.</span><span class="n">offset2D</span><span class="p">(</span><span class="n">offset_step</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">new_sub_contour</span> <span class="ow">in</span> <span class="n">new_sub_contours</span><span class="p">:</span>
+                    <span class="n">clipper</span><span class="o">.</span><span class="n">add_subject_wire</span><span class="p">(</span><span class="n">new_sub_contour</span><span class="p">)</span>
+                    <span class="n">queue</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">new_sub_contour</span><span class="p">)</span>
+        <span class="n">paths</span> <span class="o">=</span> <span class="n">clipper</span><span class="o">.</span><span class="n">execute</span><span class="p">()</span>
+        <span class="c1">#return paths</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_sort_clipper_output</span><span class="p">(</span><span class="n">paths</span><span class="p">)</span></div>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Parametric Products Intellectual Holdings LLC, All Rights Reserved.</p>
+  </div>
+
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

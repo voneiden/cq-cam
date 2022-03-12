@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CQ-CAM Documentation &mdash; CQ-CAM Documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="_static/tables.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/vtk.js"></script>
+        <script>
+const RENDERERS = {};
+var ID =  0;
+
+const renderWindow = vtk.Rendering.Core.vtkRenderWindow.newInstance();
+const openglRenderWindow = vtk.Rendering.OpenGL.vtkRenderWindow.newInstance();
+renderWindow.addView(openglRenderWindow);
+
+const rootContainer = document.createElement('div');
+rootContainer.style.position = 'fixed';
+//rootContainer.style.zIndex = -1;
+rootContainer.style.left = 0;
+rootContainer.style.top = 0;
+rootContainer.style.pointerEvents = 'none';
+rootContainer.style.width = '100%';
+rootContainer.style.height = '100%';
+
+openglRenderWindow.setContainer(rootContainer);
+
+const interact_style = vtk.Interaction.Style.vtkInteractorStyleManipulator.newInstance();
+
+const manips = {
+    rot: vtk.Interaction.Manipulators.vtkMouseCameraTrackballRotateManipulator.newInstance(),
+    pan: vtk.Interaction.Manipulators.vtkMouseCameraTrackballPanManipulator.newInstance(),
+    zoom1: vtk.Interaction.Manipulators.vtkMouseCameraTrackballZoomManipulator.newInstance(),
+    zoom2: vtk.Interaction.Manipulators.vtkMouseCameraTrackballZoomManipulator.newInstance(),
+    roll: vtk.Interaction.Manipulators.vtkMouseCameraTrackballRollManipulator.newInstance(),
+};
+
+manips.zoom1.setControl(true);
+manips.zoom2.setButton(3);
+manips.roll.setShift(true);
+manips.pan.setButton(2);
+
+for (var k in manips){{
+    interact_style.addMouseManipulator(manips[k]);
+}};
+
+const interactor = vtk.Rendering.Core.vtkRenderWindowInteractor.newInstance();
+interactor.setView(openglRenderWindow);
+interactor.initialize();
+interactor.setInteractorStyle(interact_style);
+
+document.addEventListener('DOMContentLoaded', function () {
+    document.body.appendChild(rootContainer);
+});
+
+function updateViewPort(element, renderer) {
+  const { innerHeight, innerWidth } = window;
+  const { x, y, width, height } = element.getBoundingClientRect();
+  const viewport = [
+    x / innerWidth,
+    1 - (y + height) / innerHeight,
+    (x + width) / innerWidth,
+    1 - y / innerHeight,
+  ];
+  renderer.setViewport(...viewport);
+}
+
+function recomputeViewports() {
+  const rendererElems = document.querySelectorAll('.renderer');
+  for (let i = 0; i < rendererElems.length; i++) {
+    const elem = rendererElems[i];
+    const { id } = elem;
+    const renderer = RENDERERS[id];
+    updateViewPort(elem, renderer);
+  }
+  renderWindow.render();
+}
+
+function resize() {
+  rootContainer.style.width = `${window.innerWidth}px`;
+  openglRenderWindow.setSize(window.innerWidth, window.innerHeight);
+  recomputeViewports();
+}
+
+window.addEventListener('resize', resize);
+document.addEventListener('scroll', recomputeViewports);
+
+
+function enterCurrentRenderer(e) {
+  interactor.bindEvents(document.body);
+  interact_style.setEnabled(true);
+  interactor.setCurrentRenderer(RENDERERS[e.target.id]);
+}
+
+function exitCurrentRenderer(e) {
+  interactor.setCurrentRenderer(null);
+  interact_style.setEnabled(false);
+  interactor.unbindEvents();
+}
+
+
+function applyStyle(element) {
+  element.classList.add('renderer');
+  element.style.width = '100%';
+  element.style.height = '100%';
+  element.style.display = 'inline-block';
+  element.style.boxSizing = 'border';
+  return element;
+}
+
+window.addEventListener('load', resize);
+
+function render(data, parent_element, ratio){
+
+    // Initial setup
+    const renderer = vtk.Rendering.Core.vtkRenderer.newInstance({ background: [1, 1, 1 ] });
+
+    // iterate over all children children
+    for (var el of data){
+        var trans = el.position;
+        var rot = el.orientation;
+        var rgba = el.color;
+        var shape = el.shape;
+
+        // load the inline data
+        var reader = vtk.IO.XML.vtkXMLPolyDataReader.newInstance();
+        const textEncoder = new TextEncoder();
+        reader.parseAsArrayBuffer(textEncoder.encode(shape));
+
+        // setup actor,mapper and add
+        const mapper = vtk.Rendering.Core.vtkMapper.newInstance();
+        mapper.setInputConnection(reader.getOutputPort());
+        mapper.setResolveCoincidentTopologyToPolygonOffset();
+        mapper.setResolveCoincidentTopologyPolygonOffsetParameters(0.5,100);
+
+        const actor = vtk.Rendering.Core.vtkActor.newInstance();
+        actor.setMapper(mapper);
+
+        // set color and position
+        actor.getProperty().setColor(rgba.slice(0,3));
+        actor.getProperty().setOpacity(rgba[3]);
+
+        actor.rotateZ(rot[2]*180/Math.PI);
+        actor.rotateY(rot[1]*180/Math.PI);
+        actor.rotateX(rot[0]*180/Math.PI);
+
+        actor.setPosition(trans);
+
+        renderer.addActor(actor);
+
+    };
+
+    //add the container
+    const container = applyStyle(document.createElement("div"));
+    parent_element.appendChild(container);
+    container.addEventListener('mouseenter', enterCurrentRenderer);
+    container.addEventListener('mouseleave', exitCurrentRenderer);
+    container.id = ID;
+
+    renderWindow.addRenderer(renderer);
+    updateViewPort(container, renderer);
+    renderer.getActiveCamera().set({ position: [1, -1, 1], viewUp: [0, 0, 1] });
+    renderer.resetCamera();
+
+    RENDERERS[ID] = renderer;
+    ID++;
+};
+</script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Installation" href="installation.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="#" class="icon icon-home"> CQ-CAM
+          </a>
+              <div class="version">
+                0.0
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="operations.html">Operations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="algorithms.html">Algorithms</a></li>
+<li class="toctree-l1"><a class="reference internal" href="classreference.html">CQ-CAM Class Summary</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="#">CQ-CAM</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="#" class="icon icon-home"></a> &raquo;</li>
+      <li>CQ-CAM Documentation</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <div class="section" id="cq-cam-documentation">
+<h1>CQ-CAM Documentation<a class="headerlink" href="#cq-cam-documentation" title="Permalink to this headline"></a></h1>
+<p>CQ-CAM is a CAM extension for generating and visualizing CNC milling toolpaths for CadQuery.</p>
+<div class="section" id="test-out-rendering">
+<h2>Test out rendering<a class="headerlink" href="#test-out-rendering" title="Permalink to this headline"></a></h2>
+<div class="cq-vtk"
+ style="text-align:lefts;float:left;border: 1px solid #ddd; width:100%; height:500px"">
+   <script>
+   var parent_element = document.currentScript.parentNode;
+   var data = [{"shape": "<?xml version=\"1.0\"?>\n<VTKFile type=\"PolyData\" version=\"0.1\" byte_order=\"LittleEndian\" header_type=\"UInt32\" compressor=\"vtkZLibDataCompressor\">\n  <PolyData>\n    <Piece NumberOfPoints=\"460\"                  NumberOfVerts=\"126\"                  NumberOfLines=\"215\"                  NumberOfStrips=\"0\"                    NumberOfPolys=\"12\"                  >\n      <PointData Normals=\"Normals\">\n        <DataArray type=\"Float32\" Name=\"Normals\" NumberOfComponents=\"3\" format=\"appended\" RangeMin=\"0\"                    RangeMax=\"1\"                    offset=\"0\"                   />\n      </PointData>\n      <CellData Normals=\"Normals\">\n        <DataArray type=\"Int64\" IdType=\"1\" Name=\"SUBSHAPE_IDS\" format=\"appended\" RangeMin=\"4\"                    RangeMax=\"212\"                  offset=\"76\"                  />\n        <DataArray type=\"Int64\" IdType=\"1\" Name=\"MESH_TYPES\" format=\"appended\" RangeMin=\"2\"                    RangeMax=\"7\"                    offset=\"620\"                 />\n        <DataArray type=\"Float32\" Name=\"Normals\" NumberOfComponents=\"3\" format=\"appended\" RangeMin=\"1\"                    RangeMax=\"1\"                    offset=\"704\"                 />\n      </CellData>\n      <Points>\n        <DataArray type=\"Float32\" Name=\"Points\" NumberOfComponents=\"3\" format=\"appended\" RangeMin=\"7.5\"                  RangeMax=\"18.161239771\"         offset=\"800\"                 />\n      </Points>\n      <Verts>\n        <DataArray type=\"Int64\" Name=\"connectivity\" format=\"appended\" RangeMin=\"\"                     RangeMax=\"\"                     offset=\"2084\"                />\n        <DataArray type=\"Int64\" Name=\"offsets\" format=\"appended\" RangeMin=\"\"                     RangeMax=\"\"                     offset=\"2380\"                />\n      </Verts>\n      <Lines>\n        <DataArray type=\"Int64\" Name=\"connectivity\" format=\"appended\" RangeMin=\"\"                     RangeMax=\"\"                     offset=\"2680\"                />\n        <DataArray type=\"Int64\" Name=\"offsets\" format=\"appended\" RangeMin=\"\"                     RangeMax=\"\"                     offset=\"3460\"                />\n      </Lines>\n      <Strips>\n        <DataArray type=\"Int64\" Name=\"connectivity\" format=\"appended\" RangeMin=\"\"                     RangeMax=\"\"                     offset=\"3988\"                />\n        <DataArray type=\"Int64\" Name=\"offsets\" format=\"appended\" RangeMin=\"\"                     RangeMax=\"\"                     offset=\"4004\"                />\n      </Strips>\n      <Polys>\n        <DataArray type=\"Int64\" Name=\"connectivity\" format=\"appended\" RangeMin=\"\"                     RangeMax=\"\"                     offset=\"4020\"                />\n        <DataArray type=\"Int64\" Name=\"offsets\" format=\"appended\" RangeMin=\"\"                     RangeMax=\"\"                     offset=\"4144\"                />\n      </Polys>\n    </Piece>\n  </PolyData>\n  <AppendedData encoding=\"base64\">\n   _AQAAAACAAACQFQAAJgAAAA==eJztzTENAAAIBLF3hjWkYwIGkna67RIAAAAAgC1dt/37MSK+Eek=AQAAAACAAAAICwAAhgEAAA==eJy9ztV3z3EAxnEXjubY5MHBcUw30zm16e6Y7maG6Wkmpru7c5jJGTa9P8iF1/3n5nt+z83r8nmXLvF/ZViOFRjHeFZldSawEZuwKZuzBVuxNduyHTswkZ3YmV3ZjT3Yk73Zh33ZjwM4kCkcxCEcyuEcwVEczbEcxwmcyMmcwmmczhmcydmcw3mcz4VcxCVcyuVcwVVczTSu5TquZwY3cjO3cBu3cwd3cjf3cB/3M4sHeZhHeJTHeIIneZpneI7neZGXeIVXeZ03eIu3eZf3+IAP+ZhP+IzPmcOXfM1c5vEt3/MDPzGfBfzCbyzkd/7gL/7mXxazFMuyPCuyMquwGmuwFmuzLuuxIRuzGVuyDduzI7uwO3sxif2ZzMEROyxGjozYMRzPSZzKVM7iXC7gYi7jSq6J2PQYuSFiN3ErM7mLe3mAh5jN4zzFs7wQsZdj5LWIvck7vM9HfMoXfMU3fMeP/MyvEVsUI39G7B+WDFgpYM2AdQLWD9ggYKg31BP6+weSdpxfAQAAAACAAAAICwAAKwAAAA==eJxjYoAAplF6lB6lhz3NSmOaeZQepUfpUXqUHlQ0rct9WtPsNKYBSoUEHg==AQAAAACAAACMEAAANAAAAA==eJztyjEKACAMA8D+zK/l6YJDB6Hg7nW6JK3Kqj5mZmZmZmZm/sSZ+865tql//TveBksKbw==AQAAAACAAACQFQAAsQMAAA==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AQAAAACAAAC4BgAAeAEAAA==eJwtxVFEHAAAANCWJElOkiRJTpIkJ0mS5OScJEmSJEmSJElOkiRJcpLknCQ5SU5mZmaSmWRmJpmZmZlJZmZmkplkH7338zIzHmQ52znOdZ7zHXCBC13kYpe41GUud4WDrnSVq13jWtc55Ho3uNFNbnaLW93msNsdcdQd7nSXu93jXve53wMe9JCHPeJRj3ncE570lKc941nHPOd5L3jRS172ile95nXHveFNb3nbCSe9413ved8pH/jQR0772I/9xE/9zM/9wic+9Uu/8pnP/dpv/NbvfOFLv/cHf/Qnf/YXf/U3X/na3/3DP/3Lv/3HN771X//zne+d8eihTGc52znOdZ7zHXCBC13kYpe41GUud4WDrnSVq13jWtc55Ho3uNFNbnaLW93msNsdcdQd7nSXu93jXve53wMe9JCHPeJRj3ncE570lKc941nHPOd5L3jRS172ile95nXHveFNb3nbCSe9413ved8pH/jQR0772P8BP2BdwQ==AAAAAACAAAAAAAAAAAAAAACAAAAAAAAAAQAAAACAAAAgAQAASQAAAA==eJxdyMkNgDAAA0Hovx3CfYWEuykktP7Yn9E6lMW/CmsM1g122GJvv3rABScc7VfPmDDiar96wxN3zParD3zxxst+9YMfWV0bEw==AQAAAACAAABgAAAAKAAAAA==eJxjZoAANijNCaV5oDQ/lBaC0qJQWgJKS0NpOSitCKVVoDQAIoAA6w==\n  </AppendedData>\n</VTKFile>\n", "color": [1.0, 0.800000011920929, 0.0, 1.0], "position": [0.0, 0.0, 0.0], "orientation": [0.0, -0.0, 0.0]}];
+   render(data, parent_element);
+   </script>
+</div>
+<div style="clear:both;">
+</div><div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">cq_cam.job</span> <span class="kn">import</span> <span class="n">Job</span>
+<span class="kn">from</span> <span class="nn">cq_cam.operations.profile</span> <span class="kn">import</span> <span class="n">Profile</span>
+<span class="kn">from</span> <span class="nn">cq_cam.commands.base_command</span> <span class="kn">import</span> <span class="n">Unit</span>
+<span class="kn">from</span> <span class="nn">cq_cam.visualize</span> <span class="kn">import</span> <span class="n">visualize_task</span>
+
+<span class="n">wp</span> <span class="o">=</span> <span class="n">cadquery</span><span class="o">.</span><span class="n">Workplane</span><span class="p">(</span><span class="s2">&quot;front&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">box</span><span class="p">(</span><span class="mf">20.0</span><span class="p">,</span> <span class="mf">20.0</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
+
+<span class="n">job_plane</span> <span class="o">=</span> <span class="n">wp</span><span class="o">.</span><span class="n">faces</span><span class="p">(</span><span class="s1">&#39;&gt;Z&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">workplane</span><span class="p">()</span>
+<span class="n">job</span> <span class="o">=</span> <span class="n">Job</span><span class="p">(</span><span class="n">job_plane</span><span class="p">,</span> <span class="mi">300</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="n">Unit</span><span class="o">.</span><span class="n">METRIC</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
+<span class="n">op</span> <span class="o">=</span> <span class="n">Profile</span><span class="p">(</span><span class="n">job</span><span class="o">=</span><span class="n">job</span><span class="p">,</span> <span class="n">clearance_height</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">top_height</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">wp</span><span class="o">=</span><span class="n">wp</span><span class="o">.</span><span class="n">wires</span><span class="p">(</span><span class="s1">&#39;&lt;Z&#39;</span><span class="p">))</span>
+<span class="n">toolpath</span> <span class="o">=</span> <span class="n">visualize_task</span><span class="p">(</span><span class="n">job</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">as_edges</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="c1">#result = cadquery.Assembly().add(wp).add(toolpath)</span>
+<span class="c1">#result = wp.edges()</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">wp</span>
+<span class="n">result</span><span class="o">.</span><span class="n">objects</span> <span class="o">+=</span> <span class="n">toolpath</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="table-of-contents">
+<h2>Table Of Contents<a class="headerlink" href="#table-of-contents" title="Permalink to this headline"></a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="operations.html">Operations</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="operations.html#profile">Profile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="operations.html#pocket">Pocket</a></li>
+<li class="toctree-l2"><a class="reference internal" href="operations.html#drill">Drill</a></li>
+<li class="toctree-l2"><a class="reference internal" href="operations.html#d-surface">3D Surface</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="algorithms.html">Algorithms</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="algorithms.html#profiling">Profiling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="algorithms.html#pocketing">Pocketing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="algorithms.html#d-surfaces">3D surfaces</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="classreference.html">CQ-CAM Class Summary</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="classreference.html#core-classes">Core Classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="classreference.html#milling-strategies">Milling strategies</a></li>
+<li class="toctree-l2"><a class="reference internal" href="classreference.html#misc">Misc</a></li>
+<li class="toctree-l2"><a class="reference internal" href="classreference.html#class-details">Class details</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+<div class="section" id="indices-and-tables">
+<h2>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Permalink to this headline"></a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></p></li>
+<li><p><a class="reference internal" href="py-modindex.html"><span class="std std-ref">Module Index</span></a></p></li>
+<li><p><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></p></li>
+</ul>
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="installation.html" class="btn btn-neutral float-right" title="Installation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Matti Eiden, All Rights Reserved.</p>
+  </div>
+
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

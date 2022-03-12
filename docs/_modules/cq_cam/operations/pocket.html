@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>cq_cam.operations.pocket &mdash; CadQuery Documentation</title>
+      <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../../_static/tables.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+        <script src="../../../_static/jquery.js"></script>
+        <script src="../../../_static/underscore.js"></script>
+        <script src="../../../_static/doctools.js"></script>
+        <script src="../../../_static/vtk.js"></script>
+        <script>
+const RENDERERS = {};
+var ID =  0;
+
+const renderWindow = vtk.Rendering.Core.vtkRenderWindow.newInstance();
+const openglRenderWindow = vtk.Rendering.OpenGL.vtkRenderWindow.newInstance();
+renderWindow.addView(openglRenderWindow);
+
+const rootContainer = document.createElement('div');
+rootContainer.style.position = 'fixed';
+//rootContainer.style.zIndex = -1;
+rootContainer.style.left = 0;
+rootContainer.style.top = 0;
+rootContainer.style.pointerEvents = 'none';
+rootContainer.style.width = '100%';
+rootContainer.style.height = '100%';
+
+openglRenderWindow.setContainer(rootContainer);
+
+const interact_style = vtk.Interaction.Style.vtkInteractorStyleManipulator.newInstance();
+
+const manips = {
+    rot: vtk.Interaction.Manipulators.vtkMouseCameraTrackballRotateManipulator.newInstance(),
+    pan: vtk.Interaction.Manipulators.vtkMouseCameraTrackballPanManipulator.newInstance(),
+    zoom1: vtk.Interaction.Manipulators.vtkMouseCameraTrackballZoomManipulator.newInstance(),
+    zoom2: vtk.Interaction.Manipulators.vtkMouseCameraTrackballZoomManipulator.newInstance(),
+    roll: vtk.Interaction.Manipulators.vtkMouseCameraTrackballRollManipulator.newInstance(),
+};
+
+manips.zoom1.setControl(true);
+manips.zoom2.setButton(3);
+manips.roll.setShift(true);
+manips.pan.setButton(2);
+
+for (var k in manips){{
+    interact_style.addMouseManipulator(manips[k]);
+}};
+
+const interactor = vtk.Rendering.Core.vtkRenderWindowInteractor.newInstance();
+interactor.setView(openglRenderWindow);
+interactor.initialize();
+interactor.setInteractorStyle(interact_style);
+
+document.addEventListener('DOMContentLoaded', function () {
+    document.body.appendChild(rootContainer);
+});
+
+function updateViewPort(element, renderer) {
+  const { innerHeight, innerWidth } = window;
+  const { x, y, width, height } = element.getBoundingClientRect();
+  const viewport = [
+    x / innerWidth,
+    1 - (y + height) / innerHeight,
+    (x + width) / innerWidth,
+    1 - y / innerHeight,
+  ];
+  renderer.setViewport(...viewport);
+}
+
+function recomputeViewports() {
+  const rendererElems = document.querySelectorAll('.renderer');
+  for (let i = 0; i < rendererElems.length; i++) {
+    const elem = rendererElems[i];
+    const { id } = elem;
+    const renderer = RENDERERS[id];
+    updateViewPort(elem, renderer);
+  }
+  renderWindow.render();
+}
+
+function resize() {
+  rootContainer.style.width = `${window.innerWidth}px`;
+  openglRenderWindow.setSize(window.innerWidth, window.innerHeight);
+  recomputeViewports();
+}
+
+window.addEventListener('resize', resize);
+document.addEventListener('scroll', recomputeViewports);
+
+
+function enterCurrentRenderer(e) {
+  interactor.bindEvents(document.body);
+  interact_style.setEnabled(true);
+  interactor.setCurrentRenderer(RENDERERS[e.target.id]);
+}
+
+function exitCurrentRenderer(e) {
+  interactor.setCurrentRenderer(null);
+  interact_style.setEnabled(false);
+  interactor.unbindEvents();
+}
+
+
+function applyStyle(element) {
+  element.classList.add('renderer');
+  element.style.width = '100%';
+  element.style.height = '100%';
+  element.style.display = 'inline-block';
+  element.style.boxSizing = 'border';
+  return element;
+}
+
+window.addEventListener('load', resize);
+
+function render(data, parent_element, ratio){
+
+    // Initial setup
+    const renderer = vtk.Rendering.Core.vtkRenderer.newInstance({ background: [1, 1, 1 ] });
+
+    // iterate over all children children
+    for (var el of data){
+        var trans = el.position;
+        var rot = el.orientation;
+        var rgba = el.color;
+        var shape = el.shape;
+
+        // load the inline data
+        var reader = vtk.IO.XML.vtkXMLPolyDataReader.newInstance();
+        const textEncoder = new TextEncoder();
+        reader.parseAsArrayBuffer(textEncoder.encode(shape));
+
+        // setup actor,mapper and add
+        const mapper = vtk.Rendering.Core.vtkMapper.newInstance();
+        mapper.setInputConnection(reader.getOutputPort());
+        mapper.setResolveCoincidentTopologyToPolygonOffset();
+        mapper.setResolveCoincidentTopologyPolygonOffsetParameters(0.5,100);
+
+        const actor = vtk.Rendering.Core.vtkActor.newInstance();
+        actor.setMapper(mapper);
+
+        // set color and position
+        actor.getProperty().setColor(rgba.slice(0,3));
+        actor.getProperty().setOpacity(rgba[3]);
+
+        actor.rotateZ(rot[2]*180/Math.PI);
+        actor.rotateY(rot[1]*180/Math.PI);
+        actor.rotateX(rot[0]*180/Math.PI);
+
+        actor.setPosition(trans);
+
+        renderer.addActor(actor);
+
+    };
+
+    //add the container
+    const container = applyStyle(document.createElement("div"));
+    parent_element.appendChild(container);
+    container.addEventListener('mouseenter', enterCurrentRenderer);
+    container.addEventListener('mouseleave', exitCurrentRenderer);
+    container.id = ID;
+
+    renderWindow.addRenderer(renderer);
+    updateViewPort(container, renderer);
+    renderer.getActiveCamera().set({ position: [1, -1, 1], viewUp: [0, 0, 1] });
+    renderer.resetCamera();
+
+    RENDERERS[ID] = renderer;
+    ID++;
+};
+</script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../../index.html" class="icon icon-home"> CadQuery
+          </a>
+              <div class="version">
+                0.1
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../operations.html">Operations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../algorithms.html">Algorithms</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../classreference.html">CQ-CAM Class Summary</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">CadQuery</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../../index.html">Module code</a> &raquo;</li>
+      <li>cq_cam.operations.pocket</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for cq_cam.operations.pocket</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">defaultdict</span>
+<span class="kn">from</span> <span class="nn">dataclasses</span> <span class="kn">import</span> <span class="n">dataclass</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Dict</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">OCP.BRepFeat</span> <span class="kn">import</span> <span class="n">BRepFeat</span>
+<span class="kn">from</span> <span class="nn">OCP.TopAbs</span> <span class="kn">import</span> <span class="n">TopAbs_FACE</span>
+<span class="kn">from</span> <span class="nn">OCP.TopExp</span> <span class="kn">import</span> <span class="n">TopExp_Explorer</span>
+<span class="kn">from</span> <span class="nn">cadquery</span> <span class="kn">import</span> <span class="n">cq</span>
+
+<span class="kn">from</span> <span class="nn">cq_cam.commands.base_command</span> <span class="kn">import</span> <span class="n">Unit</span>
+<span class="kn">from</span> <span class="nn">cq_cam.commands.command</span> <span class="kn">import</span> <span class="n">Rapid</span><span class="p">,</span> <span class="n">Cut</span><span class="p">,</span> <span class="n">Plunge</span>
+<span class="kn">from</span> <span class="nn">cq_cam.job</span> <span class="kn">import</span> <span class="n">Job</span>
+<span class="kn">from</span> <span class="nn">cq_cam.operations.base_operation</span> <span class="kn">import</span> <span class="n">FaceBaseOperation</span>
+<span class="kn">from</span> <span class="nn">cq_cam.operations.mixin_operation</span> <span class="kn">import</span> <span class="n">PlaneValidationMixin</span><span class="p">,</span> <span class="n">ObjectsValidationMixin</span>
+<span class="kn">from</span> <span class="nn">cq_cam.operations.strategy</span> <span class="kn">import</span> <span class="n">ZigZagStrategy</span><span class="p">,</span> <span class="n">ContourStrategy</span>
+<span class="kn">from</span> <span class="nn">cq_cam.utils.utils</span> <span class="kn">import</span> <span class="n">WireClipper</span><span class="p">,</span> <span class="n">flatten_list</span>
+<span class="kn">from</span> <span class="nn">cq_cam.visualize</span> <span class="kn">import</span> <span class="n">visualize_task</span>
+
+
+<div class="viewcode-block" id="Pocket"><a class="viewcode-back" href="../../../classreference.html#cq_cam.operations.pocket.Pocket">[docs]</a><span class="nd">@dataclass</span><span class="p">(</span><span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">Pocket</span><span class="p">(</span><span class="n">PlaneValidationMixin</span><span class="p">,</span> <span class="n">ObjectsValidationMixin</span><span class="p">,</span> <span class="n">FaceBaseOperation</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; 2.5D Pocket operation</span>
+
+<span class="sd">    All faces involved must be planes and parallel.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">tool_diameter</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">3.175</span>
+    <span class="sd">&quot;&quot;&quot; Diameter of the tool that will be used to perform the operation.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># TODO rotation angle for zigzag</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">_tool_diameter</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">tool_diameter</span>
+
+    <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># Give each face an ID</span>
+        <span class="n">faces</span> <span class="o">=</span> <span class="p">[(</span><span class="n">i</span><span class="p">,</span> <span class="n">face</span><span class="o">.</span><span class="n">copy</span><span class="p">())</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">face</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_faces</span><span class="p">)]</span>
+        <span class="n">features</span><span class="p">,</span> <span class="n">coplanar_faces</span><span class="p">,</span> <span class="n">depth_info</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_discover_pocket_features</span><span class="p">(</span><span class="n">faces</span><span class="p">)</span>
+        <span class="n">groups</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_group_faces_by_features</span><span class="p">(</span><span class="n">features</span><span class="p">,</span> <span class="n">coplanar_faces</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">group_faces</span> <span class="ow">in</span> <span class="n">groups</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="n">boundaries</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_boundaries_by_group</span><span class="p">(</span><span class="n">group_faces</span><span class="p">,</span> <span class="n">coplanar_faces</span><span class="p">,</span> <span class="n">depth_info</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">boundary</span><span class="p">,</span> <span class="n">start_depth</span><span class="p">,</span> <span class="n">end_depth</span> <span class="ow">in</span> <span class="n">boundaries</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">process_boundary</span><span class="p">(</span><span class="n">boundary</span><span class="p">,</span> <span class="n">start_depth</span><span class="p">,</span> <span class="n">end_depth</span><span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_group_faces_by_features</span><span class="p">(</span><span class="n">features</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">cq</span><span class="o">.</span><span class="n">Face</span><span class="p">],</span> <span class="n">faces</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">cq</span><span class="o">.</span><span class="n">Face</span><span class="p">]]):</span>
+        <span class="n">feat</span> <span class="o">=</span> <span class="n">BRepFeat</span><span class="p">()</span>
+        <span class="n">remaining</span> <span class="o">=</span> <span class="n">faces</span><span class="p">[:]</span>
+        <span class="n">groups</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="p">[])</span>
+        <span class="k">for</span> <span class="n">feature</span> <span class="ow">in</span> <span class="n">features</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">face</span> <span class="ow">in</span> <span class="n">remaining</span><span class="p">[:]:</span>
+                <span class="c1"># IsInside_s works regardless the faces are co-planar</span>
+                <span class="k">if</span> <span class="n">feat</span><span class="o">.</span><span class="n">IsInside_s</span><span class="p">(</span><span class="n">face</span><span class="o">.</span><span class="n">wrapped</span><span class="p">,</span> <span class="n">feature</span><span class="o">.</span><span class="n">wrapped</span><span class="p">):</span>
+                    <span class="n">groups</span><span class="p">[</span><span class="n">feature</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">i</span><span class="p">,</span> <span class="n">face</span><span class="p">))</span>
+                    <span class="n">remaining</span><span class="o">.</span><span class="n">remove</span><span class="p">((</span><span class="n">i</span><span class="p">,</span> <span class="n">face</span><span class="p">))</span>
+
+        <span class="k">assert</span> <span class="ow">not</span> <span class="n">remaining</span>
+        <span class="k">return</span> <span class="n">groups</span>
+
+    <span class="k">def</span> <span class="nf">_discover_pocket_features</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">faces</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">cq</span><span class="o">.</span><span class="n">Face</span><span class="p">]]):</span>
+        <span class="sd">&quot;&quot;&quot; Given a list of faces, creates fused feature faces and returns depth information &quot;&quot;&quot;</span>
+        <span class="c1"># Move everything on the same plane</span>
+        <span class="n">coplanar_faces</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">job_zdir</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">job</span><span class="o">.</span><span class="n">workplane</span><span class="o">.</span><span class="n">plane</span><span class="o">.</span><span class="n">zDir</span>
+        <span class="n">job_height</span> <span class="o">=</span> <span class="n">job_zdir</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">job</span><span class="o">.</span><span class="n">workplane</span><span class="o">.</span><span class="n">plane</span><span class="o">.</span><span class="n">origin</span><span class="p">)</span>
+        <span class="n">depth_info</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">face</span> <span class="ow">in</span> <span class="n">faces</span><span class="p">:</span>
+            <span class="n">face_height</span> <span class="o">=</span> <span class="n">job_zdir</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">face</span><span class="o">.</span><span class="n">Center</span><span class="p">())</span>
+            <span class="n">face_depth</span> <span class="o">=</span> <span class="n">face_height</span> <span class="o">-</span> <span class="n">job_height</span>
+            <span class="n">depth_info</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">face_depth</span>
+
+            <span class="c1"># Move face to same level with job plane</span>
+            <span class="n">translated_face</span> <span class="o">=</span> <span class="n">face</span><span class="o">.</span><span class="n">translate</span><span class="p">(</span><span class="n">job_zdir</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="o">-</span><span class="n">face_depth</span><span class="p">))</span>
+            <span class="n">coplanar_faces</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">i</span><span class="p">,</span> <span class="n">translated_face</span><span class="p">))</span>
+
+        <span class="n">features</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_combine_coplanar_faces</span><span class="p">([</span><span class="n">f</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">coplanar_faces</span><span class="p">])</span>
+
+        <span class="k">return</span> <span class="n">features</span><span class="p">,</span> <span class="n">coplanar_faces</span><span class="p">,</span> <span class="n">depth_info</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_combine_coplanar_faces</span><span class="p">(</span><span class="n">faces</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">cq</span><span class="o">.</span><span class="n">Face</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">cq</span><span class="o">.</span><span class="n">Face</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot; Given a list of (coplanar) faces, fuse them together to form</span>
+<span class="sd">         bigger faces &quot;&quot;&quot;</span>
+
+        <span class="c1"># This works also as a sanity check as it will</span>
+        <span class="c1"># raise if the faces are not coplanar</span>
+        <span class="n">wp</span> <span class="o">=</span> <span class="n">cq</span><span class="o">.</span><span class="n">Workplane</span><span class="p">()</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">faces</span><span class="p">)</span><span class="o">.</span><span class="n">combine</span><span class="p">()</span>
+        <span class="n">features</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">explorer</span> <span class="o">=</span> <span class="n">TopExp_Explorer</span><span class="p">(</span><span class="n">wp</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">wrapped</span><span class="p">,</span> <span class="n">TopAbs_FACE</span><span class="p">)</span>
+        <span class="k">while</span> <span class="n">explorer</span><span class="o">.</span><span class="n">More</span><span class="p">():</span>
+            <span class="n">face</span> <span class="o">=</span> <span class="n">explorer</span><span class="o">.</span><span class="n">Current</span><span class="p">()</span>
+            <span class="n">features</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">cq</span><span class="o">.</span><span class="n">Face</span><span class="p">(</span><span class="n">face</span><span class="p">))</span>
+            <span class="n">explorer</span><span class="o">.</span><span class="n">Next</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">features</span>
+
+    <span class="k">def</span> <span class="nf">_boundaries_by_group</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>
+                             <span class="n">group_faces</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">cq</span><span class="o">.</span><span class="n">Face</span><span class="p">]],</span>
+                             <span class="n">coplanar_faces</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">cq</span><span class="o">.</span><span class="n">Face</span><span class="p">]],</span>
+                             <span class="n">depth_info</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">]):</span>
+        <span class="n">face_depths</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">depth_info</span><span class="o">.</span><span class="n">values</span><span class="p">()))</span>
+        <span class="n">face_depths</span><span class="o">.</span><span class="n">sort</span><span class="p">()</span>
+        <span class="n">face_depths</span><span class="o">.</span><span class="n">reverse</span><span class="p">()</span>
+        <span class="n">current_depth</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">boundaries</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">group_i</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">group_faces</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">face_depth</span> <span class="ow">in</span> <span class="n">face_depths</span><span class="p">:</span>
+            <span class="n">depth_i</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">depth</span> <span class="ow">in</span> <span class="n">depth_info</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">depth</span> <span class="o">&lt;=</span> <span class="n">face_depth</span> <span class="ow">and</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">group_i</span><span class="p">]</span>
+            <span class="n">features</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_combine_coplanar_faces</span><span class="p">([</span><span class="n">f</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">coplanar_faces</span> <span class="k">if</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">depth_i</span> <span class="ow">and</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">group_i</span><span class="p">])</span>
+            <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">features</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span>
+            <span class="n">boundary</span> <span class="o">=</span> <span class="n">features</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">boundaries</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">boundary</span><span class="p">,</span> <span class="n">current_depth</span><span class="p">,</span> <span class="n">face_depth</span><span class="p">))</span>
+            <span class="n">current_depth</span> <span class="o">=</span> <span class="n">face_depth</span>
+        <span class="k">return</span> <span class="n">boundaries</span>
+
+    <span class="k">def</span> <span class="nf">_generate_depths</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">start_depth</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">end_depth</span><span class="p">:</span> <span class="nb">float</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">stepdown</span><span class="p">:</span>
+            <span class="n">depths</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">start_depth</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">stepdown</span><span class="p">,</span> <span class="n">end_depth</span><span class="p">,</span> <span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">stepdown</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">depths</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="n">end_depth</span><span class="p">:</span>
+                <span class="n">depths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">end_depth</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">depths</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">end_depth</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">process_boundary</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">face</span><span class="p">:</span> <span class="n">cq</span><span class="o">.</span><span class="n">Face</span><span class="p">,</span> <span class="n">start_depth</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">end_depth</span><span class="p">:</span> <span class="nb">float</span><span class="p">):</span>
+        <span class="c1"># TODO break this function down into easily testable sections</span>
+        <span class="c1"># Perform validations</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">validate_face_plane</span><span class="p">(</span><span class="n">face</span><span class="p">)</span>
+        <span class="n">face_workplane</span> <span class="o">=</span> <span class="n">cq</span><span class="o">.</span><span class="n">Workplane</span><span class="p">(</span><span class="n">obj</span><span class="o">=</span><span class="n">face</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">validate_plane</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">job</span><span class="p">,</span> <span class="n">face_workplane</span><span class="p">)</span>
+
+        <span class="c1"># Prepare profile paths</span>
+        <span class="n">job_plane</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">job</span><span class="o">.</span><span class="n">workplane</span><span class="o">.</span><span class="n">plane</span>
+        <span class="n">tool_radius</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tool_diameter</span> <span class="o">/</span> <span class="mi">2</span>
+        <span class="n">outer_wire_offset</span> <span class="o">=</span> <span class="n">tool_radius</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">outer_boundary_offset</span>
+        <span class="n">inner_wire_offset</span> <span class="o">=</span> <span class="n">tool_radius</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">inner_boundary_offset</span>
+
+        <span class="c1"># These are the profile paths. They are done very last as a finishing pass</span>
+        <span class="n">outer_profiles</span> <span class="o">=</span> <span class="n">face</span><span class="o">.</span><span class="n">outerWire</span><span class="p">()</span><span class="o">.</span><span class="n">offset2D</span><span class="p">(</span><span class="n">outer_wire_offset</span><span class="p">)</span>
+        <span class="n">inner_profiles</span> <span class="o">=</span> <span class="n">flatten_list</span><span class="p">([</span><span class="n">wire</span><span class="o">.</span><span class="n">offset2D</span><span class="p">(</span><span class="n">inner_wire_offset</span><span class="p">)</span> <span class="k">for</span> <span class="n">wire</span> <span class="ow">in</span> <span class="n">face</span><span class="o">.</span><span class="n">innerWires</span><span class="p">()])</span>
+
+        <span class="c1"># Prepare primary clearing regions</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">boundary_final_pass_stepover</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">boundary_final_pass_stepover</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">stepover</span>
+        <span class="n">final_pass_offset</span> <span class="o">=</span> <span class="n">tool_radius</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">boundary_final_pass_stepover</span>
+
+        <span class="c1"># Generate the primary clearing regions with stepover from the above profiles</span>
+        <span class="n">outer_boundaries</span> <span class="o">=</span> <span class="n">flatten_list</span><span class="p">([</span><span class="n">wire</span><span class="o">.</span><span class="n">offset2D</span><span class="p">(</span><span class="o">-</span><span class="n">final_pass_offset</span><span class="p">)</span> <span class="k">for</span> <span class="n">wire</span> <span class="ow">in</span> <span class="n">outer_profiles</span><span class="p">])</span>
+        <span class="n">inner_boundaries</span> <span class="o">=</span> <span class="n">flatten_list</span><span class="p">([</span><span class="n">wire</span><span class="o">.</span><span class="n">offset2D</span><span class="p">(</span><span class="n">final_pass_offset</span><span class="p">)</span> <span class="k">for</span> <span class="n">wire</span> <span class="ow">in</span> <span class="n">inner_profiles</span><span class="p">])</span>
+
+        <span class="n">cut_sequences</span> <span class="o">=</span> <span class="n">ZigZagStrategy</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">outer_boundaries</span><span class="p">,</span> <span class="n">inner_boundaries</span><span class="p">)</span>
+        <span class="n">show_object</span> <span class="o">=</span> <span class="k">lambda</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="mi">0</span>
+        <span class="c1">#contour_strat = ContourStrategy.process(self, outer_boundaries, inner_boundaries, show_object)</span>
+        <span class="c1">#contour_cut_sequences = ContourStrategy.flatten(contour_strat, self.job, show_object)</span>
+
+
+        <span class="c1">#for i, depth in enumerate(self._generate_depths(start_depth, end_depth)):</span>
+        <span class="c1">#    for cut_sequence in cut_sequences:</span>
+        <span class="c1">#        cut_start = cut_sequence[0]</span>
+        <span class="c1">#        self.commands.append(Rapid(None, None, self.clearance_height))</span>
+        <span class="c1">#        self.commands.append(Rapid(*cut_start, None))</span>
+        <span class="c1">#        self.commands.append(Rapid(None, None, self.top_height))  # TODO plunge or rapid?</span>
+        <span class="c1">#        self.commands.append(Plunge(depth))</span>
+        <span class="c1">#        for cut in cut_sequence[1:]:</span>
+        <span class="c1">#            self.commands.append(Cut(*cut, None))</span>
+
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">depth</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_generate_depths</span><span class="p">(</span><span class="n">start_depth</span><span class="p">,</span> <span class="n">end_depth</span><span class="p">)):</span>
+            <span class="k">for</span> <span class="n">cut_sequence</span> <span class="ow">in</span> <span class="n">cut_sequences</span><span class="p">:</span>
+                <span class="n">cut_start</span> <span class="o">=</span> <span class="n">cut_sequence</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">commands</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Rapid</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">z</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">clearance_height</span><span class="p">))</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">commands</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Rapid</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="n">cut_start</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">y</span><span class="o">=</span><span class="n">cut_start</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">z</span><span class="o">=</span><span class="kc">None</span><span class="p">))</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">commands</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Rapid</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">z</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">top_height</span><span class="p">))</span>  <span class="c1"># TODO plunge or rapid?</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">commands</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Plunge</span><span class="p">(</span><span class="n">z</span><span class="o">=</span><span class="n">depth</span><span class="p">))</span>
+                <span class="k">for</span> <span class="n">cut</span> <span class="ow">in</span> <span class="n">cut_sequence</span><span class="p">[</span><span class="mi">1</span><span class="p">:]:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">commands</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Cut</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="n">cut</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">y</span><span class="o">=</span><span class="n">cut</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">z</span><span class="o">=</span><span class="kc">None</span><span class="p">))</span></div>
+
+
+<span class="k">def</span> <span class="nf">pick_other_scanline_end</span><span class="p">(</span><span class="n">scanline</span><span class="p">,</span> <span class="n">scanpoint</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">scanline</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">scanpoint</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">scanline</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">scanline</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+
+<span class="k">def</span> <span class="nf">demo</span><span class="p">():</span>
+    <span class="n">job_plane</span> <span class="o">=</span> <span class="n">cq</span><span class="o">.</span><span class="n">Workplane</span><span class="p">()</span><span class="o">.</span><span class="n">box</span><span class="p">(</span><span class="mi">15</span><span class="p">,</span> <span class="mi">15</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span><span class="o">.</span><span class="n">faces</span><span class="p">(</span><span class="s1">&#39;&gt;Z&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">workplane</span><span class="p">()</span>
+    <span class="n">obj</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">job_plane</span>
+            <span class="o">.</span><span class="n">rect</span><span class="p">(</span><span class="mf">7.5</span><span class="p">,</span> <span class="mf">7.5</span><span class="p">)</span>
+            <span class="o">.</span><span class="n">cutBlind</span><span class="p">(</span><span class="o">-</span><span class="mi">4</span><span class="p">)</span>
+            <span class="o">.</span><span class="n">faces</span><span class="p">(</span><span class="s1">&#39;&gt;Z[1]&#39;</span><span class="p">)</span>
+            <span class="o">.</span><span class="n">rect</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+            <span class="o">.</span><span class="n">extrude</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+            <span class="o">.</span><span class="n">faces</span><span class="p">(</span><span class="s1">&#39;&gt;Z&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">workplane</span><span class="p">()</span>
+            <span class="o">.</span><span class="n">moveTo</span><span class="p">(</span><span class="o">-</span><span class="mf">5.75</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="o">.</span><span class="n">rect</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+            <span class="o">.</span><span class="n">cutBlind</span><span class="p">(</span><span class="o">-</span><span class="mi">6</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">op_plane</span> <span class="o">=</span> <span class="n">obj</span><span class="o">.</span><span class="n">faces</span><span class="p">(</span><span class="s1">&#39;&gt;Z[1] or &gt;Z[2]&#39;</span><span class="p">)</span>
+    <span class="c1">#test = obj.faces(&#39;&gt;Z[-3] or &gt;Z[-2] or &gt;Z[-4]&#39;)</span>
+    <span class="c1"># obj = op_plane.workplane().rect(2, 2).extrude(4)</span>
+
+    <span class="n">job</span> <span class="o">=</span> <span class="n">Job</span><span class="p">(</span><span class="n">job_plane</span><span class="p">,</span> <span class="mi">300</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="n">Unit</span><span class="o">.</span><span class="n">METRIC</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
+    <span class="n">op</span> <span class="o">=</span> <span class="n">Pocket</span><span class="p">(</span><span class="n">job</span><span class="o">=</span><span class="n">job</span><span class="p">,</span> <span class="n">wp</span><span class="o">=</span><span class="n">op_plane</span><span class="p">,</span> <span class="n">clearance_height</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">stepdown</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">tool_diameter</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+
+    <span class="n">toolpath</span> <span class="o">=</span> <span class="n">visualize_task</span><span class="p">(</span><span class="n">job</span><span class="p">,</span> <span class="n">op</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">op</span><span class="o">.</span><span class="n">to_gcode</span><span class="p">())</span>
+
+    <span class="n">show_object</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span>
+    <span class="c1">#show_object(cq.Workplane().box(15, 15, 10).faces(&#39;&gt;Z&#39;), &#39;job&#39;)</span>
+    <span class="c1">#show_object(op_plane, &#39;op&#39;)</span>
+    <span class="c1"># show_object(op_plane)</span>
+    <span class="n">show_object</span><span class="p">(</span><span class="n">toolpath</span><span class="p">,</span> <span class="s1">&#39;g&#39;</span><span class="p">)</span>
+    <span class="c1"># for w in op._wires:</span>
+    <span class="c1">#    show_object(w)</span>
+
+    <span class="c1">#show_object(test, &#39;test&#39;)</span>
+
+<span class="k">def</span> <span class="nf">demo2</span><span class="p">():</span>
+    <span class="kn">from</span> <span class="nn">cq_cam.job</span> <span class="kn">import</span> <span class="n">Job</span>
+    <span class="kn">from</span> <span class="nn">cq_cam.operations.pocket</span> <span class="kn">import</span> <span class="n">Pocket</span>
+    <span class="kn">from</span> <span class="nn">cq_cam.commands.base_command</span> <span class="kn">import</span> <span class="n">Unit</span>
+    <span class="kn">from</span> <span class="nn">cq_cam.visualize</span> <span class="kn">import</span> <span class="n">visualize_task</span>
+
+    <span class="n">result</span> <span class="o">=</span> <span class="n">cq</span><span class="o">.</span><span class="n">Workplane</span><span class="p">(</span><span class="s2">&quot;front&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">box</span><span class="p">(</span><span class="mf">20.0</span><span class="p">,</span> <span class="mf">20.0</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">faces</span><span class="p">(</span><span class="s1">&#39;&gt;Z&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">workplane</span><span class="p">()</span><span class="o">.</span><span class="n">rect</span><span class="p">(</span><span class="mi">15</span><span class="p">,</span> <span class="mi">15</span><span class="p">)</span><span class="o">.</span><span class="n">cutBlind</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="c1">#show_object(result.faces(&#39;&lt;Z[1]&#39;))</span>
+    <span class="n">job_plane</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">faces</span><span class="p">(</span><span class="s1">&#39;&gt;Z&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">workplane</span><span class="p">()</span>
+    <span class="n">job</span> <span class="o">=</span> <span class="n">Job</span><span class="p">(</span><span class="n">job_plane</span><span class="p">,</span> <span class="mi">300</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="n">Unit</span><span class="o">.</span><span class="n">METRIC</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
+    <span class="n">op</span> <span class="o">=</span> <span class="n">Pocket</span><span class="p">(</span><span class="n">job</span><span class="o">=</span><span class="n">job</span><span class="p">,</span> <span class="n">clearance_height</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">top_height</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">wp</span><span class="o">=</span><span class="n">result</span><span class="o">.</span><span class="n">faces</span><span class="p">(</span><span class="s1">&#39;&lt;Z[1]&#39;</span><span class="p">))</span>
+    <span class="n">toolpath</span> <span class="o">=</span> <span class="n">visualize_task</span><span class="p">(</span><span class="n">job</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">as_edges</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">result</span><span class="o">.</span><span class="n">objects</span> <span class="o">+=</span> <span class="n">toolpath</span>
+    <span class="n">show_object</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+
+<span class="k">if</span> <span class="s1">&#39;show_object&#39;</span> <span class="ow">in</span> <span class="nb">locals</span><span class="p">()</span> <span class="ow">or</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="n">demo2</span><span class="p">()</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Parametric Products Intellectual Holdings LLC, All Rights Reserved.</p>
+  </div>
+
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

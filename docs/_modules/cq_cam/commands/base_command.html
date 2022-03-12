@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>cq_cam.commands.base_command &mdash; CadQuery Documentation</title>
+      <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../../_static/tables.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+        <script src="../../../_static/jquery.js"></script>
+        <script src="../../../_static/underscore.js"></script>
+        <script src="../../../_static/doctools.js"></script>
+        <script src="../../../_static/vtk.js"></script>
+        <script>
+const RENDERERS = {};
+var ID =  0;
+
+const renderWindow = vtk.Rendering.Core.vtkRenderWindow.newInstance();
+const openglRenderWindow = vtk.Rendering.OpenGL.vtkRenderWindow.newInstance();
+renderWindow.addView(openglRenderWindow);
+
+const rootContainer = document.createElement('div');
+rootContainer.style.position = 'fixed';
+//rootContainer.style.zIndex = -1;
+rootContainer.style.left = 0;
+rootContainer.style.top = 0;
+rootContainer.style.pointerEvents = 'none';
+rootContainer.style.width = '100%';
+rootContainer.style.height = '100%';
+
+openglRenderWindow.setContainer(rootContainer);
+
+const interact_style = vtk.Interaction.Style.vtkInteractorStyleManipulator.newInstance();
+
+const manips = {
+    rot: vtk.Interaction.Manipulators.vtkMouseCameraTrackballRotateManipulator.newInstance(),
+    pan: vtk.Interaction.Manipulators.vtkMouseCameraTrackballPanManipulator.newInstance(),
+    zoom1: vtk.Interaction.Manipulators.vtkMouseCameraTrackballZoomManipulator.newInstance(),
+    zoom2: vtk.Interaction.Manipulators.vtkMouseCameraTrackballZoomManipulator.newInstance(),
+    roll: vtk.Interaction.Manipulators.vtkMouseCameraTrackballRollManipulator.newInstance(),
+};
+
+manips.zoom1.setControl(true);
+manips.zoom2.setButton(3);
+manips.roll.setShift(true);
+manips.pan.setButton(2);
+
+for (var k in manips){{
+    interact_style.addMouseManipulator(manips[k]);
+}};
+
+const interactor = vtk.Rendering.Core.vtkRenderWindowInteractor.newInstance();
+interactor.setView(openglRenderWindow);
+interactor.initialize();
+interactor.setInteractorStyle(interact_style);
+
+document.addEventListener('DOMContentLoaded', function () {
+    document.body.appendChild(rootContainer);
+});
+
+function updateViewPort(element, renderer) {
+  const { innerHeight, innerWidth } = window;
+  const { x, y, width, height } = element.getBoundingClientRect();
+  const viewport = [
+    x / innerWidth,
+    1 - (y + height) / innerHeight,
+    (x + width) / innerWidth,
+    1 - y / innerHeight,
+  ];
+  renderer.setViewport(...viewport);
+}
+
+function recomputeViewports() {
+  const rendererElems = document.querySelectorAll('.renderer');
+  for (let i = 0; i < rendererElems.length; i++) {
+    const elem = rendererElems[i];
+    const { id } = elem;
+    const renderer = RENDERERS[id];
+    updateViewPort(elem, renderer);
+  }
+  renderWindow.render();
+}
+
+function resize() {
+  rootContainer.style.width = `${window.innerWidth}px`;
+  openglRenderWindow.setSize(window.innerWidth, window.innerHeight);
+  recomputeViewports();
+}
+
+window.addEventListener('resize', resize);
+document.addEventListener('scroll', recomputeViewports);
+
+
+function enterCurrentRenderer(e) {
+  interactor.bindEvents(document.body);
+  interact_style.setEnabled(true);
+  interactor.setCurrentRenderer(RENDERERS[e.target.id]);
+}
+
+function exitCurrentRenderer(e) {
+  interactor.setCurrentRenderer(null);
+  interact_style.setEnabled(false);
+  interactor.unbindEvents();
+}
+
+
+function applyStyle(element) {
+  element.classList.add('renderer');
+  element.style.width = '100%';
+  element.style.height = '100%';
+  element.style.display = 'inline-block';
+  element.style.boxSizing = 'border';
+  return element;
+}
+
+window.addEventListener('load', resize);
+
+function render(data, parent_element, ratio){
+
+    // Initial setup
+    const renderer = vtk.Rendering.Core.vtkRenderer.newInstance({ background: [1, 1, 1 ] });
+
+    // iterate over all children children
+    for (var el of data){
+        var trans = el.position;
+        var rot = el.orientation;
+        var rgba = el.color;
+        var shape = el.shape;
+
+        // load the inline data
+        var reader = vtk.IO.XML.vtkXMLPolyDataReader.newInstance();
+        const textEncoder = new TextEncoder();
+        reader.parseAsArrayBuffer(textEncoder.encode(shape));
+
+        // setup actor,mapper and add
+        const mapper = vtk.Rendering.Core.vtkMapper.newInstance();
+        mapper.setInputConnection(reader.getOutputPort());
+        mapper.setResolveCoincidentTopologyToPolygonOffset();
+        mapper.setResolveCoincidentTopologyPolygonOffsetParameters(0.5,100);
+
+        const actor = vtk.Rendering.Core.vtkActor.newInstance();
+        actor.setMapper(mapper);
+
+        // set color and position
+        actor.getProperty().setColor(rgba.slice(0,3));
+        actor.getProperty().setOpacity(rgba[3]);
+
+        actor.rotateZ(rot[2]*180/Math.PI);
+        actor.rotateY(rot[1]*180/Math.PI);
+        actor.rotateX(rot[0]*180/Math.PI);
+
+        actor.setPosition(trans);
+
+        renderer.addActor(actor);
+
+    };
+
+    //add the container
+    const container = applyStyle(document.createElement("div"));
+    parent_element.appendChild(container);
+    container.addEventListener('mouseenter', enterCurrentRenderer);
+    container.addEventListener('mouseleave', exitCurrentRenderer);
+    container.id = ID;
+
+    renderWindow.addRenderer(renderer);
+    updateViewPort(container, renderer);
+    renderer.getActiveCamera().set({ position: [1, -1, 1], viewUp: [0, 0, 1] });
+    renderer.resetCamera();
+
+    RENDERERS[ID] = renderer;
+    ID++;
+};
+</script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../../index.html" class="icon icon-home"> CadQuery
+          </a>
+              <div class="version">
+                0.1
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../algorithms.html">Algorithms</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../classreference.html">CQ-CAM Class Summary</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">CadQuery</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../../index.html">Module code</a> &raquo;</li>
+      <li>cq_cam.commands.base_command</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for cq_cam.commands.base_command</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">from</span> <span class="nn">abc</span> <span class="kn">import</span> <span class="n">ABC</span><span class="p">,</span> <span class="n">abstractmethod</span>
+<span class="kn">from</span> <span class="nn">dataclasses</span> <span class="kn">import</span> <span class="n">dataclass</span>
+<span class="kn">from</span> <span class="nn">enum</span> <span class="kn">import</span> <span class="n">Enum</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Union</span><span class="p">,</span> <span class="n">TYPE_CHECKING</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span>
+
+<span class="kn">from</span> <span class="nn">OCP.TopAbs</span> <span class="kn">import</span> <span class="n">TopAbs_REVERSED</span>
+<span class="kn">from</span> <span class="nn">cadquery</span> <span class="kn">import</span> <span class="n">cq</span>
+
+
+<span class="kn">from</span> <span class="nn">cq_cam.commands.util_command</span> <span class="kn">import</span> <span class="n">same_to_none</span><span class="p">,</span> <span class="n">vector_same_to_none</span><span class="p">,</span> <span class="n">equal_within_tolerance</span><span class="p">,</span> \
+    <span class="n">normalize</span><span class="p">,</span> <span class="n">vector_to_tuple</span>
+<span class="kn">from</span> <span class="nn">cq_cam.operations.tabs</span> <span class="kn">import</span> <span class="n">Transition</span>
+<span class="kn">from</span> <span class="nn">cq_cam.utils.utils</span> <span class="kn">import</span> <span class="n">pairwise_open</span><span class="p">,</span> <span class="n">is_arc_clockwise</span>
+
+<span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">cq_cam.job</span> <span class="kn">import</span> <span class="n">Job</span>
+
+
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">CommandSequence</span><span class="p">:</span>
+    <span class="n">start</span><span class="p">:</span> <span class="n">cq</span><span class="o">.</span><span class="n">Vector</span>
+    <span class="n">commands</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Command</span><span class="p">]</span>
+    <span class="n">end</span><span class="p">:</span> <span class="n">cq</span><span class="o">.</span><span class="n">Vector</span>
+
+    <span class="k">def</span> <span class="nf">reverse</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># Flip the start and end properties</span>
+        <span class="n">start</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">start</span>
+        <span class="n">end</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">end</span>
+        <span class="n">next_end</span> <span class="o">=</span> <span class="n">start</span>
+
+        <span class="c1"># Flip each command direction</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">command</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">commands</span><span class="p">):</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">command</span><span class="p">,</span> <span class="n">MotionCommand</span><span class="p">):</span>
+                <span class="n">command</span><span class="p">,</span> <span class="n">next_end</span> <span class="o">=</span> <span class="n">command</span><span class="o">.</span><span class="n">flip</span><span class="p">(</span><span class="n">next_end</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">commands</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">command</span>
+
+        <span class="c1"># Flip the list so that we can iterate naturally</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">commands</span><span class="o">.</span><span class="n">reverse</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">start</span> <span class="o">=</span> <span class="n">next_end</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">end</span> <span class="o">=</span> <span class="n">start</span>
+
+    <span class="k">def</span> <span class="nf">is_clockwise</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Only works on sequences that form a simple polygon! &quot;&quot;&quot;</span>
+        <span class="c1"># TODO implement logic for circles or some other weird stuff</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">commands</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="kn">from</span> <span class="nn">cq_cam.commands.command</span> <span class="kn">import</span> <span class="n">CircularCW</span><span class="p">,</span> <span class="n">CircularCCW</span>
+            <span class="n">cmd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">commands</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span> <span class="n">CircularCW</span><span class="p">):</span>
+                <span class="k">return</span> <span class="kc">True</span>
+            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span> <span class="n">CircularCCW</span><span class="p">):</span>
+                <span class="k">return</span> <span class="kc">False</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s1">&#39;Unable to determine if path is clockwise&#39;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">commands</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s1">&#39;Unable to determine if path is clockwise&#39;</span><span class="p">)</span>
+
+        <span class="c1"># Find the smallest y, biggest x</span>
+        <span class="c1"># https://stackoverflow.com/questions/1165647/how-to-determine-if-a-list-of-polygon-points-are-in-clockwise-order/1180256#1180256</span>
+        <span class="n">motion_commands</span> <span class="o">=</span> <span class="p">[</span><span class="n">command</span> <span class="k">for</span> <span class="n">command</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">commands</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">command</span><span class="p">,</span> <span class="n">MotionCommand</span><span class="p">)]</span>
+        <span class="n">ends</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">previous_end</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">start</span>
+        <span class="k">for</span> <span class="n">command</span> <span class="ow">in</span> <span class="n">motion_commands</span><span class="p">:</span>
+            <span class="n">end</span> <span class="o">=</span> <span class="n">command</span><span class="o">.</span><span class="n">end</span><span class="p">(</span><span class="n">previous_end</span><span class="p">)</span>
+            <span class="n">ends</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">end</span><span class="p">)</span>
+            <span class="n">previous_end</span> <span class="o">=</span> <span class="n">end</span>
+
+        <span class="c1"># TODO filter also commands that don&#39;t move on XY plane?</span>
+        <span class="n">b</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">ends</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">e</span><span class="p">:</span> <span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">y</span><span class="p">,</span> <span class="o">-</span><span class="n">e</span><span class="o">.</span><span class="n">x</span><span class="p">))[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">b_i</span> <span class="o">=</span> <span class="n">ends</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">b</span><span class="p">)</span>
+
+        <span class="n">a</span> <span class="o">=</span> <span class="n">ends</span><span class="p">[</span><span class="n">b_i</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span>
+        <span class="n">c</span> <span class="o">=</span> <span class="n">ends</span><span class="p">[(</span><span class="n">b_i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="n">ends</span><span class="p">)]</span>
+
+        <span class="n">det</span> <span class="o">=</span> <span class="p">(</span><span class="n">b</span><span class="o">.</span><span class="n">x</span> <span class="o">-</span> <span class="n">a</span><span class="o">.</span><span class="n">x</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">c</span><span class="o">.</span><span class="n">y</span> <span class="o">-</span> <span class="n">a</span><span class="o">.</span><span class="n">y</span><span class="p">)</span> <span class="o">-</span> <span class="p">(</span><span class="n">c</span><span class="o">.</span><span class="n">x</span> <span class="o">-</span> <span class="n">a</span><span class="o">.</span><span class="n">x</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">b</span><span class="o">.</span><span class="n">y</span> <span class="o">-</span> <span class="n">a</span><span class="o">.</span><span class="n">y</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">det</span> <span class="o">&lt;</span> <span class="mi">0</span>
+
+    <span class="k">def</span> <span class="nf">duplicate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">z</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">tab_z</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="kn">from</span> <span class="nn">cq_cam.commands.command</span> <span class="kn">import</span> <span class="n">Retract</span><span class="p">,</span> <span class="n">Plunge</span>
+
+        <span class="n">start</span> <span class="o">=</span> <span class="n">cq</span><span class="o">.</span><span class="n">Vector</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">start</span><span class="p">)</span>
+        <span class="n">end</span> <span class="o">=</span> <span class="n">cq</span><span class="o">.</span><span class="n">Vector</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">end</span><span class="p">)</span>
+        <span class="n">start</span><span class="o">.</span><span class="n">z</span> <span class="o">=</span> <span class="n">z</span>
+        <span class="n">end</span><span class="o">.</span><span class="n">z</span> <span class="o">=</span> <span class="n">z</span>
+        <span class="n">commands</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">tabbing</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">for</span> <span class="n">command</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">commands</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">tab_z</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">command</span><span class="p">,</span> <span class="s1">&#39;tab&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span> <span class="ow">and</span> <span class="n">z</span> <span class="o">&lt;</span> <span class="n">tab_z</span><span class="p">:</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">tabbing</span><span class="p">:</span>
+                    <span class="n">commands</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Retract</span><span class="p">(</span><span class="n">tab_z</span><span class="p">))</span>
+                    <span class="n">tabbing</span> <span class="o">=</span> <span class="kc">True</span>
+                <span class="n">commands</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">command</span><span class="o">.</span><span class="n">duplicate</span><span class="p">(</span><span class="n">tab_z</span><span class="p">))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">tabbing</span><span class="p">:</span>
+                    <span class="n">commands</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Plunge</span><span class="p">(</span><span class="n">z</span><span class="p">))</span>
+                    <span class="n">tabbing</span> <span class="o">=</span> <span class="kc">False</span>
+                <span class="n">commands</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">command</span><span class="o">.</span><span class="n">duplicate</span><span class="p">(</span><span class="n">z</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="n">CommandSequence</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">commands</span><span class="p">,</span> <span class="n">end</span><span class="p">)</span>
+
+
+<span class="k">class</span> <span class="nc">Command</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+    <span class="n">max_depth</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_depth</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">to_gcode</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">previous_command</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Command</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span> <span class="n">start</span><span class="p">:</span> <span class="n">cq</span><span class="o">.</span><span class="n">Vector</span><span class="p">,</span> <span class="n">job</span><span class="p">:</span> <span class="n">Job</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">cq</span><span class="o">.</span><span class="n">Vector</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot; Output all the necessary G-Code required to perform the command &quot;&quot;&quot;</span>
+        <span class="k">pass</span>
+
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">duplicate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">z</span><span class="p">:</span> <span class="nb">float</span><span class="p">):</span>
+        <span class="k">pass</span>
+
+
+<span class="k">class</span> <span class="nc">MotionCommand</span><span class="p">(</span><span class="n">Command</span><span class="p">,</span> <span class="n">ABC</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">flip</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new_end</span><span class="p">:</span> <span class="n">cq</span><span class="o">.</span><span class="n">Vector</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="p">(</span><span class="n">Command</span><span class="p">,</span> <span class="n">cq</span><span class="o">.</span><span class="n">Vector</span><span class="p">):</span>
+        <span class="kn">from</span> <span class="nn">cq_cam.commands.command</span> <span class="kn">import</span> <span class="n">Cut</span><span class="p">,</span> <span class="n">Plunge</span><span class="p">,</span> <span class="n">Retract</span>
+
+        <span class="c1"># This is a bit hard to conceptualize</span>
+        <span class="c1"># &quot;new_end&quot; is the old start (so it&#39;s the previous)</span>
+        <span class="c1"># &quot;start&quot; below is actually the old end</span>
+        <span class="n">new_start</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">end</span><span class="p">(</span><span class="n">new_end</span><span class="p">)</span>
+
+        <span class="n">x_eq</span><span class="p">,</span> <span class="n">y_eq</span><span class="p">,</span> <span class="n">z_eq</span> <span class="o">=</span> <span class="n">new_start</span><span class="o">.</span><span class="n">x</span> <span class="o">==</span> <span class="n">new_end</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">new_start</span><span class="o">.</span><span class="n">y</span> <span class="o">==</span> <span class="n">new_end</span><span class="o">.</span><span class="n">y</span><span class="p">,</span> <span class="n">new_start</span><span class="o">.</span><span class="n">z</span> <span class="o">==</span> <span class="n">new_end</span><span class="o">.</span><span class="n">z</span>
+        <span class="k">if</span> <span class="n">x_eq</span> <span class="ow">and</span> <span class="n">y_eq</span><span class="p">:</span>
+            <span class="c1"># Going up, use Cut</span>
+            <span class="k">if</span> <span class="n">new_end</span><span class="o">.</span><span class="n">z</span> <span class="o">&gt;</span> <span class="n">new_start</span><span class="o">.</span><span class="n">z</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">Retract</span><span class="p">(</span><span class="n">same_to_none</span><span class="p">(</span><span class="n">new_end</span><span class="o">.</span><span class="n">z</span><span class="p">,</span> <span class="n">new_start</span><span class="o">.</span><span class="n">z</span><span class="p">)),</span> <span class="n">new_start</span>
+                <span class="c1"># Going down, use Plunge</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">Plunge</span><span class="p">(</span><span class="n">same_to_none</span><span class="p">(</span><span class="n">new_end</span><span class="o">.</span><span class="n">z</span><span class="p">,</span> <span class="n">new_start</span><span class="o">.</span><span class="n">z</span><span class="p">)),</span> <span class="n">new_start</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">z_eq</span><span class="p">:</span>
+            <span class="c1"># TODO Ramp!</span>
+            <span class="k">pass</span>
+        <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span> <span class="o">=</span> <span class="n">vector_same_to_none</span><span class="p">(</span><span class="n">new_end</span><span class="p">,</span> <span class="n">new_start</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">Cut</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span> <span class="n">z</span><span class="o">=</span><span class="n">z</span><span class="p">,</span> <span class="n">tab</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">tab</span><span class="p">),</span> <span class="n">new_start</span>
+
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">end</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">start</span><span class="p">:</span> <span class="n">cq</span><span class="o">.</span><span class="n">Vector</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">cq</span><span class="o">.</span><span class="n">Vector</span><span class="p">:</span>
+        <span class="k">pass</span>
+
+    <span class="k">def</span> <span class="nf">diff</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">start</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">cq</span><span class="o">.</span><span class="n">Vector</span><span class="p">],</span> <span class="n">job</span><span class="p">:</span> <span class="n">Job</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">cq</span><span class="o">.</span><span class="n">Vector</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot; Output X Y and Z coordinates as necessary &quot;&quot;&quot;</span>
+        <span class="n">end</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">end</span><span class="p">(</span><span class="n">start</span><span class="p">)</span>
+        <span class="n">coordinates</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">if</span> <span class="n">start</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">equal_within_tolerance</span><span class="p">(</span><span class="n">end</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">start</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">job</span><span class="o">.</span><span class="n">gcode_precision</span><span class="p">):</span>
+            <span class="n">coordinates</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;X</span><span class="si">{</span><span class="n">normalize</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">end</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">job</span><span class="o">.</span><span class="n">gcode_precision</span><span class="p">))</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">start</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">equal_within_tolerance</span><span class="p">(</span><span class="n">end</span><span class="o">.</span><span class="n">y</span><span class="p">,</span> <span class="n">start</span><span class="o">.</span><span class="n">y</span><span class="p">,</span> <span class="n">job</span><span class="o">.</span><span class="n">gcode_precision</span><span class="p">):</span>
+            <span class="n">coordinates</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Y</span><span class="si">{</span><span class="n">normalize</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">end</span><span class="o">.</span><span class="n">y</span><span class="p">,</span> <span class="n">job</span><span class="o">.</span><span class="n">gcode_precision</span><span class="p">))</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">start</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">equal_within_tolerance</span><span class="p">(</span><span class="n">end</span><span class="o">.</span><span class="n">z</span><span class="p">,</span> <span class="n">start</span><span class="o">.</span><span class="n">z</span><span class="p">,</span> <span class="n">job</span><span class="o">.</span><span class="n">gcode_precision</span><span class="p">):</span>
+            <span class="n">coordinates</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Z</span><span class="si">{</span><span class="n">normalize</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">end</span><span class="o">.</span><span class="n">z</span><span class="p">,</span> <span class="n">job</span><span class="o">.</span><span class="n">gcode_precision</span><span class="p">))</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="s2">&quot;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">coordinates</span><span class="p">),</span> <span class="n">end</span>
+
+
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">EndData</span><span class="p">(</span><span class="n">Command</span><span class="p">,</span> <span class="n">ABC</span><span class="p">):</span>
+    <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">y</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">z</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">tab</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="k">def</span> <span class="nf">end</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">previous_end</span><span class="p">:</span> <span class="n">cq</span><span class="o">.</span><span class="n">Vector</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">cq</span><span class="o">.</span><span class="n">Vector</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">cq</span><span class="o">.</span><span class="n">Vector</span><span class="p">(</span>
+            <span class="n">previous_end</span><span class="o">.</span><span class="n">x</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">x</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">x</span><span class="p">,</span>
+            <span class="n">previous_end</span><span class="o">.</span><span class="n">y</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">y</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="p">,</span>
+            <span class="n">previous_end</span><span class="o">.</span><span class="n">z</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">z</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">z</span>
+        <span class="p">)</span>
+
+
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">InitialReference</span><span class="p">(</span><span class="n">MotionCommand</span><span class="p">):</span>
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;reference&#39;</span><span class="p">]</span>
+    <span class="n">reference</span><span class="p">:</span> <span class="n">cq</span><span class="o">.</span><span class="n">Vector</span>
+
+    <span class="k">def</span> <span class="nf">to_gcode</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">previous_command</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Command</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span> <span class="n">start</span><span class="p">:</span> <span class="n">cq</span><span class="o">.</span><span class="n">Vector</span><span class="p">,</span> <span class="n">job</span><span class="p">:</span> <span class="n">Job</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">cq</span><span class="o">.</span><span class="n">Vector</span><span class="p">]:</span>
+        <span class="k">raise</span> <span class="bp">NotImplemented</span><span class="p">(</span><span class="s1">&#39;InitialReference can not output gcode&#39;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">duplicate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">z</span><span class="p">:</span> <span class="nb">float</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="bp">NotImplemented</span><span class="p">(</span><span class="s1">&#39;InitialReference can not be duplicated&#39;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">end</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">start</span><span class="p">:</span> <span class="n">cq</span><span class="o">.</span><span class="n">Vector</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">cq</span><span class="o">.</span><span class="n">Vector</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">reference</span>
+
+
+<span class="k">class</span> <span class="nc">Linear</span><span class="p">(</span><span class="n">MotionCommand</span><span class="p">,</span> <span class="n">ABC</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; Linear interpolation (G01) &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">to_gcode</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">previous_command</span><span class="p">:</span> <span class="n">MotionCommand</span><span class="p">,</span> <span class="n">start</span><span class="p">:</span> <span class="n">cq</span><span class="o">.</span><span class="n">Vector</span><span class="p">,</span> <span class="n">job</span><span class="p">:</span> <span class="n">Job</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">Linear</span><span class="p">):</span>
+            <span class="k">return</span> <span class="s2">&quot;&quot;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">&quot;G1&quot;</span>
+
+
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">CircularData</span><span class="p">(</span><span class="n">EndData</span><span class="p">,</span> <span class="n">ABC</span><span class="p">):</span>
+    <span class="c1"># TODO in py3.10 dataclass supports __slots__ better with default values (?)</span>
+    <span class="n">radius</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">ijk</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">mid</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">radius</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">ijk</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s1">&#39;Either radius or ijk must be given to a circular command&#39;</span><span class="p">)</span>
+
+
+<span class="k">class</span> <span class="nc">Circular</span><span class="p">(</span><span class="n">CircularData</span><span class="p">,</span> <span class="n">MotionCommand</span><span class="p">,</span> <span class="n">ABC</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">to_gcode</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">previous_command</span><span class="p">:</span> <span class="n">MotionCommand</span><span class="p">,</span> <span class="n">start</span><span class="p">:</span> <span class="n">cq</span><span class="o">.</span><span class="n">Vector</span><span class="p">,</span> <span class="n">job</span><span class="p">:</span> <span class="n">Job</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">cq</span><span class="o">.</span><span class="n">Vector</span><span class="p">]:</span>
+        <span class="n">diff</span><span class="p">,</span> <span class="n">end</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">job</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">ijk</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">diff</span><span class="si">}{</span><span class="bp">self</span><span class="o">.</span><span class="n">diff_ijk</span><span class="p">(</span><span class="n">job</span><span class="p">)</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">end</span>
+
+        <span class="k">return</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">diff</span><span class="si">}</span><span class="s1">R</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">radius</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">end</span>
+
+    <span class="k">def</span> <span class="nf">flip</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new_end</span><span class="p">:</span> <span class="n">cq</span><span class="o">.</span><span class="n">Vector</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="p">(</span><span class="n">Command</span><span class="p">,</span> <span class="n">cq</span><span class="o">.</span><span class="n">Vector</span><span class="p">):</span>
+        <span class="kn">from</span> <span class="nn">cq_cam.commands.command</span> <span class="kn">import</span> <span class="n">CircularCW</span><span class="p">,</span> <span class="n">CircularCCW</span>
+
+        <span class="n">new_start</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">end</span><span class="p">(</span><span class="n">new_end</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">CircularCW</span><span class="p">):</span>
+            <span class="bp">cls</span> <span class="o">=</span> <span class="n">CircularCCW</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">cls</span> <span class="o">=</span> <span class="n">CircularCW</span>
+
+        <span class="n">ijk</span> <span class="o">=</span> <span class="n">cq</span><span class="o">.</span><span class="n">Vector</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ijk</span><span class="p">)</span>
+        <span class="n">ijk</span> <span class="o">=</span> <span class="n">new_end</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">ijk</span><span class="p">)</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="n">new_start</span><span class="p">)</span>
+
+        <span class="n">mid</span> <span class="o">=</span> <span class="n">cq</span><span class="o">.</span><span class="n">Vector</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">mid</span><span class="p">)</span>
+        <span class="n">mid</span> <span class="o">=</span> <span class="n">new_end</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="n">new_start</span><span class="p">)</span>
+
+        <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span> <span class="o">=</span> <span class="n">vector_same_to_none</span><span class="p">(</span><span class="n">new_end</span><span class="p">,</span> <span class="n">new_start</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span> <span class="n">z</span><span class="o">=</span><span class="n">z</span><span class="p">,</span> <span class="n">radius</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">radius</span><span class="p">,</span> <span class="n">ijk</span><span class="o">=</span><span class="p">(</span><span class="n">ijk</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">ijk</span><span class="o">.</span><span class="n">y</span><span class="p">,</span> <span class="n">ijk</span><span class="o">.</span><span class="n">z</span><span class="p">),</span> <span class="n">mid</span><span class="o">=</span><span class="p">(</span><span class="n">mid</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">mid</span><span class="o">.</span><span class="n">y</span><span class="p">,</span> <span class="n">mid</span><span class="o">.</span><span class="n">z</span><span class="p">)),</span> <span class="n">new_start</span>
+
+    <span class="k">def</span> <span class="nf">diff_ijk</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">job</span><span class="p">:</span> <span class="n">Job</span><span class="p">):</span>
+        <span class="n">ijk</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">i</span> <span class="o">=</span> <span class="n">normalize</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ijk</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">job</span><span class="o">.</span><span class="n">gcode_precision</span><span class="p">))</span>
+        <span class="n">j</span> <span class="o">=</span> <span class="n">normalize</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ijk</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">job</span><span class="o">.</span><span class="n">gcode_precision</span><span class="p">))</span>
+        <span class="n">k</span> <span class="o">=</span> <span class="n">normalize</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ijk</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">job</span><span class="o">.</span><span class="n">gcode_precision</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">i</span><span class="p">:</span>
+            <span class="n">ijk</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;I</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">j</span><span class="p">:</span>
+            <span class="n">ijk</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;J</span><span class="si">{</span><span class="n">j</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">k</span><span class="p">:</span>
+            <span class="n">ijk</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;K</span><span class="si">{</span><span class="n">k</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">ijk</span><span class="p">)</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_edge</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">edge</span><span class="p">:</span> <span class="n">cq</span><span class="o">.</span><span class="n">Edge</span><span class="p">,</span> <span class="n">transitions</span><span class="p">):</span>
+        <span class="n">orientation</span> <span class="o">=</span> <span class="n">edge</span><span class="o">.</span><span class="n">wrapped</span><span class="o">.</span><span class="n">Orientation</span><span class="p">()</span>
+        <span class="nb">reversed</span> <span class="o">=</span> <span class="n">orientation</span> <span class="o">==</span> <span class="n">TopAbs_REVERSED</span>
+        <span class="n">commands</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">start</span><span class="p">,</span> <span class="n">end</span> <span class="ow">in</span> <span class="n">pairwise_open</span><span class="p">(</span><span class="n">transitions</span><span class="p">):</span>
+            <span class="n">start_d</span><span class="p">,</span> <span class="n">transition</span> <span class="o">=</span> <span class="n">start</span>
+            <span class="n">end_d</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">end</span>
+            <span class="n">mid_d</span> <span class="o">=</span> <span class="p">(</span><span class="n">end_d</span> <span class="o">+</span> <span class="n">start_d</span><span class="p">)</span> <span class="o">/</span> <span class="mi">2</span>
+
+            <span class="n">start</span> <span class="o">=</span> <span class="n">edge</span><span class="o">.</span><span class="n">positionAt</span><span class="p">((</span><span class="mi">1</span> <span class="o">-</span> <span class="n">start_d</span><span class="p">)</span> <span class="k">if</span> <span class="nb">reversed</span> <span class="k">else</span> <span class="n">start_d</span><span class="p">)</span>
+            <span class="n">mid</span> <span class="o">=</span> <span class="n">edge</span><span class="o">.</span><span class="n">positionAt</span><span class="p">((</span><span class="mi">1</span> <span class="o">-</span> <span class="n">mid_d</span><span class="p">)</span> <span class="k">if</span> <span class="nb">reversed</span> <span class="k">else</span> <span class="n">mid_d</span><span class="p">)</span>
+            <span class="n">end</span> <span class="o">=</span> <span class="n">edge</span><span class="o">.</span><span class="n">positionAt</span><span class="p">((</span><span class="mi">1</span> <span class="o">-</span> <span class="n">end_d</span><span class="p">)</span> <span class="k">if</span> <span class="nb">reversed</span> <span class="k">else</span> <span class="n">end_d</span><span class="p">)</span>
+            <span class="n">center</span> <span class="o">=</span> <span class="n">edge</span><span class="o">.</span><span class="n">Center</span><span class="p">()</span>
+
+            <span class="n">commands</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">_from_vectors</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">mid</span><span class="p">,</span> <span class="n">end</span><span class="p">,</span> <span class="n">center</span><span class="p">,</span> <span class="n">tab</span><span class="o">=</span><span class="n">transition</span> <span class="o">==</span> <span class="n">Transition</span><span class="o">.</span><span class="n">TAB</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">commands</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_from_vectors</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">mid</span><span class="p">,</span> <span class="n">end</span><span class="p">,</span> <span class="n">center</span><span class="p">,</span> <span class="n">tab</span><span class="p">):</span>
+        <span class="kn">from</span> <span class="nn">cq_cam.commands.command</span> <span class="kn">import</span> <span class="n">CircularCW</span><span class="p">,</span> <span class="n">CircularCCW</span>
+        <span class="n">mid_relative</span> <span class="o">=</span> <span class="n">mid</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="n">start</span><span class="p">)</span>
+        <span class="n">ijk</span> <span class="o">=</span> <span class="n">center</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="n">start</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">start</span><span class="o">.</span><span class="n">x</span> <span class="o">==</span> <span class="n">end</span><span class="o">.</span><span class="n">x</span> <span class="ow">and</span> <span class="n">start</span><span class="o">.</span><span class="n">y</span> <span class="o">==</span> <span class="n">end</span><span class="o">.</span><span class="n">y</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="bp">NotImplemented</span><span class="p">(</span><span class="s1">&#39;Full circles are not implemented&#39;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">is_arc_clockwise</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">mid</span><span class="p">,</span> <span class="n">end</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">CircularCW</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="n">end</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="n">end</span><span class="o">.</span><span class="n">y</span><span class="p">,</span> <span class="n">ijk</span><span class="o">=</span><span class="n">vector_to_tuple</span><span class="p">(</span><span class="n">ijk</span><span class="p">),</span>
+                              <span class="n">mid</span><span class="o">=</span><span class="n">vector_to_tuple</span><span class="p">(</span><span class="n">mid_relative</span><span class="p">),</span> <span class="n">tab</span><span class="o">=</span><span class="n">tab</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CircularCCW</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="n">end</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="n">end</span><span class="o">.</span><span class="n">y</span><span class="p">,</span> <span class="n">ijk</span><span class="o">=</span><span class="n">vector_to_tuple</span><span class="p">(</span><span class="n">ijk</span><span class="p">),</span>
+                               <span class="n">mid</span><span class="o">=</span><span class="n">vector_to_tuple</span><span class="p">(</span><span class="n">mid_relative</span><span class="p">),</span> <span class="n">tab</span><span class="o">=</span><span class="n">tab</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="Unit"><a class="viewcode-back" href="../../../classreference.html#cq_cam.commands.base_command.Unit">[docs]</a><span class="k">class</span> <span class="nc">Unit</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+    <span class="n">METRIC</span> <span class="o">=</span> <span class="mi">20</span>
+    <span class="n">IMPERIAL</span> <span class="o">=</span> <span class="mi">21</span>
+
+    <span class="k">def</span> <span class="nf">to_gcode</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">if</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">Unit</span><span class="o">.</span><span class="n">METRIC</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">&quot;G20&quot;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">&quot;G21&quot;</span></div>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Parametric Products Intellectual Holdings LLC, All Rights Reserved.</p>
+  </div>
+
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
