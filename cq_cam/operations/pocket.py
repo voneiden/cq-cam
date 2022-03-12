@@ -13,7 +13,7 @@ from cq_cam.commands.command import Rapid, Cut, Plunge
 from cq_cam.job import Job
 from cq_cam.operations.base_operation import FaceBaseOperation
 from cq_cam.operations.mixin_operation import PlaneValidationMixin, ObjectsValidationMixin
-from cq_cam.operations.strategy import ZigZagStrategy, ContourStrategy
+from cq_cam.operations.strategy import ZigZagStrategy, ContourStrategy, Strategy
 from cq_cam.utils.utils import WireClipper, flatten_list
 from cq_cam.visualize import visualize_task
 
@@ -26,6 +26,7 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
     """
 
     tool_diameter: float = 3.175
+    strategy: Strategy = ZigZagStrategy
     """ Diameter of the tool that will be used to perform the operation.
     """
 
@@ -151,21 +152,7 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
         outer_boundaries = flatten_list([wire.offset2D(-final_pass_offset) for wire in outer_profiles])
         inner_boundaries = flatten_list([wire.offset2D(final_pass_offset) for wire in inner_profiles])
 
-        cut_sequences = ZigZagStrategy.process(self, outer_boundaries, inner_boundaries)
-        show_object = lambda *args: 0
-        #contour_strat = ContourStrategy.process(self, outer_boundaries, inner_boundaries, show_object)
-        #contour_cut_sequences = ContourStrategy.flatten(contour_strat, self.job, show_object)
-
-
-        #for i, depth in enumerate(self._generate_depths(start_depth, end_depth)):
-        #    for cut_sequence in cut_sequences:
-        #        cut_start = cut_sequence[0]
-        #        self.commands.append(Rapid(None, None, self.clearance_height))
-        #        self.commands.append(Rapid(*cut_start, None))
-        #        self.commands.append(Rapid(None, None, self.top_height))  # TODO plunge or rapid?
-        #        self.commands.append(Plunge(depth))
-        #        for cut in cut_sequence[1:]:
-        #            self.commands.append(Cut(*cut, None))
+        cut_sequences = self.strategy.process(self, outer_boundaries, inner_boundaries)
 
         for i, depth in enumerate(self._generate_depths(start_depth, end_depth)):
             for cut_sequence in cut_sequences:

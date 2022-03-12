@@ -2,7 +2,6 @@ from typing import List, Tuple, Dict
 
 import cadquery as cq
 import numpy as np
-from collections import deque
 from cq_cam.utils.linked_polygon import LinkedPolygon
 from cq_cam.utils.utils import WireClipper, pairwise, dist_to_segment_squared, cached_dist2
 
@@ -11,6 +10,10 @@ Scanline = List[Scanpoint]
 
 
 class Strategy:
+    @classmethod
+    def process(cls, task, outer_boundaries: List, inner_boundaries: List):
+        raise NotImplementedError()
+
     @staticmethod
     def _pick_nearest(point: Tuple[float, float], options: List[Tuple[float, float]]) -> Tuple[float, float]:
         nearest = (cached_dist2(point, options[0]), options[0])
@@ -166,7 +169,7 @@ class ContourStrategy(Strategy):
     """
 
     @classmethod
-    def process(cls, task, outer_boundaries: List[cq.Wire], inner_boundaries: List[cq.Wire], show_object):
+    def process(cls, task, outer_boundaries: List[cq.Wire], inner_boundaries: List[cq.Wire]):
         # We generate shrinking contours from all the outer boundaries
         offset_step = -abs(task._tool_diameter * task.stepover)
         clipper = WireClipper()
