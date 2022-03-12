@@ -175,7 +175,7 @@ class ContourStrategy(Strategy):
             clipper.add_clip_wire(outer_boundary)
         for inner_boundary in inner_boundaries:
             clipper.add_clip_wire(inner_boundary)
-
+        # TODO sane failure here if we have empty clipper
         for obi, outer_boundary in enumerate(outer_boundaries):
             queue = [outer_boundary]
 

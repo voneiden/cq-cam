@@ -151,9 +151,9 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
         outer_boundaries = flatten_list([wire.offset2D(-final_pass_offset) for wire in outer_profiles])
         inner_boundaries = flatten_list([wire.offset2D(final_pass_offset) for wire in inner_profiles])
 
-        #cut_sequences = ZigZagStrategy.process(self, outer_boundaries, inner_boundaries)
+        cut_sequences = ZigZagStrategy.process(self, outer_boundaries, inner_boundaries)
         show_object = lambda *args: 0
-        contour_strat = ContourStrategy.process(self, outer_boundaries, inner_boundaries, show_object)
+        #contour_strat = ContourStrategy.process(self, outer_boundaries, inner_boundaries, show_object)
         #contour_cut_sequences = ContourStrategy.flatten(contour_strat, self.job, show_object)
 
 
@@ -168,16 +168,14 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
         #            self.commands.append(Cut(*cut, None))
 
         for i, depth in enumerate(self._generate_depths(start_depth, end_depth)):
-            for cut_sequence in contour_strat:
+            for cut_sequence in cut_sequences:
                 cut_start = cut_sequence[0]
-                self.commands.append(Rapid(None, None, self.clearance_height))
-                self.commands.append(Rapid(cut_start[0], cut_start[1], None))
-                self.commands.append(Rapid(None, None, self.top_height))  # TODO plunge or rapid?
-                self.commands.append(Plunge(depth))
-                #self.commands += cut_sequence.commands
+                self.commands.append(Rapid(x=None, y=None, z=self.clearance_height))
+                self.commands.append(Rapid(x=cut_start[0], y=cut_start[1], z=None))
+                self.commands.append(Rapid(x=None, y=None, z=self.top_height))  # TODO plunge or rapid?
+                self.commands.append(Plunge(z=depth))
                 for cut in cut_sequence[1:]:
-                    self.commands.append(Cut(*cut, None))
-                #self.commands.append(Cut(*cut_start, None))
+                    self.commands.append(Cut(x=cut[0], y=cut[1], z=None))
 
 
 def pick_other_scanline_end(scanline, scanpoint):
@@ -220,6 +218,20 @@ def demo():
 
     #show_object(test, 'test')
 
+def demo2():
+    from cq_cam.job import Job
+    from cq_cam.operations.pocket import Pocket
+    from cq_cam.commands.base_command import Unit
+    from cq_cam.visualize import visualize_task
+
+    result = cq.Workplane("front").box(20.0, 20.0, 2).faces('>Z').workplane().rect(15, 15).cutBlind(-1)
+    #show_object(result.faces('<Z[1]'))
+    job_plane = result.faces('>Z').workplane()
+    job = Job(job_plane, 300, 100, Unit.METRIC, 5)
+    op = Pocket(job=job, clearance_height=5, top_height=0, wp=result.faces('<Z[1]'))
+    toolpath = visualize_task(job, op, as_edges=True)
+    result.objects += toolpath
+    show_object(result)
 
 if 'show_object' in locals() or __name__ == '__main__':
-    demo()
+    demo2()

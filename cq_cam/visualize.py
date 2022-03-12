@@ -18,11 +18,14 @@ class VisualizeError(Exception):
     pass
 
 
-def visualize_task(job: Job, task: Task):
+def visualize_task(job: Job, task: Task, as_edges=False):
     root_workplane = job.workplane
     root_plane = root_workplane.plane
 
-    group = AIS_MultipleConnectedInteractive()
+    if as_edges:
+        group = []
+    else:
+        group = AIS_MultipleConnectedInteractive()
 
     # x = 0
     # y = 0
@@ -66,7 +69,10 @@ def visualize_task(job: Job, task: Task):
                         center = start + ijk
                         world_center = root_plane.toWorldCoords((center.x, center.y, center.z))
                         circle = Edge.makeCircle(ijk.Length, world_center)
-                        line = AIS_Shape(circle.wrapped)
+                        if as_edges:
+                            line = circle
+                        else:
+                            line = AIS_Shape(circle.wrapped)
 
                     else:
                         midpoint = relative_midpoint.add(start)
@@ -74,41 +80,53 @@ def visualize_task(job: Job, task: Task):
                                                      root_plane.toWorldCoords((midpoint.x, midpoint.y, midpoint.z)),
                                                      world_end)
                         # line = AIS_Shape(wp.objects[0].wrapped)
-                        line = AIS_Shape(arc.wrapped)
+                        if as_edges:
+                            line = arc
+                        else:
+                            line = AIS_Shape(arc.wrapped)
                 except Exception as ex:
                     logger.error("Failed circular render", ex)
                     if world_start == world_end:
                         logger.warning("encountered zero length")
                         continue
-                    line = AIS_Line(
-                        Geom_CartesianPoint(world_start.x, world_start.y, world_start.z),
-                        Geom_CartesianPoint(world_end.x, world_end.y, world_end.z)
-                    )
-                    line.SetColor(to_occ_color('yellow'))
+
+                    if as_edges:
+                        line = Edge.makeLine(world_start, world_end)
+                    else:
+                        line = AIS_Line(
+                            Geom_CartesianPoint(world_start.x, world_start.y, world_start.z),
+                            Geom_CartesianPoint(world_end.x, world_end.y, world_end.z)
+                        )
+                        line.SetColor(to_occ_color('yellow'))
             else:
                 if world_start == world_end:
                     logger.warning("encountered zero length")
                     continue
-                line = AIS_Line(
-                    Geom_CartesianPoint(world_start.x, world_start.y, world_start.z),
-                    Geom_CartesianPoint(world_end.x, world_end.y, world_end.z)
-                )
-                print(line)
-            if isinstance(command, Rapid):
-                line.SetColor(to_occ_color('green'))
-            elif isinstance(command, Cut):
-                line.SetColor(to_occ_color('red'))
-            elif isinstance(command, Plunge):
-                line.SetColor(to_occ_color('blue'))
+                if as_edges:
+                    line = Edge.makeLine(world_start, world_end)
+                else:
+                    line = AIS_Line(
+                        Geom_CartesianPoint(world_start.x, world_start.y, world_start.z),
+                        Geom_CartesianPoint(world_end.x, world_end.y, world_end.z)
+                    )
+            if as_edges:
+                group.append(line)
+            else:
+                if isinstance(command, Rapid):
+                    line.SetColor(to_occ_color('green'))
+                elif isinstance(command, Cut):
+                    line.SetColor(to_occ_color('red'))
+                elif isinstance(command, Plunge):
+                    line.SetColor(to_occ_color('blue'))
 
-            if isinstance(command, Plunge):
-                line.Attributes().SetLineArrowDraw(True)
-                last_plunge = True
-            elif last_plunge and isinstance(line, AIS_Line):
-                line.Attributes().SetLineArrowDraw(True)
-                last_plunge = False
+                if isinstance(command, Plunge):
+                    line.Attributes().SetLineArrowDraw(True)
+                    last_plunge = True
+                elif last_plunge and isinstance(line, AIS_Line):
+                    line.Attributes().SetLineArrowDraw(True)
+                    last_plunge = False
 
-            group.Connect(line)
+                group.Connect(line)
 
             start = end
 
