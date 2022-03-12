@@ -3,7 +3,6 @@ import logging
 from OCP.AIS import AIS_MultipleConnectedInteractive, AIS_Line, AIS_Shape
 from OCP.Geom import Geom_CartesianPoint
 from cadquery import cq, Edge
-from cq_editor.cq_utils import to_occ_color
 
 from cq_cam.commands.base_command import MotionCommand
 from cq_cam.commands.command import Plunge, Cut, Rapid, Circular
@@ -16,6 +15,11 @@ logger = logging.getLogger(__name__)
 
 class VisualizeError(Exception):
     pass
+
+
+def to_occ_color(*args):
+    from cq_editor.cq_utils import to_occ_color as _to_occ_color
+    return _to_occ_color(*args)
 
 
 def visualize_task(job: Job, task: Task, as_edges=False):
