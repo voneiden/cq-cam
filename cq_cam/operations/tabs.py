@@ -1,112 +1,49 @@
-from typing import Optional, List
-
-import cadquery as cq
 from enum import Enum
 
+import cadquery as cq
 import numpy as np
-from cq_cam.utils.utils import WireClipper, wire_to_ordered_edges
+
+from cq_cam.utils.utils import wire_to_ordered_edges
+
+
+class Transition(Enum):
+    NORMAL = 0
+    TAB = 1
+    IGNORE = 2
 
 
 class Tabs:
-    height: float
-
-    def __init__(self,
-                 height: float,
-                 width: float,
-                 count: Optional[int] = None,
-                 distance: Optional[float] = None,
-                 positions: Optional[List[float]] = None):
-        from cq_cam.operations.base_operation import OperationError # TODO
-        self.height = height
+    def __init__(self, *, width: float, height: float):
         self.width = width
-        self.count = count
-        self.distance = distance
-        self.positions = positions or []
+        self.height = height
 
-        if count is None and distance is None and not positions:
-            raise OperationError('At least one of "count", "distance" or "positions" must be defined')
+    def load_ordered_edges(self, ordered_edges):
+        raise NotImplementedError()
 
-        if count is not None and distance is not None:
-            raise OperationError('Only one of "count" and "distance" may be defined')
-
-        if distance is not None and distance <= 0:
-            raise OperationError('Distance must be greater than zero')
-
-        if count is not None and count < 1:
-            raise OperationError('Count must be 1 or more')
-
-    def process(self, wire: cq.Wire):
-        center = wire.Center()
-        length = wire.Length()
-        half = self.width / 2
-        half_d = 1 / length * half
-        step_d = 1 / length * 0.1
-        outer = wire.offset2D(0.5, 'intersection')[0]
-        inner = wire.offset2D(-0.5)[0]
-        # Use Wire.locationAt ?
-        # Determine top center somehow
-        # Each location will produce a segment of desired width
-        # Convert into a rectangle
-        # Use clipper to break the wire
-
-        # TODO convert self.distance to count
-        positions = []
-        clip_polygons = []
-        if self.count:
-            for d in np.linspace(0, 1, self.count, endpoint=False):
-                ds = np.arange(d - half_d, d + half_d + step_d, step_d)
-                ds = [d % 1 for d in ds]
-                ds_inner = [(-d + 0.25) % 1 for d in ds]
-                vecs = wire.positions(ds)
-                tangents = [wire.tangentAt(d) for d in ds]
-                for tangent in tangents:
-                    tangent.x, tangent.y = tangent.y, -tangent.x
-                outer_vecs = [v.add(t.multiply(0.1)) for v, t in zip(vecs, tangents)]
-                inner_vecs = [v.sub(t.multiply(0.1)) for v, t in zip(vecs, tangents)]
-                outer_vecs = outer.positions(ds)
-                inner_vecs = inner.positions(ds_inner)
-                outer_t = [(v.x, v.y) for v in outer_vecs]
-                inner_t = [(v.x, v.y) for v in inner_vecs]
-                inner_t.reverse()
-                polygon = outer_t + inner_t + [outer_t[0]]
-                clip_polygons.append(polygon)
-
-        clipper = WireClipper()
-        for clip_polygon in clip_polygons:
-            clipper.add_clip_polygon(clip_polygon, True)
-
-        clipper.add_subject_wire(wire, is_closed=False)
-        paths = clipper.execute()
-        limit_paths = clipper.execute_difference()
-        show_object(outer, 'outer')
-        show_object(inner, 'inner')
-        for i, path in enumerate(clip_polygons):
-            wp = cq.Workplane().moveTo(*path[0])
-            for p in path[1:]:
-                wp = wp.lineTo(*p)
-            show_object(wp.close(), f'clip-{i}')
-
-        for i, path in enumerate(paths):
-            wp = cq.Workplane().moveTo(*path[0])
-            for p in path[1:]:
-                wp = wp.lineTo(*p)
-            show_object(wp.close(), f'path-{i}')
-
-        for i, path in enumerate(limit_paths):
-            wp = cq.Workplane().moveTo(*path[0])
-            for p in path[1:]:
-                wp = wp.lineTo(*p)
-            show_object(wp.close(), f'limit-path-{i}')
-        print(paths)
+    def edge_tab_transitions(self, edge_index):
+        raise NotImplementedError()
 
 
+class NoTabs(Tabs):
+    def __init__(self):
+        super().__init__(width=0, height=0)
 
-class EdgeTabs:
-    def __init__(self, spacing: float, width: float = 2, only=None):
+    def load_ordered_edges(self, ordered_edges):
+        pass
+
+    def edge_tab_transitions(self, edge_index):
+        return [
+            (0, Transition.NORMAL),
+            (1, Transition.NORMAL)
+        ]
+
+
+class EdgeTabs(Tabs):
+    def __init__(self, *, spacing: float, width: float, height: float, only=None):
+        super().__init__(width=width, height=height)
         self.edges_ds = None
         self.spacing = spacing
         self.only = only
-        self.width = width
 
     def load_ordered_edges(self, ordered_edges):
         self.edges_ds = []
@@ -137,26 +74,23 @@ class EdgeTabs:
         return transitions
 
 
-class Transition(Enum):
-    NORMAL = 0
-    TAB = 1
-    IGNORE = 2
-
-
-class WireTabs:
-    def __init__(self):
+class WireTabs(Tabs):
+    def __init__(self, *, count: int, width: float, height: float):
+        super().__init__(width=width, height=height)
         self.edge_lengths = None
         self.edge_ranges = None
         self.wire_tab_ds = None
+        self.count = count
+        self.width = width
 
-    def wire_tab_count(self, wire, count, width=2):
+    def load_wire(self, wire):
         length = wire.Length()
-        half = width / 2
+        half = self.width / 2
         half_d = 1 / length * half
 
         wire_tab_ds = []
 
-        for d in np.linspace(0, 1, count, endpoint=False):
+        for d in np.linspace(0, 1, self.count, endpoint=False):
             range = (d - half_d, d + half_d)
             wire_tab_ds.append(range)
 

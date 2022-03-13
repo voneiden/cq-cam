@@ -216,9 +216,10 @@ def demo2():
     job_plane = result.faces('>Z').workplane()
     job = Job(job_plane, 300, 100, Unit.METRIC, 5)
     op = Pocket(job=job, clearance_height=5, top_height=0, wp=result.faces('<Z[1]'))
-    toolpath = visualize_task(job, op, as_edges=True)
-    result.objects += toolpath
+    toolpath = visualize_task(job, op, as_edges=False)
+    #result.objects += toolpath
     show_object(result)
+    show_object(toolpath)
 
 if 'show_object' in locals() or __name__ == '__main__':
     demo2()

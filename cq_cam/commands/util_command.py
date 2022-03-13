@@ -3,7 +3,7 @@ from typing import Optional, Tuple, TYPE_CHECKING
 
 from cadquery import cq
 
-from cq_cam.operations.tabs import WireTabs, EdgeTabs
+from cq_cam.operations.tabs import WireTabs, EdgeTabs, NoTabs, Tabs
 from cq_cam.utils.utils import (
     wire_to_ordered_edges,
     start_point, orient_vector,
@@ -72,13 +72,9 @@ def wire_to_command_sequence(wire: cq.Wire, plane: cq.Plane) -> 'CommandSequence
     return CommandSequence(sequence_start, commands, sequence_end)
 
 
-
-def wire_to_command_sequence2(wire: cq.Wire) -> 'CommandSequence':
+def wire_to_command_sequence2(wire: cq.Wire, tabs: Tabs) -> 'CommandSequence':
     """
     Convert a wire into ordered sequence of commands.
-
-    :param wire: wire to convert
-    :return:
     """
     from cq_cam.commands.base_command import CommandSequence, Circular
     from cq_cam.commands.command import Cut
@@ -89,20 +85,14 @@ def wire_to_command_sequence2(wire: cq.Wire) -> 'CommandSequence':
     sequence_start = start_point(ordered_edges[0])
     sequence_end = end_point(ordered_edges[-1])
 
-    # Experimental tabs
-    tabs = WireTabs()
-    tabs.load_ordered_edges(ordered_edges)
-    tabs.wire_tab_count(wire, 4)
+    if isinstance(tabs, WireTabs):
+        tabs.load_wire(wire)
 
-    # Experimental edge tabs
-    tabs = EdgeTabs(4)
     tabs.load_ordered_edges(ordered_edges)
 
     for edge_i, edge in enumerate(ordered_edges):
-
         edge_transitions = tabs.edge_tab_transitions(edge_i)
 
-        #command_end = end_point(edge)
         if edge.geomType() == "LINE":
             commands += Cut.from_edge(edge, edge_transitions)
 

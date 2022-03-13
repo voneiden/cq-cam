@@ -17,8 +17,6 @@ class OperationError(Exception):
     pass
 
 
-
-
 @dataclass
 class Task(ABC):
     job: Job
@@ -108,7 +106,7 @@ class FaceBaseOperation(Task, ABC):
     For example a value of 0.5 means the operation tries to use 
     50% of the tool width."""
 
-    outer_boundary_offset: float = -1
+    outer_boundary_offset: Union[float, Tuple[float, float]] = -1
     """ Offset is in multiples of tool diameter
       * -1 for closed pockets and inside profiles
       * 0 for open pockets
@@ -119,7 +117,7 @@ class FaceBaseOperation(Task, ABC):
     When doing open 2.5D pockets, see `avoid`.
     """
 
-    inner_boundary_offset: Optional[float] = 1
+    inner_boundary_offset: Optional[Union[float, Tuple[float, float]]] = 1
     """ See `outer_boundary_offset`  """
 
     boundary_final_pass_stepover: Union[float, None] = None
@@ -129,6 +127,12 @@ class FaceBaseOperation(Task, ABC):
     stepdown: Union[float, None] = None
     """ Maximum distance to step down on each pass 
     """
+
+    def __post_init__(self):
+        if isinstance(self.outer_boundary_offset, (float, int)):
+            self.outer_boundary_offset = (self.outer_boundary_offset, 0)
+        if isinstance(self.inner_boundary_offset, (float, int)):
+            self.inner_boundary_offset = (self.inner_boundary_offset, 0)
 
     @property
     @abstractmethod
@@ -161,8 +165,8 @@ class FaceBaseOperation(Task, ABC):
     def offset_boundary(self, boundary: cq.Face) -> List[cq.Face]:
         assert boundary.geomType() in ("PLANE", "CIRCLE")
 
-        outer_offset = self._tool_diameter * self.outer_boundary_offset
-        inner_offset = self._tool_diameter * self.inner_boundary_offset
+        outer_offset = self._tool_diameter * self.outer_boundary_offset[0] + self.outer_boundary_offset[1]
+        inner_offset = self._tool_diameter * self.inner_boundary_offset[0] + self.inner_boundary_offset[1]
 
         outer_wires = boundary.outerWire().offset2D(outer_offset)
         inner_wires = [] if inner_offset is None else flatten_list(
@@ -182,9 +186,3 @@ class FaceBaseOperation(Task, ABC):
             boundaries.append(cq.Face.makeFromWires(outer_face.outerWire(), inner))
 
         return boundaries
-
-
-
-
-
-

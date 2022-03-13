@@ -12,52 +12,70 @@ Core Classes
 
 .. autosummary::
 
-    job.Job
-    operations.profile.Profile
-    operations.pocket.Pocket
-    operations.op3d.Surface3D
+    Job
+    Profile
+    Pocket
+    Surface3D
 
 Milling strategies
 -------------------
 
 .. autosummary::
 
-    operations.strategy.ZigZagStrategy
-    operations.strategy.ContourStrategy
+    ZigZagStrategy
+    ContourStrategy
+
+
+Tabbing methods
+-------------------
+
+.. autosummary::
+
+    EdgeTabs
+    WireTabs
 
 Misc
 -----
 
 .. autosummary::
-    commands.base_command.Unit
+
+    Unit
 
 Class details
 -------------------
 
-.. autoclass:: cq_cam.job.Job
+.. autoclass:: cq_cam.Job
    :show-inheritance:
    :members:
 
-.. autoclass:: cq_cam.operations.profile.Profile
+.. autoclass:: cq_cam.Profile
    :show-inheritance:
    :members:
 
-.. autoclass:: cq_cam.operations.pocket.Pocket
+.. autoclass:: cq_cam.Pocket
    :show-inheritance:
    :members:
 
-.. autoclass:: cq_cam.operations.op3d.Surface3D
+.. autoclass:: cq_cam.Surface3D
    :show-inheritance:
    :members:
 
-.. autoclass:: cq_cam.operations.strategy.ZigZagStrategy
+.. autoclass:: cq_cam.ZigZagStrategy
    :show-inheritance:
    :members:
 
-.. autoclass:: cq_cam.operations.strategy.ContourStrategy
+.. autoclass:: cq_cam.ContourStrategy
    :show-inheritance:
    :members:
 
-.. autoenum:: cq_cam.commands.base_command.Unit
+.. autoclass:: cq_cam.EdgeTabs
+   :show-inheritance:
+   :members:
+
+.. autoclass:: cq_cam.WireTabs
+   :show-inheritance:
+   :members:
+
+.. autoenum:: cq_cam.Unit
    :show-inheritance:
    :members:
