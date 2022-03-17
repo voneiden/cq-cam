@@ -87,7 +87,7 @@ class Profile(PlaneValidationMixin, ObjectsValidationMixin, Task):
 
         faces: List[cq.Face] = []
         wires: List[cq.Wire] = []
-        objects = self._o_objects()
+        objects = self._o_objects(self.o)
         for obj in objects:
             if isinstance(obj, cq.Face):
                 faces.append(obj)
@@ -117,14 +117,6 @@ class Profile(PlaneValidationMixin, ObjectsValidationMixin, Task):
             if self.wire_offset is None:
                 raise OperationError("'wire_offset' must be defined when profiling wires")
             self.profile(wire, self.wire_offset[0] * self.tool_diameter + self.wire_offset[1])
-
-    def _o_objects(self):
-        if isinstance(self.o, cq.Workplane):
-            return self.o.objects
-        elif isinstance(self.o, list):
-            return self.o
-        else:
-            return [self.o]
 
     def profile(self, wire: cq.Wire, offset: float):
 

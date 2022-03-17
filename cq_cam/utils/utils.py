@@ -53,6 +53,10 @@ def orient_vector(vector: cq.Vector, plane: cq.Plane):
 def drop_z(vector: cq.Vector) -> Tuple[float, float]:
     return vector.x, vector.y
 
+def flatten_wire_to_closed_2d(wire: cq.Wire):
+    polygon = [drop_z(v) for v in flatten_wire(wire)]
+    polygon.append(polygon[0])
+    return polygon
 
 def vectors_to_xy(plane: cq.Plane, *vectors: cq.Vector):
     return tuple((plane.xDir.dot(vector),
@@ -190,14 +194,14 @@ class WireClipper:
         self._add_path(pyclipper.scale_to_clipper(polygon), pt, is_closed, cache)
         return polygon
 
-    def add_clip_polygon(self, polygon: Iterable[Tuple[float, float]], is_closed=False):
-        return self._add_polygon(polygon, pyclipper.PT_CLIP, is_closed)
+    def add_clip_polygon(self, polygon: Iterable[Tuple[float, float]], is_closed=False, cache=False):
+        return self._add_polygon(polygon, pyclipper.PT_CLIP, is_closed, cache)
 
     def add_subject_polygon(self, polygon: Iterable[Tuple[float, float]], is_closed=False):
         return self._add_polygon(polygon, pyclipper.PT_SUBJECT, is_closed)
 
-    def _add_polygon(self, polygon: Iterable[Tuple[float, float]], pt, is_closed=False):
-        self._add_path(pyclipper.scale_to_clipper(polygon), pt, is_closed, False)
+    def _add_polygon(self, polygon: Iterable[Tuple[float, float]], pt, is_closed=False, cache=False):
+        self._add_path(pyclipper.scale_to_clipper(polygon), pt, is_closed, cache)
 
     def _add_path(self, path, pt, closed, cache):
         if pt == pyclipper.PT_CLIP and cache:
@@ -242,7 +246,7 @@ class WireClipper:
     def execute(self, clip_type=pyclipper.CT_INTERSECTION) -> Tuple[Tuple[Tuple[float, float], Tuple[float, float]]]:
         # TODO detect if there's nothing to do?
         polytree = self._clipper.Execute2(clip_type)
-
+        # TODO option to return nested structure?
         open_paths = pyclipper.scale_from_clipper(pyclipper.OpenPathsFromPolyTree(polytree))
         closed_paths = pyclipper.scale_from_clipper(pyclipper.ClosedPathsFromPolyTree(polytree))
         # noinspection PyTypeChecker

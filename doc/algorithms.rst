@@ -1,5 +1,5 @@
 ##########
-Algorithms
+Algorithms explained (TODO)
 ##########
 
 There is not much information about algorithms that are used in generating the toolpaths

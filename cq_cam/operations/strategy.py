@@ -53,12 +53,20 @@ class ZigZagStrategy(Strategy):
 
         outer_polygons = []
         for outer_boundary in outer_boundaries:
-            polygon = clipper.add_clip_wire(outer_boundary)
+            if isinstance(outer_boundary, cq.Wire):
+                polygon = clipper.add_clip_wire(outer_boundary)
+            else:
+                clipper.add_clip_polygon(outer_boundary, True)
+                polygon = outer_boundary
             outer_polygons.append(polygon)
 
         inner_polygons = []
         for inner_boundary in inner_boundaries:
-            polygon = clipper.add_clip_wire(inner_boundary)
+            if isinstance(inner_boundary, cq.Wire):
+                polygon = clipper.add_clip_wire(inner_boundary)
+            else:
+                clipper.add_clip_polygon(inner_boundary, True)
+                polygon = inner_boundary
             inner_polygons.append(polygon)
 
         max_bounds = clipper.max_bounds()
@@ -189,5 +197,5 @@ class ContourStrategy(Strategy):
                     clipper.add_subject_wire(new_sub_contour)
                     queue.append(new_sub_contour)
         paths = clipper.execute()
-        #return paths
+        # return paths
         return cls._sort_clipper_output(paths)

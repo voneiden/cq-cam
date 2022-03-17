@@ -72,7 +72,7 @@ def wire_to_command_sequence(wire: cq.Wire, plane: cq.Plane) -> 'CommandSequence
     return CommandSequence(sequence_start, commands, sequence_end)
 
 
-def wire_to_command_sequence2(wire: cq.Wire, tabs: Tabs) -> 'CommandSequence':
+def wire_to_command_sequence2(wire: cq.Wire, tabs: Tabs = NoTabs) -> 'CommandSequence':
     """
     Convert a wire into ordered sequence of commands.
     """

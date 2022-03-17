@@ -84,7 +84,13 @@ class Task(ABC):
         matrix = self.job.workplane.plane.fG
         return [face.transformShape(matrix) for face in faces]
 
-
+    def _o_objects(self, o):
+        if isinstance(o, cq.Workplane):
+            return o.objects
+        elif isinstance(o, list):
+            return o
+        else:
+            return [o]
 @dataclass
 class FaceBaseOperation(Task, ABC):
     """ Base class for any operation that operates primarily on face(s)
@@ -186,3 +192,6 @@ class FaceBaseOperation(Task, ABC):
             boundaries.append(cq.Face.makeFromWires(outer_face.outerWire(), inner))
 
         return boundaries
+
+
+

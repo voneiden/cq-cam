@@ -1,5 +1,6 @@
 from collections import defaultdict
 from dataclasses import dataclass
+from math import copysign
 from typing import List, Tuple, Dict
 
 import numpy as np
@@ -10,11 +11,12 @@ from cadquery import cq
 
 from cq_cam.commands.base_command import Unit
 from cq_cam.commands.command import Rapid, Cut, Plunge
+from cq_cam.commands.util_command import wire_to_command_sequence2
 from cq_cam.job import Job
-from cq_cam.operations.base_operation import FaceBaseOperation
+from cq_cam.operations.base_operation import FaceBaseOperation, OperationError
 from cq_cam.operations.mixin_operation import PlaneValidationMixin, ObjectsValidationMixin
 from cq_cam.operations.strategy import ZigZagStrategy, ContourStrategy, Strategy
-from cq_cam.utils.utils import WireClipper, flatten_list
+from cq_cam.utils.utils import WireClipper, flatten_list, drop_z, flatten_wire, flatten_wire_to_closed_2d
 from cq_cam.visualize import visualize_task
 
 
@@ -126,6 +128,36 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
         else:
             return [end_depth]
 
+    def _apply_avoid(self, outer_subject_wires, inner_subject_wires, avoid_objs, outer_offset, inner_offset):
+        avoid_clip = WireClipper()
+        for o in avoid_objs:
+            if isinstance(o, cq.Face):
+                # Use reverse offsets because avoid is like an anti-pocket
+                outer_avoid_wires = o.outerWire().offset2D(inner_offset)
+                inner_avoid_wires = flatten_list([wire.offset2D(outer_offset) for wire in o.innerWires()])
+            elif isinstance(o, cq.Wire):
+                # TODO check this
+                outer_avoid_wires = o.offset2D(inner_offset)
+                inner_avoid_wires = []
+            else:
+                raise OperationError('Avoid can only be a wire or a face')
+
+            for wire in outer_avoid_wires + inner_avoid_wires:
+                avoid_clip.add_clip_wire(wire)
+
+        for outer_subject in outer_subject_wires:
+            avoid_clip.add_subject_wire(outer_subject)
+
+        outer_boundaries = [list(boundary) for boundary in avoid_clip.execute_difference()]
+        avoid_clip.reset()
+
+        for inner_subject in inner_subject_wires:
+            avoid_clip.add_subject_wire(inner_subject)
+
+        inner_boundaries = [list(boundary) for boundary in avoid_clip.execute_difference()]
+
+        return outer_boundaries, inner_boundaries
+
     def process_boundary(self, face: cq.Face, start_depth: float, end_depth: float):
         # TODO break this function down into easily testable sections
         # Perform validations
@@ -143,16 +175,47 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
         outer_profiles = face.outerWire().offset2D(outer_wire_offset)
         inner_profiles = flatten_list([wire.offset2D(inner_wire_offset) for wire in face.innerWires()])
 
+
+
         # Prepare primary clearing regions
         if self.boundary_final_pass_stepover is None:
             self.boundary_final_pass_stepover = self.stepover
         final_pass_offset = tool_radius * self.boundary_final_pass_stepover
 
         # Generate the primary clearing regions with stepover from the above profiles
-        outer_boundaries = flatten_list([wire.offset2D(-final_pass_offset) for wire in outer_profiles])
-        inner_boundaries = flatten_list([wire.offset2D(final_pass_offset) for wire in inner_profiles])
+        outer_boundaries = flatten_list([wire.offset2D(copysign(final_pass_offset, outer_wire_offset)) for wire in outer_profiles])
+        inner_boundaries = flatten_list([wire.offset2D(copysign(final_pass_offset, inner_wire_offset)) for wire in inner_profiles])
+
+        # TODO apply "avoid" here using wire clipper? or in the strategy?
+        # Note: also apply avoid to the actual profiles
+        if self.avoid:
+            objs = self._o_objects(self.avoid)
+
+            outer_profiles, inner_profiles = self._apply_avoid(
+                outer_profiles,
+                inner_profiles,
+                objs,
+                outer_wire_offset,
+                inner_wire_offset
+            )
+
+            outer_boundaries, inner_boundaries = self._apply_avoid(
+                outer_boundaries,
+                inner_boundaries,
+                objs,
+                outer_wire_offset + copysign(final_pass_offset, outer_wire_offset),
+                inner_wire_offset + copysign(final_pass_offset, inner_wire_offset)
+            )
 
         cut_sequences = self.strategy.process(self, outer_boundaries, inner_boundaries)
+        if self.avoid:
+            cut_sequences += outer_profiles
+            cut_sequences += inner_profiles
+        else:
+            outer_polygons = tuple(flatten_wire_to_closed_2d(outer_profile) for outer_profile in outer_profiles)
+            inner_polygons = tuple(flatten_wire_to_closed_2d(inner_profile) for inner_profile in inner_profiles)
+            cut_sequences += outer_polygons
+            cut_sequences += inner_polygons
 
         for i, depth in enumerate(self._generate_depths(start_depth, end_depth)):
             for cut_sequence in cut_sequences:
@@ -163,6 +226,7 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
                 self.commands.append(Plunge(z=depth))
                 for cut in cut_sequence[1:]:
                     self.commands.append(Cut(x=cut[0], y=cut[1], z=None))
+
 
 
 def pick_other_scanline_end(scanline, scanpoint):
@@ -212,14 +276,16 @@ def demo2():
     from cq_cam.visualize import visualize_task
 
     result = cq.Workplane("front").box(20.0, 20.0, 2).faces('>Z').workplane().rect(15, 15).cutBlind(-1)
+    result = result.moveTo(0, -10).rect(5, 5).cutBlind(-1)
     #show_object(result.faces('<Z[1]'))
     job_plane = result.faces('>Z').workplane()
     job = Job(job_plane, 300, 100, Unit.METRIC, 5)
-    op = Pocket(job=job, clearance_height=5, top_height=0, wp=result.faces('<Z[1]'))
+    op = Pocket(job=job, tool_diameter=1, clearance_height=5, top_height=0, wp=result.faces('<Z[1]'), outer_boundary_offset=-1)#, avoid=result.faces('>Z'))
     toolpath = visualize_task(job, op, as_edges=False)
     #result.objects += toolpath
     show_object(result)
     show_object(toolpath)
+    show_object(result.faces('>Z'), 'avoid', {'color': 'red'})
 
 if 'show_object' in locals() or __name__ == '__main__':
     demo2()

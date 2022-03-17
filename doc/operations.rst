@@ -120,6 +120,19 @@ Closed pockets and strategies
 Open pockets
 ------------
 
+Open pockets can be done by increasing the `outer_boundary_offset` and defining `avoid`. Avoid prevents the tool from
+entering the faces listed.
+
+.. cadquery::
+
+    from cq_cam import Job, Pocket, METRIC, visualize_task
+
+    result = cq.Workplane("front").box(20.0, 20.0, 2).faces('>Z').workplane().rect(15, 15).cutBlind(-1).moveTo(0, -10).rect(5, 5).cutBlind(-1)
+    job_plane = result.faces('>Z').workplane()
+    job = Job(job_plane, 300, 100, METRIC, 5)
+    op = Pocket(job=job, tool_diameter=1, clearance_height=5, top_height=0, wp=result.faces('<Z[1]'), outer_boundary_offset=1, avoid=result.faces('>Z'))
+    toolpath = visualize_task(job, op, as_edges=True)
+    result.objects += toolpath
 
 
 Drill
