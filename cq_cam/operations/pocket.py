@@ -175,16 +175,14 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
         outer_profiles = face.outerWire().offset2D(outer_wire_offset)
         inner_profiles = flatten_list([wire.offset2D(inner_wire_offset) for wire in face.innerWires()])
 
-
-
         # Prepare primary clearing regions
         if self.boundary_final_pass_stepover is None:
             self.boundary_final_pass_stepover = self.stepover
         final_pass_offset = tool_radius * self.boundary_final_pass_stepover
 
         # Generate the primary clearing regions with stepover from the above profiles
-        outer_boundaries = flatten_list([wire.offset2D(copysign(final_pass_offset, outer_wire_offset)) for wire in outer_profiles])
-        inner_boundaries = flatten_list([wire.offset2D(copysign(final_pass_offset, inner_wire_offset)) for wire in inner_profiles])
+        outer_boundaries = flatten_list([wire.offset2D(-final_pass_offset) for wire in outer_profiles])
+        inner_boundaries = flatten_list([wire.offset2D(final_pass_offset) for wire in inner_profiles])
 
         # TODO apply "avoid" here using wire clipper? or in the strategy?
         # Note: also apply avoid to the actual profiles
@@ -203,8 +201,8 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
                 outer_boundaries,
                 inner_boundaries,
                 objs,
-                outer_wire_offset + copysign(final_pass_offset, outer_wire_offset),
-                inner_wire_offset + copysign(final_pass_offset, inner_wire_offset)
+                outer_wire_offset - final_pass_offset,
+                inner_wire_offset + final_pass_offset
             )
 
         cut_sequences = self.strategy.process(self, outer_boundaries, inner_boundaries)
@@ -228,7 +226,6 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
                     self.commands.append(Cut(x=cut[0], y=cut[1], z=None))
 
 
-
 def pick_other_scanline_end(scanline, scanpoint):
     if scanline[0] == scanpoint:
         return scanline[1]
@@ -250,7 +247,7 @@ def demo():
             .cutBlind(-6)
     )
     op_plane = obj.faces('>Z[1] or >Z[2]')
-    #test = obj.faces('>Z[-3] or >Z[-2] or >Z[-4]')
+    # test = obj.faces('>Z[-3] or >Z[-2] or >Z[-4]')
     # obj = op_plane.workplane().rect(2, 2).extrude(4)
 
     job = Job(job_plane, 300, 100, Unit.METRIC, 5)
@@ -260,14 +257,15 @@ def demo():
     print(op.to_gcode())
 
     show_object(obj)
-    #show_object(cq.Workplane().box(15, 15, 10).faces('>Z'), 'job')
-    #show_object(op_plane, 'op')
+    # show_object(cq.Workplane().box(15, 15, 10).faces('>Z'), 'job')
+    # show_object(op_plane, 'op')
     # show_object(op_plane)
     show_object(toolpath, 'g')
     # for w in op._wires:
     #    show_object(w)
 
-    #show_object(test, 'test')
+    # show_object(test, 'test')
+
 
 def demo2():
     from cq_cam.job import Job
@@ -277,15 +275,17 @@ def demo2():
 
     result = cq.Workplane("front").box(20.0, 20.0, 2).faces('>Z').workplane().rect(15, 15).cutBlind(-1)
     result = result.moveTo(0, -10).rect(5, 5).cutBlind(-1)
-    #show_object(result.faces('<Z[1]'))
+    # show_object(result.faces('<Z[1]'))
     job_plane = result.faces('>Z').workplane()
     job = Job(job_plane, 300, 100, Unit.METRIC, 5)
-    op = Pocket(job=job, tool_diameter=1, clearance_height=5, top_height=0, wp=result.faces('<Z[1]'), outer_boundary_offset=-1)#, avoid=result.faces('>Z'))
+    op = Pocket(job=job, tool_diameter=1, clearance_height=5, top_height=0, wp=result.faces('<Z[1]'),
+                outer_boundary_offset=1, avoid=result.faces('>Z'))
     toolpath = visualize_task(job, op, as_edges=False)
-    #result.objects += toolpath
+    # result.objects += toolpath
     show_object(result)
     show_object(toolpath)
     show_object(result.faces('>Z'), 'avoid', {'color': 'red'})
+
 
 if 'show_object' in locals() or __name__ == '__main__':
     demo2()
