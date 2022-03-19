@@ -12,3 +12,5 @@ dependencies:
       - "--editable=."
       - sphinxcadquery
       - enum-tools[sphinx]
+      - pyclipper
+      - numpy
