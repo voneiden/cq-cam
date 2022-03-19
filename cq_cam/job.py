@@ -7,13 +7,13 @@ from cadquery import cq
 
 if TYPE_CHECKING:
     from cq_cam.commands.base_command import Unit
-    from cq_cam.operations.base_operation import Task
+    from cq_cam.operations.base_operation import Operation
 
 
 @dataclass
 class Job:
     workplane: cq.Workplane
-    tasks: List[Task] = field(init=False, default_factory=list)
+    tasks: List[Operation] = field(init=False, default_factory=list)
     feed: float
     plunge_feed: float
     unit: Unit

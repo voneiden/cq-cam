@@ -40,6 +40,7 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
 
     def __post_init__(self):
         # Give each face an ID
+        super().__post_init__()
         faces = [(i, face.copy()) for i, face in enumerate(self._faces)]
         features, coplanar_faces, depth_info = self._discover_pocket_features(faces)
         groups = self._group_faces_by_features(features, coplanar_faces)
@@ -168,8 +169,8 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
         # Prepare profile paths
         job_plane = self.job.workplane.plane
         tool_radius = self._tool_diameter / 2
-        outer_wire_offset = tool_radius * self.outer_boundary_offset
-        inner_wire_offset = tool_radius * self.inner_boundary_offset
+        outer_wire_offset = tool_radius * self.outer_boundary_offset[0] + self.outer_boundary_offset[1]
+        inner_wire_offset = tool_radius * self.inner_boundary_offset[0] + self.inner_boundary_offset[1]
 
         # These are the profile paths. They are done very last as a finishing pass
         outer_profiles = face.outerWire().offset2D(outer_wire_offset)
@@ -278,7 +279,7 @@ def demo2():
     # show_object(result.faces('<Z[1]'))
     job_plane = result.faces('>Z').workplane()
     job = Job(job_plane, 300, 100, Unit.METRIC, 5)
-    op = Pocket(job=job, tool_diameter=1, clearance_height=5, top_height=0, wp=result.faces('<Z[1]'),
+    op = Pocket(job=job, tool_diameter=1, clearance_height=5, top_height=0, o=result.faces('<Z[1]'),
                 outer_boundary_offset=1, avoid=result.faces('>Z'))
     toolpath = visualize_task(job, op, as_edges=False)
     # result.objects += toolpath

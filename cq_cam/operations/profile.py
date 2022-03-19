@@ -8,7 +8,7 @@ from cadquery import cq
 from cq_cam.commands.command import Rapid, Plunge
 from cq_cam.commands.util_command import wire_to_command_sequence2
 
-from cq_cam.operations.base_operation import Task, OperationError
+from cq_cam.operations.base_operation import Operation, OperationError
 from cq_cam.operations.mixin_operation import PlaneValidationMixin, ObjectsValidationMixin
 from cq_cam.operations.tabs import Tabs, NoTabs, WireTabs
 from cq_cam.utils.utils import (
@@ -23,7 +23,7 @@ _op_o_shapes = Union[cq.Wire, cq.Face]
 
 
 @dataclass
-class Profile(PlaneValidationMixin, ObjectsValidationMixin, Task):
+class Profile(PlaneValidationMixin, ObjectsValidationMixin, Operation):
     """
     Create a profiles based on selected wires and faces in a Workplane.
     """

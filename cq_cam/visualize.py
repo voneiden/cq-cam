@@ -8,7 +8,7 @@ from cq_cam.commands.base_command import MotionCommand
 from cq_cam.commands.command import Plunge, Cut, Rapid, Circular
 from cq_cam.commands.util_command import arc_center_midpoint
 from cq_cam.job import Job
-from cq_cam.operations.base_operation import Task
+from cq_cam.operations.base_operation import Operation
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ def to_occ_color(*args):
     return _to_occ_color(*args)
 
 
-def visualize_task(job: Job, task: Task, as_edges=False):
+def visualize_task(job: Job, task: Operation, as_edges=False):
     root_workplane = job.workplane
     root_plane = root_workplane.plane
 

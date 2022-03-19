@@ -1,5 +1,6 @@
 from cq_cam.commands.base_command import Unit
 from cq_cam.job import Job
+from cq_cam.operations.drill import Drill
 from cq_cam.operations.op3d import Surface3D
 from cq_cam.operations.pocket import Pocket
 from cq_cam.operations.profile import Profile
@@ -14,6 +15,7 @@ __all__ = [
     'Job',
     'Profile',
     'Pocket',
+    'Drill',
     'Surface3D',
     'Unit',
     'ZigZagStrategy',

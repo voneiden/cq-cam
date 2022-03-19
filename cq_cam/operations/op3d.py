@@ -30,6 +30,7 @@ from cq_cam.visualize import visualize_task
 @dataclass
 class Surface3D(FaceBaseOperation):
     tool: ocl.MillingCutter = ocl.CylCutter(3.175, 15)
+    interpolation_step: float = 0.5
 
     @property
     def _tool_diameter(self) -> float:
@@ -46,7 +47,7 @@ class Surface3D(FaceBaseOperation):
         4) Proceed generating multiple depths taking section depths into consideration
         :return:
         """
-
+        super().__post_init__()
         faces = self.transform_shapes_to_global(self._faces)
         compound = cq.Workplane().add(faces).combine().objects[0]
         bb = compound.BoundingBox()
@@ -62,12 +63,10 @@ class Surface3D(FaceBaseOperation):
 
         for op_boundary in op_boundaries:
             outer_boundary = op_boundary.outerWire()
-            inner_boundaries = op_boundary.innerWires()
+            inner_boundaries = op_boundary.innerWires() # TODO is this needed?
 
-            cut_sequences = ZigZagStrategy.process(self, [outer_boundary], inner_boundaries)
+            cut_sequences = ZigZagStrategy.process(self, [outer_boundary], [])
 
-            # Get depths for
-            max_step = 1
 
             def interpolate_cut_sequence(cut_sequence):
                 interpolated = [cut_sequence[0]]
@@ -77,7 +76,7 @@ class Surface3D(FaceBaseOperation):
                     v = v2 - v1
                     u = v.normalized()
                     l = v.Length
-                    for step in np.arange(0, l, max_step):
+                    for step in np.arange(0, l, self.interpolation_step):
                         step_v = v1 + u * step
                         interpolated.append((step_v.x, step_v.y))
                     interpolated.append(p2)
@@ -136,20 +135,20 @@ class Surface3D(FaceBaseOperation):
                 # TODO if there is a new cut sequence within radius of max_step then use it without retracting
                 for cut_sequence in depth_cut_sequences:
                     cut_start = cut_sequence[0]
-                    self.commands.append(Rapid(None, None, self.clearance_height))
-                    self.commands.append(Rapid(cut_start[0], cut_start[1], None))
-                    self.commands.append(Rapid(None, None, self.top_height))  # TODO plunge or rapid?
-                    self.commands.append(Plunge(cut_start[2]))
+                    self.commands.append(Rapid(x=None, y=None, z=self.clearance_height))
+                    self.commands.append(Rapid(x=cut_start[0], y=cut_start[1], z=None))
+                    self.commands.append(Rapid(x=None, y=None, z=self.top_height))  # TODO plunge or rapid?
+                    self.commands.append(Plunge(z=cut_start[2]))
                     for cut in cut_sequence[1:]:
-                        self.commands.append(Cut(cut[0], cut[1], max(depth, cut[2])))
+                        self.commands.append(Cut(x=cut[0], y=cut[1], z=max(depth, cut[2])))
 
-        for i, base_boundary in enumerate(base_boundaries):
-            show_object(base_boundary, f'base_boundary-{i}')
-
-        for i, op_boundary in enumerate(op_boundaries):
-            show_object(op_boundary, f'op_boundary-{i}')
-
-        show_object(faces, 'depth_boundary')
+        # for i, base_boundary in enumerate(base_boundaries):
+        #    show_object(base_boundary, f'base_boundary-{i}')
+        #
+        # for i, op_boundary in enumerate(op_boundaries):
+        #    show_object(op_boundary, f'op_boundary-{i}')
+        #
+        # show_object(faces, 'depth_boundary')
 
     @classmethod
     def shape_to_triangles(cls,
@@ -241,7 +240,7 @@ def demo():
               rapid_height=10)
 
     faces = wp.faces('(not +X) and (not -X) and (not -Y) and (not +Y) and (not -Z)')
-    op = Surface3D(job=job, clearance_height=2, top_height=0, wp=faces, tool=ocl.CylCutter(3.175, 10),
+    op = Surface3D(job=job, clearance_height=2, top_height=0, o=faces, tool=ocl.CylCutter(3.175, 10),
                    avoid=None, stepdown=-5)
 
     toolpath = visualize_task(job, op)
@@ -249,5 +248,29 @@ def demo():
     show_object(toolpath, 'toolpath')
 
 
+def demo2():
+    result = (
+        cq.Workplane('XY').rect(30, 30).extrude(20)
+            .faces('>Z').workplane().rect(20, 20).cutBlind(-5)
+            .faces('>Z[1]').workplane().rect(10, 10).extrude(3)
+            .faces('>Z[1]').fillet(1)
+            .faces('>Z[2]').fillet(1)
+            .faces('>Z')
+    )
+    result.objects = result.objects[0].innerWires()
+    result = result.fillet(1)
+    job = Job(workplane=result.faces('>Z').workplane(),
+              feed=300,
+              plunge_feed=100,
+              unit=Unit.METRIC,
+              rapid_height=10)
+    op = Surface3D(job=job, clearance_height=2, top_height=0, o=result.faces(), tool=ocl.CylCutter(3.175, 10),
+                   interpolation_step=0.1, outer_boundary_offset=0)
+    toolpath = visualize_task(job, op, as_edges=False)
+
+    show_object(result)
+    show_object(toolpath)
+
+
 if 'show_object' in locals() or __name__ == '__main__':
-    demo()
+    demo2()

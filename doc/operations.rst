@@ -11,6 +11,7 @@ It can be used for both outer and inner profiles.
 
 Outer profile
 -------------
+
 .. cadquery::
 
     from cq_cam import Job, Profile, METRIC, visualize_task
@@ -101,7 +102,7 @@ Closed pockets and strategies
 
     job_plane = result.faces('>Z').workplane()
     job = Job(job_plane, 300, 100, METRIC, 5)
-    op = Pocket(job=job, clearance_height=5, top_height=0, wp=result.faces('<Z[1]'), strategy=ZigZagStrategy)
+    op = Pocket(job=job, clearance_height=5, top_height=0, o=result.faces('<Z[1]'), strategy=ZigZagStrategy)
     toolpath = visualize_task(job, op, as_edges=True)
     result.objects += toolpath
 
@@ -113,7 +114,7 @@ Closed pockets and strategies
 
     job_plane = result.faces('>Z').workplane()
     job = Job(job_plane, 300, 100, METRIC, 5)
-    op = Pocket(job=job, clearance_height=5, top_height=0, wp=result.faces('<Z[1]'), strategy=ContourStrategy)
+    op = Pocket(job=job, clearance_height=5, top_height=0, o=result.faces('<Z[1]'), strategy=ContourStrategy)
     toolpath = visualize_task(job, op, as_edges=True)
     result.objects += toolpath
 
@@ -130,15 +131,43 @@ entering the faces listed.
     result = cq.Workplane("front").box(20.0, 20.0, 2).faces('>Z').workplane().rect(15, 15).cutBlind(-1).moveTo(0, -10).rect(5, 5).cutBlind(-1)
     job_plane = result.faces('>Z').workplane()
     job = Job(job_plane, 300, 100, METRIC, 5)
-    op = Pocket(job=job, tool_diameter=1, clearance_height=5, top_height=0, wp=result.faces('<Z[1]'), outer_boundary_offset=1, avoid=result.faces('>Z'))
+    op = Pocket(job=job, tool_diameter=1, clearance_height=5, top_height=0, o=result.faces('<Z[1]'), outer_boundary_offset=1, avoid=result.faces('>Z'))
     toolpath = visualize_task(job, op, as_edges=True)
     result.objects += toolpath
 
 
 Drill
 ========
+.. cadquery::
 
+    from cq_cam import Job, Drill, METRIC, visualize_task
+    result = cq.Workplane("front").box(20.0, 20.0, 2).faces('>Z').workplane().pushPoints([
+        (3, 3), (-5, -8), (0, 0), (5, 2), (7, -3), (-8, 2)]).circle(1).cutThruAll()
+    job_plane = result.faces('>Z').workplane()
+    job = Job(job_plane, 300, 100, METRIC, 5)
+    op = Drill(job=job, clearance_height=5, top_height=0, depth=2, o=result.faces('>Z').objects[0].innerWires())
+    toolpath = visualize_task(job, op, as_edges=True)
+    result.objects += toolpath
 
 3D Surface
 ==========
 
+.. cadquery::
+
+    import ocl
+    from cq_cam import Job, Surface3D, METRIC, visualize_task
+    result = (
+        cq.Workplane('XY').rect(30, 30).extrude(20)
+        .faces('>Z').workplane().rect(20, 20).cutBlind(-5)
+        .faces('>Z[1]').workplane().rect(10, 10).extrude(3)
+        .faces('>Z[1]').fillet(1)
+        .faces('>Z[2]').fillet(1)
+        .faces('>Z')
+    )
+    result.objects = result.objects[0].innerWires()
+    result = result.fillet(1)
+    job = Job(workplane=result.faces('>Z').workplane(), feed=300, plunge_feed=100, unit=METRIC, rapid_height=10)
+    op = Surface3D(job=job, clearance_height=2, top_height=0, o=result.faces(), tool=ocl.CylCutter(3.175, 10),
+                   interpolation_step=0.1, outer_boundary_offset=0)
+    toolpath = visualize_task(job, op, as_edges=True)
+    result.objects += toolpath

@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import Optional, List, Union
 
 from cq_cam.commands.command import Rapid, Plunge
-from cq_cam.operations.base_operation import Task, OperationError
+from cq_cam.operations.base_operation import Operation, OperationError
 import cadquery as cq
 
 from cq_cam.operations.strategy import Strategy
@@ -12,13 +12,13 @@ _op_o_shapes = Union[cq.Wire, cq.Face, cq.Vector]
 
 
 @dataclass
-class Drill(Task):
+class Drill(Operation):
     wp: cq.Workplane = None
     """ The cadquery Workplane containing faces and/or
     wires that the profile will operate on. 
     """
     o: Union[cq.Workplane, List[_op_o_shapes], _op_o_shapes] = None
-    depth: Optional[float] = None
+    depth: float = None
 
     def __post_init__(self):
         # TODO max depth
@@ -28,6 +28,9 @@ class Drill(Task):
 
         if self.o is None:
             raise OperationError("o must be defined")
+
+        if self.depth is None:
+            raise OperationError('depth must be defined')
 
         for obj in self._o_objects(self.o):
             if isinstance(obj, cq.Vector):
@@ -46,8 +49,6 @@ class Drill(Task):
         if not drill_vectors:
             raise OperationError("Given wp does not contain anything to do")
 
-        # TODO generate commands
-        # TODO optimize order
 
         drill_points = [(point.x, point.y) for point in drill_vectors]
         ordered_drill_points = []
@@ -59,13 +60,13 @@ class Drill(Task):
             drill_points.pop(drill_points.index(drill_point))
             last = drill_point
 
-
+        depth = -abs(self.depth)
         for point in ordered_drill_points:
             cut_sequences.append([
                 Rapid(x=None, y=None, z=self.clearance_height),
                 Rapid(x=point[0], y=point[1], z=None),
                 Rapid(x=None, y=None, z=self.top_height),
-                Plunge(z=-10),  # TODO depth
+                Plunge(z=depth),  # TODO depth
                 Rapid(x=None, y=None, z=self.clearance_height),
             ])
         cut_sequences = flatten_list(cut_sequences)
@@ -78,15 +79,8 @@ def demo():
     from cq_cam.visualize import visualize_task
 
     result = cq.Workplane("front").box(20.0, 20.0, 2).faces('>Z').workplane().pushPoints([
-        (3, 3),
-        (-5, -8),
-        (0,0),
-        (5,2),
-        (7,-3),
-        (-8,2)
-    ]).circle(
-        1).cutThruAll()
-    # show_object(result.faces('<Z[1]'))
+        (3, 3), (-5, -8), (0, 0), (5, 2), (7, -3), (-8, 2)]).circle(1).cutThruAll()
+
     job_plane = result.faces('>Z').workplane()
     job = Job(job_plane, 300, 100, Unit.METRIC, 5)
     op = Drill(job=job, clearance_height=5, top_height=0, o=result.faces('>Z').objects[0].innerWires())

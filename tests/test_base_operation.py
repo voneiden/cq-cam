@@ -4,7 +4,7 @@ from unittest.mock import patch
 from cadquery import cq
 
 from cq_cam.job import Job
-from cq_cam.operations.base_operation import Task
+from cq_cam.operations.base_operation import Operation
 
 
 class TaskTest(unittest.TestCase):
@@ -21,7 +21,7 @@ class TaskTest(unittest.TestCase):
             job: Job = job_cls.return_value
             job.workplane = job_plane
 
-            task = Task(job=job, clearance_height=10, top_height=5)
+            task = Operation(job=job, clearance_height=10, top_height=5)
             transformed_faces = task.transform_shapes_to_global(op_faces)
             result_plane = cq.Workplane().add(transformed_faces).workplane()
             self.assertEqual(result_plane.plane.origin, cq.Vector(0, 0, -2))

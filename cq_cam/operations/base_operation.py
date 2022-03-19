@@ -18,7 +18,7 @@ class OperationError(Exception):
 
 
 @dataclass
-class Task(ABC):
+class Operation(ABC):
     job: Job
     """ The `Job` which this task belongs to.
     """
@@ -91,17 +91,20 @@ class Task(ABC):
             return o
         else:
             return [o]
+
 @dataclass
-class FaceBaseOperation(Task, ABC):
+class FaceBaseOperation(Operation, ABC):
     """ Base class for any operation that operates primarily on face(s)
     """
 
-    wp: cq.Workplane = None
+    _op_o_shapes = Union[cq.Wire, cq.Face]
+
+    o: Union[cq.Workplane, List[_op_o_shapes], _op_o_shapes] = None
     """ The cadquery Workplane containing faces and/or
     wires that the profile will operate on. 
     """
 
-    avoid: Optional[cq.Workplane] = None
+    avoid: Optional[Union[cq.Workplane, List[_op_o_shapes], _op_o_shapes]] = None
     """ [INOP] List of faces that the tool may not enter. This option
     can be relevant when using an `outer_boundary_offset` that
     would otherwise cause the tool to enter features you do
@@ -145,9 +148,9 @@ class FaceBaseOperation(Task, ABC):
     def _tool_diameter(self) -> float:
         pass
 
-    def _wp_to_faces(self, name, wp):
+    def _wp_to_faces(self, name, o):
         faces: List[cq.Face] = []
-        for obj in self.wp.objects:
+        for obj in self._o_objects(o):
             if isinstance(obj, cq.Face):
                 faces.append(obj)
             elif isinstance(obj, cq.Wire):
@@ -162,7 +165,7 @@ class FaceBaseOperation(Task, ABC):
 
     @property
     def _faces(self):
-        return self._wp_to_faces('wp', self.wp)
+        return self._wp_to_faces('o', self.o)
 
     @property
     def _avoid(self):
