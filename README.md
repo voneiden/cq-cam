@@ -4,6 +4,8 @@ CQ-CAM
 CQ-CAM aims to become a free, parametric CAM solution for
 3-axis CNC mills closely integrating with CadQuery. 
 
+[Documentation: https://cq-cam.readthedocs.io/en/latest/](https://cq-cam.readthedocs.io/en/latest/)
+
 ⚠ NOTE ⚠
 ===
 Highly experimental at this stage. Expect bugs and always inspect the generated gcode.
