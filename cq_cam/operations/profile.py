@@ -132,9 +132,9 @@ class Profile(PlaneValidationMixin, ObjectsValidationMixin, Operation):
 
         command_sequence = wire_to_command_sequence2(offset_wires[0], self.tabs)
 
-        if command_sequence.is_clockwise() != cut_clockwise(True, True, True):
-            command_sequence.reverse()
-            pass
+        #if command_sequence.is_clockwise() != cut_clockwise(True, True, True):
+        #    command_sequence.reverse()
+        #    pass
 
         start = command_sequence.start
         end = command_sequence.end
