@@ -1,6 +1,6 @@
-from abc import ABC, abstractproperty, abstractmethod
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import List, Union, Optional, Tuple, Dict
+from typing import List, Union, Optional, Tuple
 
 from OCP.BRepFeat import BRepFeat
 from OCP.TopAbs import TopAbs_FACE
@@ -9,8 +9,7 @@ from cadquery import cq
 
 from cq_cam.commands.base_command import Command
 from cq_cam.job import Job
-from cq_cam.utils.linked_polygon import LinkedPolygon
-from cq_cam.utils.utils import flatten_list, pairwise, dist_to_segment_squared, cached_dist2
+from cq_cam.utils.utils import flatten_list
 
 
 class OperationError(Exception):
@@ -91,6 +90,7 @@ class Operation(ABC):
             return o
         else:
             return [o]
+
 
 @dataclass
 class FaceBaseOperation(Operation, ABC):
@@ -195,6 +195,3 @@ class FaceBaseOperation(Operation, ABC):
             boundaries.append(cq.Face.makeFromWires(outer_face.outerWire(), inner))
 
         return boundaries
-
-
-

@@ -1,6 +1,5 @@
 from collections import defaultdict
 from dataclasses import dataclass
-from math import copysign
 from typing import List, Tuple, Dict
 
 import numpy as np
@@ -11,12 +10,11 @@ from cadquery import cq
 
 from cq_cam.commands.base_command import Unit
 from cq_cam.commands.command import Rapid, Cut, Plunge
-from cq_cam.commands.util_command import wire_to_command_sequence2
 from cq_cam.job import Job
 from cq_cam.operations.base_operation import FaceBaseOperation, OperationError
 from cq_cam.operations.mixin_operation import PlaneValidationMixin, ObjectsValidationMixin
-from cq_cam.operations.strategy import ZigZagStrategy, ContourStrategy, Strategy
-from cq_cam.utils.utils import WireClipper, flatten_list, drop_z, flatten_wire, flatten_wire_to_closed_2d
+from cq_cam.operations.strategy import ZigZagStrategy, Strategy
+from cq_cam.utils.utils import WireClipper, flatten_list, flatten_wire_to_closed_2d
 from cq_cam.visualize import visualize_task
 
 
