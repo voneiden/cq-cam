@@ -18,8 +18,8 @@ class CommandSequenceTest(unittest.TestCase):
     def test_reverse_line(self):
         start = cq.Vector(0, 0, 0)
         end = cq.Vector(1, 0, 0)
-        initial_cut = Cut(1, None, None)
-        reversed_cut = Cut(0, None, None)
+        initial_cut = Cut(x=1, y=None, z=None)
+        reversed_cut = Cut(x=0, y=None, z=None)
 
         cs = CommandSequence(start, [initial_cut], end)
 
@@ -44,8 +44,8 @@ class CommandSequenceTest(unittest.TestCase):
     def test_reverse_arc(self):
         start = cq.Vector(0, 0, 0)
         end = cq.Vector(1, 1, 0)
-        initial_cut = CircularCW(1, 1, None, 1, (1, 0, 0), None)
-        reversed_cut = CircularCCW(0, 0, None, 1, (0, -1, 0), None)
+        initial_cut = CircularCW(x=1, y=1, z=None, radius=1, ijk=(1, 0, 0), mid=(0.29289319999999996, 0.7071068, 0))
+        reversed_cut = CircularCCW(x=0, y=0, z=None, radius=1, ijk=(0, -1, 0), mid=(-0.7071068, -0.29289319999999996, 0))
 
         cs = CommandSequence(start, [initial_cut], end)
 
