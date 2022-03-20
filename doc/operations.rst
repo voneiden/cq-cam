@@ -151,6 +151,8 @@ Drill
 
 3D Surface
 ==========
+3D Surface requires that opencamlib is installed.
+The package is available in conda but not in pip.
 
 .. cadquery::
 
@@ -169,5 +171,27 @@ Drill
     job = Job(workplane=result.faces('>Z').workplane(), feed=300, plunge_feed=100, unit=METRIC, rapid_height=10)
     op = Surface3D(job=job, clearance_height=2, top_height=0, o=result.faces(), tool=ocl.CylCutter(3.175, 10),
                    interpolation_step=0.1, outer_boundary_offset=0)
+    toolpath = visualize_task(job, op, as_edges=True)
+    result.objects += toolpath
+
+
+
+
+Other features
+==============
+
+Multiple depths
+---------------
+
+A common feature is the need to perform an operation in multiple stepdown depths. Most operations support this feature.
+
+.. cadquery::
+
+    from cq_cam import Job, Profile, METRIC, visualize_task, EdgeTabs
+    result = cadquery.Workplane("front").box(20.0, 20.0, 5)
+
+    job_plane = result.faces('>Z').workplane()
+    job = Job(job_plane, 300, 100, METRIC, 5)
+    op = Profile(job=job, o=result.wires('<Z'), stepdown=-1, tabs=EdgeTabs(spacing=9, width=2, height=2))
     toolpath = visualize_task(job, op, as_edges=True)
     result.objects += toolpath
