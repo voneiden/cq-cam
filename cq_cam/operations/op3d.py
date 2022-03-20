@@ -3,12 +3,6 @@ from typing import Tuple, List
 
 import cadquery as cq
 import numpy as np
-# Fiber(const Point &p1, const Point &p2)
-# MillingCutter:  ocl::BallCutter, ocl::BullCutter, ocl::CompositeCutter, ocl::ConeCutter, ocl::CylCutter
-# STLSurf
-# * addTriangle
-# Triangle(Point p1, Point p2, Point p3)
-# BatchPushCutter: use for batch jobs
 import ocl
 from OCP.BRep import BRep_Tool
 from OCP.BRepMesh import BRepMesh_IncrementalMesh
@@ -23,7 +17,7 @@ from cq_cam.job import Job
 from cq_cam.operations.base_operation import FaceBaseOperation
 from cq_cam.operations.strategy import ZigZagStrategy
 from cq_cam.utils import utils
-from cq_cam.utils.utils import flatten_list, WireClipper
+from cq_cam.utils.utils import flatten_list
 from cq_cam.visualize import visualize_task
 
 
@@ -63,10 +57,9 @@ class Surface3D(FaceBaseOperation):
 
         for op_boundary in op_boundaries:
             outer_boundary = op_boundary.outerWire()
-            inner_boundaries = op_boundary.innerWires() # TODO is this needed?
+            inner_boundaries = op_boundary.innerWires()  # TODO is this needed?
 
             cut_sequences = ZigZagStrategy.process(self, [outer_boundary], [])
-
 
             def interpolate_cut_sequence(cut_sequence):
                 interpolated = [cut_sequence[0]]
