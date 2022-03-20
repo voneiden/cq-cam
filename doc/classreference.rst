@@ -16,6 +16,7 @@ Core Classes
     Profile
     Pocket
     Surface3D
+    Drill
 
 Milling strategies
 -------------------
@@ -57,6 +58,10 @@ Class details
    :members:
 
 .. autoclass:: cq_cam.Surface3D
+   :show-inheritance:
+   :members:
+
+.. autoclass:: cq_cam.Drill
    :show-inheritance:
    :members:
 
