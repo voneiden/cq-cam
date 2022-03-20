@@ -6,59 +6,60 @@ CQ-CAM aims to become a free, parametric CAM solution for
 
 ⚠ NOTE ⚠
 ===
-Highly experimental at this stage. This is NOT ready for general use or even the real world.
+Highly experimental at this stage. Expect bugs and always inspect the generated gcode.
 
-Requirements
+Requirements and installation
 ---
+* 
+* [cadquery=master=py3.10](https://github.com/CadQuery/cadquery)
+* Optional visualization: [cq-editor=master=py3.10](https://github.com/CadQuery/CQ-editor)
+* Optional 3D toolpaths: [opencamlib=2019.07](https://anaconda.org/conda-forge/opencamlib) (note, not available in PyPI)
+* Python packages in requirements.txt / setup.py
 
-* Visualization: cq-editor=master=py3.10
-* 3D toolpaths: opencamlib=2019.07
-* Python packages in requirements.txt
+### Install locally editable development version
+
+Install cadquery and the optional deps (CQ-Editor, opencamlib).
+
+Clone this repo, navigate to the source folder and run `pip install -e .`
+
+
+### Install release version
+
+As above, install cadquery and the optional deps (CQ-Editor, opencamlib) and run `pip install cq-cam`
+
 
 
 Contributions
 ---
-Feedback is welcome, but please no spontaneous code contributions.
-Open an issue, discuss and get an approval before submitting a PR.
+Feedback is welcome. Please discuss before proposing changes or opening PR's.
 
 
-Roadmap to first release
+Roadmap to v1.0
 ---
-The initial pace has been pretty good. The first release might be doable 
-during March 2022. 
+The scope of v1.0 is open for the time being. Some possibilities are
 
-#### To-do
-* Drill Operation
-* Release package preparation
-* Basic documentation
-
-
-#### In Progress
-* Migrating code from PoC to production quality
-  * Tidying and unifying code
-  * Adding integration tests
-  
-#### Done
-* 2.5D Profiling
-* 2.5D Pocketing with ZigZag strategy
-* Contour strategy
-* 3D Surface with ZigZag strategy, using opencamlib
-* Visualizing toolpaths in CQ-Editor (requires master version)
-* G-Code generation
-* Profiling tabs
-* Adding unit tests and refactor to more functional code to simplify testing
-* Optimize rapid and cut order (nearest neighbour)
-
-### After the first release?
 * Climb/Conventional
 * Bore Operation (helical drilling)
 * Optimize rapid and cut order (opt-2? meanwhile if you need more optimized rapids check out https://gcode-sort.web.app/)
 * Other strategies
 * Ramps
 
+Current features (v0.1)
+----------------
+See https://cq-cam.readthedocs.io/en/latest/operations.html for a showcase of different operations and features.
 
-Outside of scope
----
+* 2.5D Profiling
+* 2.5D Pocketing with ZigZag and Contour strategies
+* 3D Surface with ZigZag strategy, using opencamlib
+* Drill Operation
+* Visualizing toolpaths in CQ-Editor (requires master version)
+* G-Code generation
+* Profiling tabs
+* Optimize rapid and cut order (nearest neighbour)
+
+
+Permanently outside of scope
+---------------------------
 
 * Simulation
 * Lathes and 4D
