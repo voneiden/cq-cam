@@ -11,7 +11,7 @@ from OCP.TopExp import TopExp_Explorer
 from OCP.TopLoc import TopLoc_Location
 from OCP.gp import gp_Pnt
 
-from cq_cam.commands.base_command import Unit
+from cq_cam import Unit
 from cq_cam.commands.command import Rapid, Plunge, Cut
 from cq_cam.job import Job
 from cq_cam.operations.base_operation import FaceBaseOperation

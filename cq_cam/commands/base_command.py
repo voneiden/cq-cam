@@ -291,12 +291,3 @@ class Circular(CircularData, MotionCommand, ABC):
                                mid=vector_to_tuple(mid_relative), tab=tab)
 
 
-class Unit(Enum):
-    METRIC = 20
-    IMPERIAL = 21
-
-    def to_gcode(self) -> str:
-        if self == Unit.METRIC:
-            return "G20"
-        else:
-            return "G21"

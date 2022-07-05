@@ -1,4 +1,4 @@
-from cq_cam.commands.base_command import Unit
+from cq_cam.common import Unit
 from cq_cam.job import Job
 from cq_cam.operations.drill import Drill
 from cq_cam.operations.pocket import Pocket

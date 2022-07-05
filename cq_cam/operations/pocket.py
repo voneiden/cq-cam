@@ -8,7 +8,7 @@ from OCP.TopAbs import TopAbs_FACE
 from OCP.TopExp import TopExp_Explorer
 from cadquery import cq
 
-from cq_cam.commands.base_command import Unit
+from cq_cam import Unit
 from cq_cam.commands.command import Rapid, Cut, Plunge
 from cq_cam.job import Job
 from cq_cam.operations.base_operation import FaceBaseOperation, OperationError

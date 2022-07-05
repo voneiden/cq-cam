@@ -1,7 +1,7 @@
 import itertools
 import math
 from functools import cache
-from typing import List, Tuple, Iterable
+from typing import List, Tuple, Iterable, Union
 
 import numpy as np
 import pyclipper
@@ -10,7 +10,8 @@ from OCP.BRepLib import BRepLib
 from OCP.BRepTools import BRepTools_WireExplorer
 from OCP.HLRAlgo import HLRAlgo_Projector
 from OCP.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape
-from OCP.TopAbs import TopAbs_REVERSED
+from OCP.TopAbs import TopAbs_REVERSED, TopAbs_EDGE
+from OCP.TopExp import TopExp_Explorer
 from OCP.TopoDS import TopoDS_Shape, TopoDS
 from OCP.gp import gp_Ax2, gp_Pnt, gp_Dir
 from cadquery import cq, Edge
@@ -53,10 +54,12 @@ def orient_vector(vector: cq.Vector, plane: cq.Plane):
 def drop_z(vector: cq.Vector) -> Tuple[float, float]:
     return vector.x, vector.y
 
+
 def flatten_wire_to_closed_2d(wire: cq.Wire):
     polygon = [drop_z(v) for v in flatten_wire(wire)]
     polygon.append(polygon[0])
     return polygon
+
 
 def vectors_to_xy(plane: cq.Plane, *vectors: cq.Vector):
     return tuple((plane.xDir.dot(vector),
@@ -284,6 +287,7 @@ def pairwise(iterable):
     next(b, None)
     return zip(a, itertools.chain(b, [iterable[0]]))
 
+
 def pairwise_open(iterable):
     """s -> (s0,s1), (s1,s2), (s2, s3), ...
     builtin in py3.10"""
@@ -340,3 +344,54 @@ def project_face(face: cq.Face, projection_dir=(0, 0, 1)) -> cq.Face:
     wires = [wire for (_, wire) in wires_with_area]
 
     return cq.Face.makeFromWires(wires[0], wires[1:])
+
+
+def extract_wires(shape: Union[cq.Workplane, List[cq.Shape]]):
+    if isinstance(shape, cq.Workplane):
+        return extract_wires(shape.objects)
+    try:
+        shape_objs = [shape_obj for shape_obj in shape]
+    except TypeError:
+        shape_objs = [shape]
+
+    outers = []
+    inners = []
+
+    for shape_obj in shape_objs:
+        if isinstance(shape_obj, cq.Wire):
+            outers.append(shape_obj)
+        elif isinstance(shape_obj, cq.Face):
+            outers.append(shape_obj.outerWire())
+            inners += shape_obj.innerWires()
+        else:
+            raise ValueError(f'Unsupported shape {type(shape_obj)}')
+
+    return outers, inners
+
+
+def compound_to_edges(compound: cq.Compound):
+    """
+    Break a compound into a list of edges.
+
+    :param compound:
+    :return:
+    """
+    edges = []
+    explorer = TopExp_Explorer(compound.wrapped, TopAbs_EDGE)
+    while explorer.More():
+        edge = explorer.Current()
+        edges.append(cq.Edge(edge))
+        explorer.Next()
+    return edges
+
+
+def filter_edges_below_plane(edges: List[cq.Edge], plane: cq.Plane):
+    """
+    Given a list of edges, return edges whose center is below plane.
+    This is meant to be used as a quick filter after cutting against the plane.
+
+    :param edges:
+    :param plane:
+    :return:
+    """
+    return [edge for edge in edges if plane.zDir.dot(edge.Center() - plane.origin) < 0]

@@ -13,13 +13,14 @@ from cq_cam.operations.mixin_operation import PlaneValidationMixin, ObjectsValid
 from cq_cam.operations.tabs import Tabs, NoTabs, WireTabs
 from cq_cam.utils.utils import (
     plane_offset_distance,
-    cut_clockwise
+    cut_clockwise, extract_wires
 )
 from cq_cam.visualize import visualize_task
 
 logger = logging.getLogger(__name__)
 
 _op_o_shapes = Union[cq.Wire, cq.Face]
+
 
 
 @dataclass
