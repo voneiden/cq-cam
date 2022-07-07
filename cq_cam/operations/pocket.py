@@ -9,13 +9,12 @@ from OCP.TopExp import TopExp_Explorer
 from cadquery import cq
 
 from cq_cam import Unit
-from cq_cam.commands.command import Rapid, Cut, Plunge
+from cq_cam.command import Rapid, Plunge, Cut
 from cq_cam.job import Job
 from cq_cam.operations.base_operation import FaceBaseOperation, OperationError
 from cq_cam.operations.mixin_operation import PlaneValidationMixin, ObjectsValidationMixin
 from cq_cam.operations.strategy import ZigZagStrategy, Strategy
 from cq_cam.utils.utils import WireClipper, flatten_list, flatten_wire_to_closed_2d
-from cq_cam.visualize import visualize_task
 
 
 @dataclass(kw_only=True)
@@ -269,7 +268,7 @@ def demo():
 def demo2():
     from cq_cam.job import Job
     from cq_cam.operations.pocket import Pocket
-    from cq_cam.commands.base_command import Unit
+    from cq_cam.command import Unit
     from cq_cam.visualize import visualize_task
 
     result = cq.Workplane("front").box(20.0, 20.0, 2).faces('>Z').workplane().rect(15, 15).cutBlind(-1)

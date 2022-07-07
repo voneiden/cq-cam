@@ -6,7 +6,7 @@ from typing import List, TYPE_CHECKING
 from cadquery import cq
 
 if TYPE_CHECKING:
-    from cq_cam.commands.base_command import Unit
+    from cq_cam.command import Unit
     from cq_cam.operations.base_operation import Operation
 
 

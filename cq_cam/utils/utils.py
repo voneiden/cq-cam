@@ -111,6 +111,21 @@ def is_arc_clockwise(start: cq.Vector, mid: cq.Vector, end: cq.Vector):
     return cp > 0
 
 
+def is_arc_clockwise2(arc: cq.Edge):
+    center = arc.arcCenter()
+    v1 = arc.startPoint() - center
+    v2 = arc.endPoint() - center
+
+    # TODO support other axes besides Z?
+    cp = v1.cross(v2)
+    if cp.z == 0:
+        raise RuntimeError('Only Z axis arcs are supported')
+
+    return cp.z < 0
+
+
+
+
 def is_parallel_plane(plane1: cq.Plane, plane2: cq.Plane):
     # Based on Plane._eq_iter
     def _eq_iter():
@@ -395,3 +410,9 @@ def filter_edges_below_plane(edges: List[cq.Edge], plane: cq.Plane):
     :return:
     """
     return [edge for edge in edges if plane.zDir.dot(edge.Center() - plane.origin) < 0]
+
+
+def optimize_float(v: float):
+    """ Drop trailing zeroes from a float that is exactly an int to save some bytes in the gcode """
+    iv = int(v)
+    return iv if v == iv else v

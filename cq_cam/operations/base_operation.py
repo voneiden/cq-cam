@@ -7,7 +7,7 @@ from OCP.TopAbs import TopAbs_FACE
 from OCP.TopExp import TopExp_Explorer
 from cadquery import cq
 
-from cq_cam.commands.base_command import Command
+from cq_cam.command import Command
 from cq_cam.job import Job
 from cq_cam.utils.utils import flatten_list
 

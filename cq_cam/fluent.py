@@ -14,8 +14,9 @@ from cadquery import cq, Compound, Wire
 #from cq_cam import Profile
 from cq_cam.commands.util_command import wire_to_command_sequence2
 from cq_cam.common import Unit
+from cq_cam.routers import route
 from cq_cam.utils.utils import extract_wires, compound_to_edges, filter_edges_below_plane, wire_to_ordered_edges
-
+from cq_cam.visualize import visualize_job
 
 
 class JobV2:
@@ -86,6 +87,7 @@ class JobV2:
             for base_feature in base_features:
                 step = cq.Vector(0, 0, 1) * stepdown
                 layers: List[cq.Wire] = [base_feature]
+                self.debug.append(base_feature)
                 for i in itertools.count():
                     if i > self.max_stepdown_count:
                         raise RuntimeError('Job.max_stepdown_count exceeded')
@@ -118,12 +120,13 @@ class JobV2:
                 l2 = wire_to_ordered_edges(layers[1])
                 ext = cq.Solid.extrudeLinear(layers[0], [], cq.Vector(0,0, -stepdown))
                 #self.debug += ext.Faces()
-                i = 4
+                i = 5
                 start = l1[i].startPoint()
-                end = l2[1].endPoint()
+                end = l2[i].endPoint()
 
                 target = end - start
 
+                find = l1[i]
 
                 #self.debug += [cut_plane]
                 #self.debug.append(cq.Edge.makeLine(start, end))
@@ -143,9 +146,18 @@ class JobV2:
                 #self.debug.append(cq.Edge.makeLine(start, start + normal))
 
 
-                cut_plane = cq.Face.makePlane(None, None, start, normal)
+                cut_plane = cq.Face.makePlane(20, 20, start, normal)
                 faces = cq.Workplane(ext).faces('(not <Z) and (not >Z)').objects
-                self.debug2 = [*faces, cut_plane]
+
+                self.debug2 = []
+                find_points = (find.startPoint(), find.endPoint())
+
+                for face in faces:
+                    for edge in face.Edges():
+                        if edge.startPoint() in find_points and edge.endPoint() in find_points:
+                            self.debug2.append(face)
+
+
                 for face in faces:
                     section = BRepAlgoAPI_Section(cut_plane.wrapped, face.wrapped, True)
                     sedges = section.SectionEdges()
@@ -171,11 +183,18 @@ class JobV2:
         #self.debug += toolpaths
         return self._add_operation([])
 
-if __name__ == 'temp':
+if __name__ == 'temp' or __name__ == '__main__':
     wp = cq.Workplane().box(15,10,5)
     top = wp.faces('>X').workplane()
     bottom = wp.faces('<X')
-    cam = JobV2(top.plane, 100, 3.175).profile(bottom, stepdown=3)
+    cam = JobV2(top.plane, 100, 3.175, rapid_height=6).profile(bottom, stepdown=3)
+
+    #show_object(cam.debug, 'stuff')
+    #show_object(cam.debug2, 'stuff2')
+
+    test_wire = cam.debug[1]
+    commands = route(cam, [test_wire])
+    ais = visualize_job(top.plane, commands[1:])
     show_object(wp)
-    show_object(cam.debug, 'stuff')
-    show_object(cam.debug2, 'stuff2')
+    show_object(wp.faces('>X'), 'top_plane')
+    show_object(ais, 'foo')

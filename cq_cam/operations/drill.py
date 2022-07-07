@@ -1,7 +1,7 @@
-from dataclasses import dataclass, field
-from typing import Optional, List, Union
+from dataclasses import dataclass
+from typing import List, Union
 
-from cq_cam.commands.command import Rapid, Plunge
+from cq_cam.command import Rapid, Plunge
 from cq_cam.operations.base_operation import Operation, OperationError
 import cadquery as cq
 
@@ -75,7 +75,7 @@ class Drill(Operation):
 
 def demo():
     from cq_cam.job import Job
-    from cq_cam.commands.base_command import Unit
+    from cq_cam.command import Unit
     from cq_cam.visualize import visualize_task
 
     result = cq.Workplane("front").box(20.0, 20.0, 2).faces('>Z').workplane().pushPoints([

@@ -1,21 +1,20 @@
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Union, List, Optional, Tuple
 
 import numpy as np
 from cadquery import cq
 
-from cq_cam.commands.command import Rapid, Plunge
+
 from cq_cam.commands.util_command import wire_to_command_sequence2
 
 from cq_cam.operations.base_operation import Operation, OperationError
 from cq_cam.operations.mixin_operation import PlaneValidationMixin, ObjectsValidationMixin
 from cq_cam.operations.tabs import Tabs, NoTabs, WireTabs
 from cq_cam.utils.utils import (
-    plane_offset_distance,
-    cut_clockwise, extract_wires
+    plane_offset_distance
 )
-from cq_cam.visualize import visualize_task
+
 
 logger = logging.getLogger(__name__)
 
@@ -167,7 +166,7 @@ class Profile(PlaneValidationMixin, ObjectsValidationMixin, Operation):
 
 def demo():
     from cq_cam.job import Job
-    from cq_cam.commands.base_command import Unit
+    from cq_cam.command import Unit
     wp = cq.Workplane().box(10, 20, 10)
     job = Job(wp.faces('>Z').workplane(), 300, 50, Unit.METRIC, 5)
     profile = Profile(job=job, o=wp.wires('<Z'), stepdown=-1, clearance_height=2, top_height=0)

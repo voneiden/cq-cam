@@ -3,7 +3,7 @@ from typing import Optional, Tuple, TYPE_CHECKING
 
 from cadquery import cq
 
-from cq_cam.operations.tabs import WireTabs, EdgeTabs, NoTabs, Tabs
+from cq_cam.operations.tabs import WireTabs, NoTabs, Tabs
 from cq_cam.utils.utils import (
     wire_to_ordered_edges,
     start_point, orient_vector,
@@ -12,7 +12,7 @@ from cq_cam.utils.utils import (
 )
 
 if TYPE_CHECKING:
-    from cq_cam.commands.base_command import CommandSequence, Circular
+    from cq_cam.command import CommandSequence, Circular
 
 
 def wire_to_command_sequence(wire: cq.Wire, plane: cq.Plane) -> 'CommandSequence':
@@ -25,7 +25,7 @@ def wire_to_command_sequence(wire: cq.Wire, plane: cq.Plane) -> 'CommandSequence
     :return:
     """
     print("wire_to_command_sequence is deprecated")
-    from cq_cam.commands.base_command import CommandSequence
+    from cq_cam.command import CommandSequence
     from cq_cam.commands.command import Cut, CircularCW, CircularCCW
 
     ordered_edges = wire_to_ordered_edges(wire)
@@ -76,7 +76,7 @@ def wire_to_command_sequence2(wire: cq.Wire, tabs: Tabs = NoTabs) -> 'CommandSeq
     """
     Convert a wire into ordered sequence of commands.
     """
-    from cq_cam.commands.base_command import CommandSequence, Circular
+    from cq_cam.command import CommandSequence, Circular
     from cq_cam.commands.command import Cut
 
     ordered_edges = wire_to_ordered_edges(wire)

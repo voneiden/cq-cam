@@ -5,7 +5,6 @@ from cq_cam.operations.pocket import Pocket
 from cq_cam.operations.profile import Profile
 from cq_cam.operations.strategy import ZigZagStrategy, ContourStrategy
 from cq_cam.operations.tabs import EdgeTabs, WireTabs
-from cq_cam.visualize import visualize_task
 
 _extra = []
 try:
@@ -27,7 +26,6 @@ __all__ = [
     'ContourStrategy',
     'EdgeTabs',
     'WireTabs',
-    'visualize_task',
     'METRIC',
     'IMPERIAL',
 ] + _extra
