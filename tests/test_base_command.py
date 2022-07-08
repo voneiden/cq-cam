@@ -2,7 +2,7 @@ import unittest
 
 from cadquery import cq
 
-from cq_cam.commands.base_command import CommandSequence
+from cq_cam.command import CommandSequence
 from cq_cam.commands.command import Cut, CircularCW, CircularCCW
 
 

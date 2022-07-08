@@ -4,7 +4,7 @@ from unittest.mock import patch
 from cadquery import cq, Edge
 
 from cq_cam.job import Job
-from cq_cam.commands.base_command import Unit
+from cq_cam.command import Unit
 from cq_cam.operations.profile import Profile
 from cq_cam.visualize import visualize_task, Geom_CartesianPoint
 
