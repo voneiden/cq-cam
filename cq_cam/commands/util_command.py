@@ -6,8 +6,8 @@ from cadquery import cq
 from cq_cam.operations.tabs import WireTabs, NoTabs, Tabs
 from cq_cam.utils.utils import (
     wire_to_ordered_edges,
-    start_point, orient_vector,
-    end_point,
+    edge_start_point, orient_vector,
+    edge_end_point,
     is_arc_clockwise,
 )
 
@@ -31,12 +31,12 @@ def wire_to_command_sequence(wire: cq.Wire, plane: cq.Plane) -> 'CommandSequence
     ordered_edges = wire_to_ordered_edges(wire)
     commands = []
 
-    sequence_start = orient_vector(start_point(ordered_edges[0]), plane)
-    sequence_end = orient_vector(end_point(ordered_edges[-1]), plane)
+    sequence_start = orient_vector(edge_start_point(ordered_edges[0]), plane)
+    sequence_end = orient_vector(edge_end_point(ordered_edges[-1]), plane)
 
     for edge in ordered_edges:
         # TODO refactor the use of orient_vector to shapeTransform
-        command_end = orient_vector(end_point(edge), plane)
+        command_end = orient_vector(edge_end_point(edge), plane)
         if edge.geomType() == "LINE":
             commands.append(Cut(command_end.x, command_end.y, None))
 
@@ -44,7 +44,7 @@ def wire_to_command_sequence(wire: cq.Wire, plane: cq.Plane) -> 'CommandSequence
             # TODO put some safe lower limit for arc length
             # grbl for example can do completely unexpected things
             # with tiny arcs
-            command_start = orient_vector(start_point(edge), plane)
+            command_start = orient_vector(edge_start_point(edge), plane)
             command_mid = orient_vector(edge.positionAt(0.5), plane)
             command_center = orient_vector(edge.arcCenter(), plane)
             # radius = abs(command_start.sub(command_center))
@@ -82,8 +82,8 @@ def wire_to_command_sequence2(wire: cq.Wire, tabs: Tabs = NoTabs) -> 'CommandSeq
     ordered_edges = wire_to_ordered_edges(wire)
     commands = []
 
-    sequence_start = start_point(ordered_edges[0])
-    sequence_end = end_point(ordered_edges[-1])
+    sequence_start = edge_start_point(ordered_edges[0])
+    sequence_end = edge_end_point(ordered_edges[-1])
 
     if isinstance(tabs, WireTabs):
         tabs.load_wire(wire)

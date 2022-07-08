@@ -18,7 +18,7 @@ from cadquery import cq, Edge
 from cadquery.occ_impl.shapes import TOLERANCE
 
 
-def end_point(edge: cq.Edge) -> cq.Vector:
+def edge_end_point(edge: cq.Edge, precision=3) -> cq.Vector:
     # https://github.com/CadQuery/cadquery/issues/831
     orientation = edge.wrapped.Orientation()
     if orientation == TopAbs_REVERSED:
@@ -26,7 +26,7 @@ def end_point(edge: cq.Edge) -> cq.Vector:
     return edge.endPoint()
 
 
-def start_point(edge: cq.Edge) -> cq.Vector:
+def edge_start_point(edge: cq.Edge, precision=3) -> cq.Vector:
     # https://github.com/CadQuery/cadquery/issues/831
     orientation = edge.wrapped.Orientation()
     if orientation == TopAbs_REVERSED:
@@ -80,7 +80,7 @@ def flatten_edges(edges: List[cq.Edge]):
         #    vxs.append(edge.startPoint())
 
         if edge.geomType() == "LINE":
-            vxs.append(end_point(edge))
+            vxs.append(edge_end_point(edge))
         elif edge.geomType() in ["ARC", "CIRCLE"]:
             # TODO handle full circles
             # TODO make sure position_space ends up returning something (really tiny arcs?)
