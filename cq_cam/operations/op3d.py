@@ -11,14 +11,11 @@ from OCP.TopExp import TopExp_Explorer
 from OCP.TopLoc import TopLoc_Location
 from OCP.gp import gp_Pnt
 
-from cq_cam import Unit
-from cq_cam.commands.command import Rapid, Plunge, Cut
-from cq_cam.job import Job
+from cq_cam.command import Rapid, Cut, Plunge
 from cq_cam.operations.base_operation import FaceBaseOperation
 from cq_cam.operations.strategy import ZigZagStrategy
 from cq_cam.utils import utils
 from cq_cam.utils.utils import flatten_list
-from cq_cam.visualize import visualize_task
 
 
 @dataclass
@@ -128,12 +125,12 @@ class Surface3D(FaceBaseOperation):
                 # TODO if there is a new cut sequence within radius of max_step then use it without retracting
                 for cut_sequence in depth_cut_sequences:
                     cut_start = cut_sequence[0]
-                    self.commands.append(Rapid(x=None, y=None, z=self.clearance_height))
-                    self.commands.append(Rapid(x=cut_start[0], y=cut_start[1], z=None))
-                    self.commands.append(Rapid(x=None, y=None, z=self.top_height))  # TODO plunge or rapid?
-                    self.commands.append(Plunge(z=cut_start[2]))
+                    self.commands.append(Rapid.abs(z=self.job.rapid_height))
+                    self.commands.append(Rapid.abs(x=cut_start[0], y=cut_start[1]))
+                    self.commands.append(Rapid.abs(z=self.job.op_safe_height))  # TODO plunge or rapid?
+                    self.commands.append(Plunge.abs(z=cut_start[2]))
                     for cut in cut_sequence[1:]:
-                        self.commands.append(Cut(x=cut[0], y=cut[1], z=max(depth, cut[2])))
+                        self.commands.append(Cut.abs(x=cut[0], y=cut[1], z=max(depth, cut[2])))
 
         # for i, base_boundary in enumerate(base_boundaries):
         #    show_object(base_boundary, f'base_boundary-{i}')
@@ -222,48 +219,3 @@ def shape_to_triangles(shape: cq.Shape,
 
 def cl_point_to_tuple(point: ocl.CLPoint) -> Tuple[float, float, float]:
     return point.x, point.y, point.z
-
-
-def demo():
-    wp = cq.Workplane('XZ').lineTo(100, 0).lineTo(100, 120).lineTo(80, 120).lineTo(0, 0).close().extrude(50)
-    job = Job(workplane=wp.faces('>Z').workplane(),
-              feed=300,
-              plunge_feed=100,
-              unit=Unit.METRIC,
-              rapid_height=10)
-
-    faces = wp.faces('(not +X) and (not -X) and (not -Y) and (not +Y) and (not -Z)')
-    op = Surface3D(job=job, clearance_height=2, top_height=0, o=faces, tool=ocl.CylCutter(3.175, 10),
-                   avoid=None, stepdown=-5)
-
-    toolpath = visualize_task(job, op)
-    show_object(wp, 'part')
-    show_object(toolpath, 'toolpath')
-
-
-def demo2():
-    result = (
-        cq.Workplane('XY').rect(30, 30).extrude(20)
-            .faces('>Z').workplane().rect(20, 20).cutBlind(-5)
-            .faces('>Z[1]').workplane().rect(10, 10).extrude(3)
-            .faces('>Z[1]').fillet(1)
-            .faces('>Z[2]').fillet(1)
-            .faces('>Z')
-    )
-    result.objects = result.objects[0].innerWires()
-    result = result.fillet(1)
-    job = Job(workplane=result.faces('>Z').workplane(),
-              feed=300,
-              plunge_feed=100,
-              unit=Unit.METRIC,
-              rapid_height=10)
-    op = Surface3D(job=job, clearance_height=2, top_height=0, o=result.faces(), tool=ocl.CylCutter(3.175, 10),
-                   interpolation_step=0.1, outer_boundary_offset=0)
-    toolpath = visualize_task(job, op, as_edges=False)
-
-    show_object(result)
-    show_object(toolpath)
-
-
-if 'show_object' in locals() or __name__ == '__main__':
-    demo2()

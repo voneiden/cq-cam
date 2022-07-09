@@ -83,7 +83,7 @@ class Operation(ABC):
         return results
 
     def transform_shapes_to_global(self, faces: List[cq.Shape]) -> List[cq.Shape]:
-        matrix = self.job.workplane.plane.fG
+        matrix = self.job.top.fG
         return [face.transformShape(matrix) for face in faces]
 
     def _o_objects(self, o):

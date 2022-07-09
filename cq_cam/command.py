@@ -7,7 +7,6 @@ import cadquery as cq
 from OCP.AIS import AIS_Shape, AIS_Line
 from OCP.Geom import Geom_CartesianPoint
 
-from cq_cam.commands.util_command import normalize
 from cq_cam.utils.utils import optimize_float
 from cq_cam.visualize import to_occ_color
 
@@ -124,6 +123,8 @@ class Linear(Command, ABC):
 
     def to_ais_shape(self, start, transform):
         end = self.end.to_vector(start)
+        if start == end:
+            return None, end
         shape = AIS_Line(
             Geom_CartesianPoint(start.toPnt()),
             Geom_CartesianPoint(end.toPnt())

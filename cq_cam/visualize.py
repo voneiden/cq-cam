@@ -37,9 +37,11 @@ def visualize_job(job_plane: cq.Plane, commands, start_height=10):
     position = cq.Vector(0, 0, start_height)
     command_group = AIS_MultipleConnectedInteractive()
 
+    previous_position = position
     for command in commands:
         shape, position = command.to_ais_shape(position, inverse_transform)
-        command_group.Connect(shape)
+        if shape:
+            command_group.Connect(shape)
 
     command_group.SetLocalTransformation(inverse_transform.wrapped.Trsf())
 

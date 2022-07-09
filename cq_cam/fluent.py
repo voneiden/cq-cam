@@ -1,19 +1,20 @@
 from __future__ import annotations
 
-import itertools
 from copy import copy
-from typing import List
+from typing import List, Optional
 
 from cadquery import cq
 
-from cq_cam import Pocket
+from cq_cam import Pocket, Drill, Surface3D
 from cq_cam.command import Command
 from cq_cam.common import Unit
 from cq_cam.operations.profile import profile
-from cq_cam.routers import route
-from cq_cam.utils.utils import extract_wires, compound_to_edges, flatten_list
+from cq_cam.utils.utils import extract_wires
 from cq_cam.visualize import visualize_job
 
+
+# TODO: Render breaks on empty moves
+# --> to_gcode and to_ais_shape should be able to handle this
 
 class Operation:
     def __init__(self, job, name: str, commands: List[Command]):
@@ -38,7 +39,7 @@ class JobV2:
     def __init__(self,
                  top: cq.Plane,
                  feed: float,
-                 tool_diameter: float,
+                 tool_diameter: Optional[float] = None,
                  name='Job',
                  plunge_feed: float = None,
                  rapid_height: float = None,
@@ -86,6 +87,9 @@ class JobV2:
         return job
 
     def profile(self, shape, outer_offset=1, inner_offset=None, stepdown=None):
+        if self.tool_diameter is None:
+            raise ValueError('Profile requires tool_diameter to be est')
+
         if inner_offset is None:
             inner_offset = -outer_offset
         outer_wires, inner_wires = extract_wires(shape)
@@ -101,5 +105,16 @@ class JobV2:
         return self._add_operation('Profile', commands)
 
     def pocket(self, *args, **kwargs):
+        if self.tool_diameter is None:
+            raise ValueError('Profile requires tool_diameter to be est')
+
         pocket = Pocket(self, *args, **kwargs)
         return self._add_operation('Pocket', pocket.commands)
+
+    def drill(self, *args, **kwargs):
+        drill = Drill(self, *args, **kwargs)
+        return self._add_operation('Drill', drill.commands)
+
+    def surface3d(self, *args, **kwargs):
+        surface3d = Surface3D(self, *args, **kwargs)
+        return self._add_operation('Surface 3D', surface3d.commands)
