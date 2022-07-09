@@ -6,8 +6,10 @@ from typing import List
 
 from cadquery import cq
 
+from cq_cam import Pocket
 from cq_cam.command import Command
 from cq_cam.common import Unit
+from cq_cam.operations.profile import profile
 from cq_cam.routers import route
 from cq_cam.utils.utils import extract_wires, compound_to_edges, flatten_list
 from cq_cam.visualize import visualize_job
@@ -83,62 +85,21 @@ class JobV2:
         job.operations = [*self.operations, Operation(job, name, commands)]
         return job
 
-    def profile(self, shape, offset=1, offset_inner=None, stepdown=None):
-        if offset_inner is None:
-            offset_inner = -offset
-        outers, inners = extract_wires(shape)
+    def profile(self, shape, outer_offset=1, inner_offset=None, stepdown=None):
+        if inner_offset is None:
+            inner_offset = -outer_offset
+        outer_wires, inner_wires = extract_wires(shape)
 
-        # Transform to relative coordinates
-        outers = [outer.transformShape(self.top.fG) for outer in outers]
-        inners = [inner.transformShape(self.top.fG) for inner in inners]
-
-        self.debug = outers + inners
-
-        # Generate base features
-        base_features = []
-        for outer in outers:
-            base_features += outer.offset2D(offset * self.tool_diameter)
-
-        for inner in inners:
-            base_features += inner.offset2D(offset_inner * self.tool_diameter)
-
-        if stepdown:
-            toolpaths = []
-            for base_feature in base_features:
-                step = cq.Vector(0, 0, 1) * stepdown
-                layers: List[cq.Wire] = [base_feature]
-                self.debug.append(base_feature)
-                for i in itertools.count():
-                    if i > self.max_stepdown_count:
-                        raise RuntimeError('Job.max_stepdown_count exceeded')
-
-                    i_op: cq.Wire = base_feature.moved(cq.Location(step * (i + 1)))
-                    if i_op.BoundingBox().zmin >= 0:
-                        break
-
-                    edges = compound_to_edges(i_op.cut(self.top_plane_face))
-                    edges = [edge for edge in edges if edge.Center().z < 0]
-                    wires = cq.Wire.combine(edges)
-                    if not wires:
-                        break
-                    self.debug.append(i_op)
-                    layers.append(i_op)
-
-                layers.reverse()
-                toolpaths += layers
-
-        else:
-            toolpaths = base_features
-
-        commands = route(self, toolpaths)
+        commands = profile(
+            job=self,
+            outer_wires=outer_wires,
+            inner_wires=inner_wires,
+            outer_offset=outer_offset,
+            inner_offset=inner_offset,
+            stepdown=stepdown
+        )
         return self._add_operation('Profile', commands)
 
-
-if __name__ == 'temp' or __name__ == '__main__':
-    wp = cq.Workplane().box(15, 10, 5)
-    top = wp.faces('>X').workplane()
-    bottom = wp.faces('<X')
-    cam = JobV2(top.plane, 100, 3.175).profile(bottom, stepdown=3)
-    print(cam.to_gcode())
-    show_object(wp)
-    cam.show(show_object)
+    def pocket(self, *args, **kwargs):
+        pocket = Pocket(self, *args, **kwargs)
+        return self._add_operation('Pocket', pocket.commands)

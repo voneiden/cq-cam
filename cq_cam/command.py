@@ -118,9 +118,9 @@ class ReferencePosition(Command):
 
 
 class Linear(Command, ABC):
-    def to_gcode(self, previous: Optional[Command], start: cq.Vector) -> Tuple[str, cq.Vector]:
+    def to_gcode(self, previous_command: Optional[Command], start: cq.Vector) -> Tuple[str, cq.Vector]:
         xyz, end = self.xyz_gcode(start)
-        return f'{self.print_modal(previous)}{xyz}', end
+        return f'{self.print_modal(previous_command)}{xyz}', end
 
     def to_ais_shape(self, start, transform):
         end = self.end.to_vector(start)
@@ -214,10 +214,10 @@ class Circular(Command, ABC):
 
         return ''.join(ijk)
 
-    def to_gcode(self, previous: Command, start: cq.Vector) -> Tuple[str, cq.Vector]:
+    def to_gcode(self, previous_command: Optional[Command], start: cq.Vector) -> Tuple[str, cq.Vector]:
         xyz, end = self.xyz_gcode(start)
         ijk = self.ijk_gcode(start)
-        return f'{self.print_modal(previous)}{xyz}{ijk}', end
+        return f'{self.print_modal(previous_command)}{xyz}{ijk}', end
 
     def to_ais_shape(self, start, transform):
         end = self.end.to_vector(start)

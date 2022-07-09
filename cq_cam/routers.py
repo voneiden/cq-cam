@@ -52,7 +52,7 @@ def rapid_to(v: cq.Vector, rapid_height: float, safe_plunge_height=None):
     return commands
 
 
-def route(job, wires: List[cq.Wire]):
+def route(job: 'JobV2', wires: List[cq.Wire]):
     commands = []
     previous_wire = None
     previous_wire_start = None

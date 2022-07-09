@@ -4,15 +4,15 @@ from OCP.BRepAdaptor import BRepAdaptor_Surface
 from OCP.GeomAbs import GeomAbs_SurfaceType
 from cadquery import cq
 
-from cq_cam.operations.base_operation import OperationError, Job
+from cq_cam.operations.base_operation import OperationError
 from cq_cam.utils.utils import is_parallel_plane
 
 
 class PlaneValidationMixin:
     @staticmethod
-    def validate_plane(job: Job, source_workplane: cq.Workplane):
+    def validate_plane(job: 'Job', source_workplane: cq.Workplane):
         face_workplane = source_workplane.workplane()
-        if not is_parallel_plane(job.workplane.plane, face_workplane.plane):
+        if not is_parallel_plane(job.top, face_workplane.plane):
             raise OperationError('Face plane is not parallel with job plane')
         return face_workplane, source_workplane
 

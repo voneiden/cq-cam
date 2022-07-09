@@ -2,7 +2,6 @@ from cq_cam.common import Unit
 from cq_cam.job import Job
 from cq_cam.operations.drill import Drill
 from cq_cam.operations.pocket import Pocket
-from cq_cam.operations.profile import Profile
 from cq_cam.operations.strategy import ZigZagStrategy, ContourStrategy
 from cq_cam.operations.tabs import EdgeTabs, WireTabs
 

@@ -8,9 +8,7 @@ from OCP.TopAbs import TopAbs_FACE
 from OCP.TopExp import TopExp_Explorer
 from cadquery import cq
 
-from cq_cam import Unit
 from cq_cam.command import Rapid, Plunge, Cut
-from cq_cam.job import Job
 from cq_cam.operations.base_operation import FaceBaseOperation, OperationError
 from cq_cam.operations.mixin_operation import PlaneValidationMixin, ObjectsValidationMixin
 from cq_cam.operations.strategy import ZigZagStrategy, Strategy
@@ -66,8 +64,8 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
         """ Given a list of faces, creates fused feature faces and returns depth information """
         # Move everything on the same plane
         coplanar_faces = []
-        job_zdir = self.job.workplane.plane.zDir
-        job_height = job_zdir.dot(self.job.workplane.plane.origin)
+        job_zdir = self.job.top.zDir
+        job_height = job_zdir.dot(self.job.top.origin)
         depth_info = {}
         for i, face in faces:
             face_height = job_zdir.dot(face.Center())
@@ -164,7 +162,6 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
         self.validate_plane(self.job, face_workplane)
 
         # Prepare profile paths
-        job_plane = self.job.workplane.plane
         tool_radius = self._tool_diameter / 2
         outer_wire_offset = tool_radius * self.outer_boundary_offset[0] + self.outer_boundary_offset[1]
         inner_wire_offset = tool_radius * self.inner_boundary_offset[0] + self.inner_boundary_offset[1]
@@ -216,74 +213,15 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
         for i, depth in enumerate(self._generate_depths(start_depth, end_depth)):
             for cut_sequence in cut_sequences:
                 cut_start = cut_sequence[0]
-                self.commands.append(Rapid(x=None, y=None, z=self.clearance_height))
-                self.commands.append(Rapid(x=cut_start[0], y=cut_start[1], z=None))
-                self.commands.append(Rapid(x=None, y=None, z=self.top_height))  # TODO plunge or rapid?
-                self.commands.append(Plunge(z=depth))
+                self.commands.append(Rapid.abs(z=self.clearance_height))
+                self.commands.append(Rapid.abs(x=cut_start[0], y=cut_start[1]))
+                self.commands.append(Rapid.abs(z=self.top_height))  # TODO plunge or rapid?
+                self.commands.append(Plunge.abs(z=depth))
                 for cut in cut_sequence[1:]:
-                    self.commands.append(Cut(x=cut[0], y=cut[1], z=None))
+                    self.commands.append(Cut.abs(x=cut[0], y=cut[1]))
 
 
 def pick_other_scanline_end(scanline, scanpoint):
     if scanline[0] == scanpoint:
         return scanline[1]
     return scanline[0]
-
-
-def demo():
-    job_plane = cq.Workplane().box(15, 15, 10).faces('>Z').workplane()
-    obj = (
-        job_plane
-            .rect(7.5, 7.5)
-            .cutBlind(-4)
-            .faces('>Z[1]')
-            .rect(2, 2)
-            .extrude(2)
-            .faces('>Z').workplane()
-            .moveTo(-5.75, 0)
-            .rect(4, 2)
-            .cutBlind(-6)
-    )
-    op_plane = obj.faces('>Z[1] or >Z[2]')
-    # test = obj.faces('>Z[-3] or >Z[-2] or >Z[-4]')
-    # obj = op_plane.workplane().rect(2, 2).extrude(4)
-
-    job = Job(job_plane, 300, 100, Unit.METRIC, 5)
-    op = Pocket(job=job, wp=op_plane, clearance_height=2, stepdown=None, tool_diameter=0.5)
-
-    toolpath = visualize_task(job, op)
-    print(op.to_gcode())
-
-    show_object(obj)
-    # show_object(cq.Workplane().box(15, 15, 10).faces('>Z'), 'job')
-    # show_object(op_plane, 'op')
-    # show_object(op_plane)
-    show_object(toolpath, 'g')
-    # for w in op._wires:
-    #    show_object(w)
-
-    # show_object(test, 'test')
-
-
-def demo2():
-    from cq_cam.job import Job
-    from cq_cam.operations.pocket import Pocket
-    from cq_cam.command import Unit
-    from cq_cam.visualize import visualize_task
-
-    result = cq.Workplane("front").box(20.0, 20.0, 2).faces('>Z').workplane().rect(15, 15).cutBlind(-1)
-    result = result.moveTo(0, -10).rect(5, 5).cutBlind(-1)
-    # show_object(result.faces('<Z[1]'))
-    job_plane = result.faces('>Z').workplane()
-    job = Job(job_plane, 300, 100, Unit.METRIC, 5)
-    op = Pocket(job=job, tool_diameter=1, clearance_height=5, top_height=0, o=result.faces('<Z[1]'),
-                outer_boundary_offset=1, avoid=result.faces('>Z'))
-    toolpath = visualize_task(job, op, as_edges=False)
-    # result.objects += toolpath
-    show_object(result)
-    show_object(toolpath)
-    show_object(result.faces('>Z'), 'avoid', {'color': 'red'})
-
-
-if 'show_object' in locals() or __name__ == '__main__':
-    demo2()

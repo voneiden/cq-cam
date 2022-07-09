@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import List, Union, Optional, Tuple
+from typing import List, Union, Optional, Tuple, TYPE_CHECKING
 
 from OCP.BRepFeat import BRepFeat
 from OCP.TopAbs import TopAbs_FACE
@@ -8,8 +8,11 @@ from OCP.TopExp import TopExp_Explorer
 from cadquery import cq
 
 from cq_cam.command import Command
-from cq_cam.job import Job
+
 from cq_cam.utils.utils import flatten_list
+
+if TYPE_CHECKING:
+    from cq_cam.fluent import JobV2
 
 
 class OperationError(Exception):
@@ -18,7 +21,7 @@ class OperationError(Exception):
 
 @dataclass
 class Operation(ABC):
-    job: Job
+    job: 'JobV2'
     """ The `Job` which this task belongs to.
     """
 
