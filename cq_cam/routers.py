@@ -52,6 +52,12 @@ def rapid_to(v: cq.Vector, rapid_height: float, safe_plunge_height=None):
     return commands
 
 
+def vertical_edge(edge: cq.Edge):
+    p1 = edge.startPoint()
+    p2 = edge.endPoint()
+    return p1.x == p2.x and p1.y == p2.y
+
+
 def route(job: 'JobV2', wires: List[cq.Wire]):
     commands = []
     previous_wire = None
@@ -74,7 +80,7 @@ def route(job: 'JobV2', wires: List[cq.Wire]):
             ep = edge_end_point(edge)
             end_cv = AbsoluteCV.from_vector(ep)
             if geom_type == 'LINE':
-                commands.append(Cut(end_cv, arrow=not edge_i))
+                commands.append(Cut(end_cv, arrow=edge_i % 5 == 0))
 
             elif geom_type == 'ARC' or geom_type == 'CIRCLE':
                 center = AbsoluteCV.from_vector(edge.arcCenter())

@@ -13,9 +13,6 @@ from cq_cam.utils.utils import extract_wires
 from cq_cam.visualize import visualize_job
 
 
-# TODO: Render breaks on empty moves
-# --> to_gcode and to_ais_shape should be able to handle this
-
 class Operation:
     def __init__(self, job, name: str, commands: List[Command]):
         self.job = job
@@ -86,7 +83,7 @@ class JobV2:
         job.operations = [*self.operations, Operation(job, name, commands)]
         return job
 
-    def profile(self, shape, outer_offset=1, inner_offset=None, stepdown=None):
+    def profile(self, shape, outer_offset=1, inner_offset=None, stepdown=None, tabs=None):
         if self.tool_diameter is None:
             raise ValueError('Profile requires tool_diameter to be est')
 
@@ -100,7 +97,8 @@ class JobV2:
             inner_wires=inner_wires,
             outer_offset=outer_offset,
             inner_offset=inner_offset,
-            stepdown=stepdown
+            stepdown=stepdown,
+            tabs=tabs
         )
         return self._add_operation('Profile', commands)
 
