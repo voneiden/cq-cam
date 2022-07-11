@@ -37,9 +37,8 @@ def visualize_job(job_plane: cq.Plane, commands, start_height=10):
     position = cq.Vector(0, 0, start_height)
     command_group = AIS_MultipleConnectedInteractive()
 
-    previous_position = position
     for command in commands:
-        shape, position = command.to_ais_shape(position, inverse_transform)
+        shape, position = command.to_ais_shape(position)
         if shape:
             command_group.Connect(shape)
 
@@ -49,4 +48,25 @@ def visualize_job(job_plane: cq.Plane, commands, start_height=10):
     group.Connect(command_group)
     group.Connect(visualize_job_plane(job_plane))
     return group
+
+
+def visualize_job_as_edges(job_plane: cq.Plane, commands, start_height=10):
+    """ To be used mainly for documentation purposes
+
+    :param job_plane:
+    :param commands:
+    :param start_height:
+    :return:
+    """
+    inverse_transform = job_plane.rG
+    position = cq.Vector(0, 0, start_height)
+    edges = []
+
+    for command in commands:
+        shape, position = command.to_ais_shape(position, as_edges=True)
+        if shape:
+            edge = shape.transformShape(inverse_transform)
+            edges.append(edge)
+
+    return edges
 

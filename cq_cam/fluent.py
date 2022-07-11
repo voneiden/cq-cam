@@ -5,12 +5,11 @@ from typing import List, Optional
 
 from cadquery import cq
 
-from cq_cam import Pocket, Drill, Surface3D
 from cq_cam.command import Command
 from cq_cam.common import Unit
 from cq_cam.operations.profile import profile
-from cq_cam.utils.utils import extract_wires
-from cq_cam.visualize import visualize_job
+from cq_cam.utils.utils import extract_wires, flatten_list
+from cq_cam.visualize import visualize_job, visualize_job_as_edges
 
 
 class Operation:
@@ -78,17 +77,22 @@ class JobV2:
         for operation in self.operations:
             show_object(visualize_job(self.top, operation.commands[1:]), f'{self.name} - {operation.name}')
 
+    def to_shapes(self, as_edges=False):
+        if as_edges:
+            return flatten_list([visualize_job_as_edges(self.top, operation.commands[1:]) for operation in self.operations])
+        return [visualize_job(self.top, operation.commands[1:]) for operation in self.operations]
+
     def _add_operation(self, name: str, commands: List[Command]):
         job = copy(self)
         job.operations = [*self.operations, Operation(job, name, commands)]
         return job
 
-    def profile(self, shape, outer_offset=1, inner_offset=None, stepdown=None, tabs=None):
+    def profile(self, shape, outer_offset=None, inner_offset=None, stepdown=None, tabs=None):
         if self.tool_diameter is None:
             raise ValueError('Profile requires tool_diameter to be est')
 
-        if inner_offset is None:
-            inner_offset = -outer_offset
+        if outer_offset is None and inner_offset is None:
+            raise ValueError('Set at least one of "outer_offset" or "inner_offset"')
         outer_wires, inner_wires = extract_wires(shape)
 
         commands = profile(
@@ -103,6 +107,7 @@ class JobV2:
         return self._add_operation('Profile', commands)
 
     def pocket(self, *args, **kwargs):
+        from cq_cam import Pocket
         if self.tool_diameter is None:
             raise ValueError('Profile requires tool_diameter to be est')
 
@@ -110,9 +115,11 @@ class JobV2:
         return self._add_operation('Pocket', pocket.commands)
 
     def drill(self, *args, **kwargs):
+        from cq_cam import Drill
         drill = Drill(self, *args, **kwargs)
         return self._add_operation('Drill', drill.commands)
 
     def surface3d(self, *args, **kwargs):
+        from cq_cam import Surface3D
         surface3d = Surface3D(self, *args, **kwargs)
         return self._add_operation('Surface 3D', surface3d.commands)

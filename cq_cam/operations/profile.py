@@ -1,19 +1,23 @@
 import itertools
+import logging
 from typing import List, Optional, TYPE_CHECKING
 
 import cadquery as cq
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge
 from OCP.Geom import Geom_Plane
 from OCP.GeomProjLib import GeomProjLib
+from OCP.TopAbs import TopAbs_REVERSED
 
 from cq_cam.operations.tabs import Tabs, Transition
 from cq_cam.routers import route
-from cq_cam.utils.utils import compound_to_edges, wire_to_ordered_edges
+from cq_cam.utils.utils import compound_to_edges, wire_to_ordered_edges, edge_oriented_param, edge_end_point, \
+    edge_start_point
 
 if TYPE_CHECKING:
     from cq_cam.fluent import JobV2
 
 DEBUG = []
+logger = logging.getLogger(__name__)
 
 
 def profile(job: 'JobV2',
@@ -30,11 +34,13 @@ def profile(job: 'JobV2',
 
     # Generate base features
     base_features = []
-    for outer in outers:
-        base_features += outer.offset2D(outer_offset * job.tool_diameter)
+    if outer_offset is not None:
+        for outer in outers:
+            base_features += outer.offset2D(outer_offset * job.tool_diameter)
 
-    for inner in inners:
-        base_features += inner.offset2D(inner_offset * job.tool_diameter)
+    if inner_offset is not None:
+        for inner in inners:
+            base_features += inner.offset2D(inner_offset * job.tool_diameter)
 
     toolpaths = []
     for base_feature in base_features:
@@ -72,6 +78,9 @@ def profile(job: 'JobV2',
     return commands
 
 
+TAB_ERRORS = []
+
+
 def apply_tabs(wire: cq.Wire, tab_z: float, tabs: Tabs):
     if tabs is None:
         return wire
@@ -82,6 +91,8 @@ def apply_tabs(wire: cq.Wire, tab_z: float, tabs: Tabs):
     tab_plane = cq.Plane((0, 0, tab_z))
 
     edges = wire_to_ordered_edges(wire)
+    if getattr(tabs, 'load_wire', None):
+        tabs.load_wire(wire)
     tabs.load_ordered_edges(edges)
 
     new_edges = []
@@ -93,33 +104,52 @@ def apply_tabs(wire: cq.Wire, tab_z: float, tabs: Tabs):
 
         previous_edge = None
         for t_start, t_end in zip(transitions, transitions[1:]):
-            p1 = edge.paramAt(t_start[0])
-            p2 = edge.paramAt(t_end[0])
+            t_start_p, t_end_p, e_reversed = edge_oriented_param(edge, t_start[0], t_end[0])
+            p1 = edge.paramAt(t_start_p)
+            p2 = edge.paramAt(t_end_p)
             curve = edge._geomAdaptor().Curve().Curve()
 
             if t_start[1] == Transition.TAB:
                 projected_curve = GeomProjLib.ProjectOnPlane_s(curve, Geom_Plane(tab_plane.toPln()),
                                                                cq.Vector(0, 0, -1).toDir(), True)
                 projected_edge = cq.Edge(BRepBuilderAPI_MakeEdge(projected_curve, p1, p2).Edge())
+
+                # Flip the orientation if the original edge was also reversed
+                # Note: trying to create edge with p2, p1 instead doesn't work as BRepBuilderAPI will
+                # automatically add REVERSED orientation
+                if e_reversed:
+                    projected_edge.wrapped.Orientation(TopAbs_REVERSED)
+
                 if previous_edge:
                     # Retract
-                    retract = cq.Edge.makeLine(previous_edge.endPoint(), projected_edge.startPoint())
+                    # retract = cq.Edge.makeLine(edge_end_point(previous_edge), edge_start_point(projected_edge))
+                    retract = cq.Edge.makeLine(edge_end_point(previous_edge), edge_start_point(projected_edge))
                     new_edges.append(retract)
 
                 previous_edge = projected_edge
                 new_edges.append(projected_edge)
             else:
                 sliced_edge = cq.Edge(BRepBuilderAPI_MakeEdge(curve, p1, p2).Edge())
+
+                # Flip the orientation if the original edge was also reversed
+                if e_reversed:
+                    sliced_edge.wrapped.Orientation(TopAbs_REVERSED)
+
                 # The location of the edge needs to be copied because it doesn't
                 # affect the underlying curve..
                 sliced_edge.move(edge.location())
                 # Plunge
                 if previous_edge:
-                    plunge = cq.Edge.makeLine(previous_edge.endPoint(), sliced_edge.startPoint())
+                    plunge = cq.Edge.makeLine(edge_end_point(previous_edge), edge_start_point(sliced_edge))
                     new_edges.append(plunge)
 
                 previous_edge = sliced_edge
                 new_edges.append(sliced_edge)
 
-    new_wire = cq.Wire.assembleEdges(new_edges)
-    return new_wire
+    global TAB_ERRORS
+    try:
+        return cq.Wire.assembleEdges(new_edges)
+    except:
+        logger.error('Failed to create tabs, see TAB_ERRORS')
+        TAB_ERRORS += new_edges
+        return wire

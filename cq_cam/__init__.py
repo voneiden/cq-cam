@@ -1,5 +1,5 @@
 from cq_cam.common import Unit
-from cq_cam.job import Job
+from cq_cam.fluent import JobV2
 from cq_cam.operations.drill import Drill
 from cq_cam.operations.pocket import Pocket
 from cq_cam.operations.strategy import ZigZagStrategy, ContourStrategy
@@ -16,8 +16,7 @@ METRIC = Unit.METRIC
 IMPERIAL = Unit.IMPERIAL
 
 __all__ = [
-    'Job',
-    'Profile',
+    'JobV2',
     'Pocket',
     'Drill',
     'Unit',

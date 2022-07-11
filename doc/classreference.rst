@@ -12,8 +12,7 @@ Core Classes
 
 .. autosummary::
 
-    Job
-    Profile
+    JobV2
     Pocket
     Surface3D
     Drill
@@ -46,10 +45,6 @@ Class details
 -------------------
 
 .. autoclass:: cq_cam.Job
-   :show-inheritance:
-   :members:
-
-.. autoclass:: cq_cam.Profile
    :show-inheritance:
    :members:
 

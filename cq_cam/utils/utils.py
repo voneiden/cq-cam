@@ -34,6 +34,13 @@ def edge_start_point(edge: cq.Edge, precision=3) -> cq.Vector:
     return edge.startPoint()
 
 
+def edge_oriented_param(edge: cq.Edge, p1, p2):
+    orientation = edge.wrapped.Orientation()
+    if orientation == TopAbs_REVERSED:
+        return (1-p2), (1-p1), True
+    return p1, p2, False
+
+
 def edge_start_end(edge: cq.Edge) -> Tuple[cq.Vector, cq.Vector]:
     # https://github.com/CadQuery/cadquery/issues/831
     orientation = edge.wrapped.Orientation()
@@ -122,8 +129,6 @@ def is_arc_clockwise2(arc: cq.Edge):
         raise RuntimeError('Only Z axis arcs are supported')
 
     return cp.z < 0
-
-
 
 
 def is_parallel_plane(plane1: cq.Plane, plane2: cq.Plane):

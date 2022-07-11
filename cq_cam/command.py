@@ -104,7 +104,7 @@ class Command(ABC):
         pass
 
     @abstractmethod
-    def to_ais_shape(self, start: cq.Vector, transform: cq.Matrix) -> (AIS_Shape, cq.Vector):
+    def to_ais_shape(self, start: cq.Vector, as_edges=False) -> (AIS_Shape, cq.Vector):
         pass
 
 
@@ -112,7 +112,7 @@ class ReferencePosition(Command):
     def to_gcode(self, previous_command: Union[Command, None], start: cq.Vector) -> (str, cq.Vector):
         raise RuntimeError('Reference position may not generate gcode')
 
-    def to_ais_shape(self, start: cq.Vector, transform: cq.Matrix) -> (AIS_Shape, cq.Vector):
+    def to_ais_shape(self, start: cq.Vector, as_edges=False) -> (AIS_Shape, cq.Vector):
         raise RuntimeError('Reference position may not generate shape')
 
 
@@ -121,10 +121,14 @@ class Linear(Command, ABC):
         xyz, end = self.xyz_gcode(start)
         return f'{self.print_modal(previous_command)}{xyz}', end
 
-    def to_ais_shape(self, start, transform):
+    def to_ais_shape(self, start, as_edges=False):
         end = self.end.to_vector(start)
         if start == end:
             return None, end
+
+        if as_edges:
+            return cq.Edge.makeLine(start, end), end
+
         shape = AIS_Line(
             Geom_CartesianPoint(start.toPnt()),
             Geom_CartesianPoint(end.toPnt())
@@ -220,10 +224,12 @@ class Circular(Command, ABC):
         ijk = self.ijk_gcode(start)
         return f'{self.print_modal(previous_command)}{xyz}{ijk}', end
 
-    def to_ais_shape(self, start, transform):
+    def to_ais_shape(self, start, as_edges=False):
         end = self.end.to_vector(start)
         mid = self.mid.to_vector(start)
         edge = cq.Edge.makeThreePointArc(start, mid, end)
+        if as_edges:
+            return edge, end
         shape = AIS_Shape(edge.wrapped)
         shape.SetColor(self.ais_color)
         return shape, end

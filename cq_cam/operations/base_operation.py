@@ -11,9 +11,6 @@ from cq_cam.command import Command
 
 from cq_cam.utils.utils import flatten_list
 
-if TYPE_CHECKING:
-    from cq_cam.fluent import JobV2
-
 
 class OperationError(Exception):
     pass
