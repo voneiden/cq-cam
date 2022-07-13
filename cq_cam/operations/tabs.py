@@ -41,6 +41,8 @@ class NoTabs(Tabs):
 class EdgeTabs(Tabs):
     def __init__(self, *, spacing: float, width: float, height: float, only=None):
         super().__init__(width=width, height=height)
+        if spacing <= width:
+            raise ValueError('Spacing must be larger than tab width')
         self.edges_ds = None
         self.spacing = spacing
         self.only = only

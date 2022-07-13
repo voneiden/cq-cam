@@ -1,3 +1,4 @@
+import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import List, Tuple, Dict
@@ -13,6 +14,8 @@ from cq_cam.operations.base_operation import FaceBaseOperation, OperationError
 from cq_cam.operations.mixin_operation import PlaneValidationMixin, ObjectsValidationMixin
 from cq_cam.operations.strategy import ZigZagStrategy, Strategy
 from cq_cam.utils.utils import WireClipper, flatten_list, flatten_wire_to_closed_2d
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(kw_only=True)
@@ -69,6 +72,7 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
         depth_info = {}
         for i, face in faces:
             face_height = job_zdir.dot(face.Center())
+            # TODO rounding errors ([-0.10000000000000275, -0.1000000000000032])
             face_depth = face_height - job_height
             depth_info[i] = face_depth
 
@@ -108,7 +112,12 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
         group_i = [i for i, _ in group_faces]
         for face_depth in face_depths:
             depth_i = [i for i, depth in depth_info.items() if depth <= face_depth and i in group_i]
-            features = self._combine_coplanar_faces([f for i, f in coplanar_faces if i in depth_i and i in group_i])
+            feature_faces = [f for i, f in coplanar_faces if i in depth_i and i in group_i]
+            if not feature_faces:
+                # Probably a bug
+                logger.warning('Empty feature faces encountered')
+                continue
+            features = self._combine_coplanar_faces(feature_faces)
             assert len(features) == 1
             boundary = features[0]
             boundaries.append((boundary, current_depth, face_depth))
@@ -176,9 +185,17 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
         final_pass_offset = tool_radius * self.boundary_final_pass_stepover
 
         # Generate the primary clearing regions with stepover from the above profiles
+        # TODO these offsets can fail!
         outer_boundaries = flatten_list([wire.offset2D(-final_pass_offset) for wire in outer_profiles])
-        inner_boundaries = flatten_list([wire.offset2D(final_pass_offset) for wire in inner_profiles])
-
+        inner_boundaries = []
+        for inner_wire in inner_profiles:
+            try:
+                inner_boundaries.append(inner_wire.offset2D(final_pass_offset))
+            except ValueError:
+                # TODO failure mode
+                logger.warning('Failed to offset wire')
+                continue
+        inner_boundaries = flatten_list(inner_boundaries)
         # TODO apply "avoid" here using wire clipper? or in the strategy?
         # Note: also apply avoid to the actual profiles
         if self.avoid:

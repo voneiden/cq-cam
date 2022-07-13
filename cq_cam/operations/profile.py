@@ -1,5 +1,6 @@
 import itertools
 import logging
+from math import isclose
 from typing import List, Optional, TYPE_CHECKING
 
 import cadquery as cq
@@ -36,11 +37,25 @@ def profile(job: 'JobV2',
     base_features = []
     if outer_offset is not None:
         for outer in outers:
-            base_features += outer.offset2D(outer_offset * job.tool_diameter)
+            base_features += outer.offset2D(outer_offset * job.tool_radius)
 
     if inner_offset is not None:
         for inner in inners:
-            base_features += inner.offset2D(inner_offset * job.tool_diameter)
+            try:
+                new_inners = inner.offset2D(inner_offset * job.tool_radius)
+                # FreeCAD style workaround for
+                # https://github.com/CadQuery/cadquery/issues/896
+                if len(inner.Edges()) == 1:
+                    edge = inner.Edges()[0]
+                    if edge.startPoint() == edge.endPoint():
+                        # OCCT bug with offsetting circles!
+                        for ni in new_inners:
+                            ni.wrapped.Location(inner.wrapped.Location().Inverted())
+
+                base_features += new_inners
+
+            except ValueError:
+                logger.warning('Failed to do inner offset')
 
     toolpaths = []
     for base_feature in base_features:
@@ -55,7 +70,9 @@ def profile(job: 'JobV2',
                     raise RuntimeError('Profile max_stepdown_count exceeded')
 
                 i_op: cq.Wire = base_feature.moved(cq.Location(step * (i + 1)))
-                if i_op.BoundingBox().zmin >= 0:
+                bb = i_op.BoundingBox()
+                # TODO arbitrary precision..
+                if bb.zmin >= -0.001:
                     break
 
                 edges = compound_to_edges(i_op.cut(job.top_plane_face))

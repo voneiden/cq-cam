@@ -8,6 +8,7 @@ from cadquery import cq
 from cq_cam.command import Command
 from cq_cam.common import Unit
 from cq_cam.operations.profile import profile
+from cq_cam.routers import rapid_to
 from cq_cam.utils.utils import extract_wires, flatten_list
 from cq_cam.visualize import visualize_job, visualize_job_as_edges
 
@@ -28,6 +29,7 @@ class Operation:
             gcode, position = command.to_gcode(previous_command, position)
             previous_command = command
             gcodes.append(gcode)
+
         return '\n'.join(gcodes)
 
 
@@ -46,6 +48,7 @@ class JobV2:
         self.top_plane_face = cq.Face.makePlane(None, None, top.origin, top.zDir)
         self.feed = feed
         self.tool_diameter = tool_diameter
+        self.tool_radius = tool_diameter / 2
         self.name = name
         self.plunge_feed = feed if plunge_feed is None else plunge_feed
         self.rapid_height = self._default_rapid_height(unit) if rapid_height is None else rapid_height
@@ -71,15 +74,24 @@ class JobV2:
 
     def to_gcode(self):
         task_break = "\n\n\n"
-        return f"({self.name} - Feedrate: {self.feed} - Unit: {self.unit})\n{self.unit.to_gcode()}\n{task_break.join(task.to_gcode() for task in self.operations)}"
+
+        to_home = f'G1Z0\nG0Z{self.rapid_height}\nX0Y0'
+        return (
+            f"({self.name} - Feedrate: {self.feed} - Unit: {self.unit})\n"
+            f"G90\n"
+            f"{self.unit.to_gcode()}\n"
+            f"{task_break.join(task.to_gcode() for task in self.operations)}"
+            f"{to_home}"
+        )
 
     def show(self, show_object):
-        for operation in self.operations:
-            show_object(visualize_job(self.top, operation.commands[1:]), f'{self.name} - {operation.name}')
+        for i, operation in enumerate(self.operations):
+            show_object(visualize_job(self.top, operation.commands[1:]), f'{self.name} #{i} {operation.name}')
 
     def to_shapes(self, as_edges=False):
         if as_edges:
-            return flatten_list([visualize_job_as_edges(self.top, operation.commands[1:]) for operation in self.operations])
+            return flatten_list(
+                [visualize_job_as_edges(self.top, operation.commands[1:]) for operation in self.operations])
         return [visualize_job(self.top, operation.commands[1:]) for operation in self.operations]
 
     def _add_operation(self, name: str, commands: List[Command]):
@@ -110,7 +122,8 @@ class JobV2:
         from cq_cam import Pocket
         if self.tool_diameter is None:
             raise ValueError('Profile requires tool_diameter to be est')
-
+        if 'tool_diameter' not in kwargs:
+            kwargs['tool_diameter'] = self.tool_diameter
         pocket = Pocket(self, *args, **kwargs)
         return self._add_operation('Pocket', pocket.commands)
 

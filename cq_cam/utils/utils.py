@@ -88,11 +88,15 @@ def flatten_edges(edges: List[cq.Edge]):
 
         if edge.geomType() == "LINE":
             vxs.append(edge_end_point(edge))
-        elif edge.geomType() in ["ARC", "CIRCLE"]:
+            # TODO tmp
+        elif edge.geomType() in ["ARC", "CIRCLE", "OFFSET"]:
             # TODO handle full circles
             # TODO make sure position_space ends up returning something (really tiny arcs?)
             positions = edge.positions(position_space(edge)[1:])
             vxs += positions
+        else:
+            print("UNKNOWN TYPE", edge.geomType())
+            raise ValueError(f"UNKNOWN TYPE {edge.geomType()}")
     return vxs
 
 
@@ -119,16 +123,13 @@ def is_arc_clockwise(start: cq.Vector, mid: cq.Vector, end: cq.Vector):
 
 
 def is_arc_clockwise2(arc: cq.Edge):
-    center = arc.arcCenter()
-    v1 = arc.startPoint() - center
-    v2 = arc.endPoint() - center
-
+    normal = arc.normal()
     # TODO support other axes besides Z?
-    cp = v1.cross(v2)
-    if cp.z == 0:
+    if normal.z == 0:
         raise RuntimeError('Only Z axis arcs are supported')
-
-    return cp.z < 0
+    if arc.wrapped.Orientation() == TopAbs_REVERSED:
+        return normal.z > 0
+    return normal.z < 0
 
 
 def is_parallel_plane(plane1: cq.Plane, plane2: cq.Plane):
@@ -421,3 +422,4 @@ def optimize_float(v: float):
     """ Drop trailing zeroes from a float that is exactly an int to save some bytes in the gcode """
     iv = int(v)
     return iv if v == iv else v
+

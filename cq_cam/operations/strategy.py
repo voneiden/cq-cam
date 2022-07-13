@@ -1,3 +1,4 @@
+import logging
 from typing import List, Tuple, Dict
 
 import cadquery as cq
@@ -7,6 +8,8 @@ from cq_cam.utils.utils import WireClipper, pairwise, dist_to_segment_squared, c
 
 Scanpoint = Tuple[float, float]
 Scanline = List[Scanpoint]
+
+logger = logging.getLogger(__name__)
 
 
 class Strategy:
@@ -192,7 +195,11 @@ class ContourStrategy(Strategy):
 
             while queue:
                 contour = queue.pop(0)
-                new_sub_contours = contour.offset2D(offset_step)
+                try:
+                    new_sub_contours = contour.offset2D(offset_step)
+                except ValueError:
+                    logger.warning('Failed to do subcontour')
+                    continue
                 for new_sub_contour in new_sub_contours:
                     clipper.add_subject_wire(new_sub_contour)
                     queue.append(new_sub_contour)

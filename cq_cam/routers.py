@@ -83,12 +83,19 @@ def route(job: 'JobV2', wires: List[cq.Wire]):
                 commands.append(Cut(end_cv, arrow=edge_i % 5 == 0))
 
             elif geom_type == 'ARC' or geom_type == 'CIRCLE':
+                sp = edge_start_point(edge)
                 center = AbsoluteCV.from_vector(edge.arcCenter())
-                mid = AbsoluteCV.from_vector(edge.positionAt(0.5))
-                if is_arc_clockwise2(edge):
-                    commands.append(CircularCW(end=end_cv, center=center, mid=mid))
+                cmd = CircularCW if is_arc_clockwise2(edge) else CircularCCW
+                # Let's break circles into half
+                if sp == ep:
+                    mid1 = AbsoluteCV.from_vector(edge.positionAt(0.25))
+                    end1 = AbsoluteCV.from_vector(edge.positionAt(0.5))
+                    commands.append(cmd(end=end1, center=center, mid=mid1))
+                    mid2 = AbsoluteCV.from_vector(edge.positionAt(0.75))
+                    commands.append(cmd(end=end_cv, center=center, mid=mid2))
                 else:
-                    commands.append(CircularCCW(end=end_cv, center=center, mid=mid))
+                    mid = AbsoluteCV.from_vector(edge.positionAt(0.5))
+                    commands.append(cmd(end=end_cv, center=center, mid=mid))
 
             elif geom_type == 'SPLINE':
                 # TODO?

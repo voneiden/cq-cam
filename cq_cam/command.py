@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from math import isclose
 from typing import Union, Optional, Tuple
 
 import cadquery as cq
@@ -20,7 +21,7 @@ class CommandVector(ABC):
         self.z = z
 
     @abstractmethod
-    def to_vector(self, origin: cq.Vector, relative=False):
+    def to_vector(self, origin: cq.Vector, relative=False) -> cq.Vector:
         pass
 
 
@@ -227,7 +228,14 @@ class Circular(Command, ABC):
     def to_ais_shape(self, start, as_edges=False):
         end = self.end.to_vector(start)
         mid = self.mid.to_vector(start)
-        edge = cq.Edge.makeThreePointArc(start, mid, end)
+        if start == end:
+            center = self.center.to_vector(start).toPnt()
+            radius = (start - center).Length
+            # uh oh
+
+            edge = cq.Edge.makeCircle(radius, center, zDir)
+        else:
+            edge = cq.Edge.makeThreePointArc(start, mid, end)
         if as_edges:
             return edge, end
         shape = AIS_Shape(edge.wrapped)
