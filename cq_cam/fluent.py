@@ -1,16 +1,21 @@
 from __future__ import annotations
 
+import logging
+import time
 from copy import copy
-from typing import List, Optional
+from typing import List, Optional, Literal
 
 from cadquery import cq
 
 from cq_cam.command import Command
 from cq_cam.common import Unit
+from cq_cam.operations.pocket import pocket
 from cq_cam.operations.profile import profile
-from cq_cam.routers import rapid_to
+from cq_cam.routers import route
 from cq_cam.utils.utils import extract_wires, flatten_list
 from cq_cam.visualize import visualize_job, visualize_job_as_edges
+
+logger = logging.getLogger()
 
 
 class Operation:
@@ -118,14 +123,30 @@ class JobV2:
         )
         return self._add_operation('Profile', commands)
 
-    def pocket(self, *args, **kwargs):
-        from cq_cam import Pocket
+    def pocket(self,
+               faces: List[cq.Face],
+               avoid: Optional[List[cq.Face]] = None,
+               stepover: float = 0.75,
+               boundary_offset: float = -1,
+               stepdown: Optional[float] = None,
+               strategy: Literal['contour'] = 'contour'):
+        start = time.time()
         if self.tool_diameter is None:
             raise ValueError('Profile requires tool_diameter to be est')
-        if 'tool_diameter' not in kwargs:
-            kwargs['tool_diameter'] = self.tool_diameter
-        pocket = Pocket(self, *args, **kwargs)
-        return self._add_operation('Pocket', pocket.commands)
+
+        # TODO extract faces
+
+        toolpaths = pocket(job=self,
+                           faces=faces,
+                           avoid=avoid,
+                           stepover=stepover,
+                           boundary_offset=boundary_offset,
+                           stepdown=stepdown,
+                           strategy=strategy)
+
+        commands = route(self, toolpaths)
+        logger.info(f"Pocket done in {time.time() - start} seconds")
+        return self._add_operation('Pocket', commands)
 
     def drill(self, *args, **kwargs):
         from cq_cam import Drill

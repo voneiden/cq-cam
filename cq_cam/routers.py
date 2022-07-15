@@ -1,8 +1,9 @@
 from math import isclose
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, List, Union
 
 import cadquery as cq
 import numpy as np
+from OCP.TopAbs import TopAbs_REVERSED
 
 from cq_cam.command import Plunge, Rapid, ReferencePosition, AbsoluteCV, Cut, CircularCW, CircularCCW, Retract
 from cq_cam.utils.utils import wire_to_ordered_edges, edge_end_point, edge_start_point, is_arc_clockwise2
@@ -57,14 +58,18 @@ def vertical_edge(edge: cq.Edge):
     p2 = edge.endPoint()
     return p1.x == p2.x and p1.y == p2.y
 
+DEBUG = []
 
-def route(job: 'JobV2', wires: List[cq.Wire]):
+def route(job: 'JobV2', wires: List[Union[cq.Wire, cq.Edge]]):
     commands = []
     previous_wire = None
     previous_wire_start = None
     ep = None
     for wire in wires:
-        edges = wire_to_ordered_edges(wire)
+        if isinstance(wire, cq.Edge):
+            edges = [wire]
+        else:
+            edges = wire_to_ordered_edges(wire)
         if not edges:
             return []
         start = edge_start_point(edges[0])
@@ -97,9 +102,18 @@ def route(job: 'JobV2', wires: List[cq.Wire]):
                     mid = AbsoluteCV.from_vector(edge.positionAt(0.5))
                     commands.append(cmd(end=end_cv, center=center, mid=mid))
 
-            elif geom_type == 'SPLINE':
-                # TODO?
-                raise RuntimeError('Unsupported geom type: SPLINE')
+            elif geom_type == 'SPLINE' or geom_type == 'OFFSET':
+                n = max(int(edge.Length() / 0.1), 2)
+
+                orientation = edge.wrapped.Orientation()
+                if orientation == TopAbs_REVERSED:
+                    i, j = 1, 0
+                else:
+                    i, j = 0, 1
+
+                for length in np.linspace(i, j, n):
+                    # [e._geomAdaptor().Curve().Curve().BasisCurve().BasisCurve() for e in pocket.DEBUG[0].Edges()]
+                    commands.append(Cut(AbsoluteCV.from_vector(edge.positionAt(length))))
 
             else:
                 raise RuntimeError(f'Unsupported geom type: {geom_type}')

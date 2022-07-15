@@ -6,16 +6,18 @@ from typing import List, Tuple, Iterable, Union
 import numpy as np
 import pyclipper
 from OCP.BRep import BRep_Tool
+from OCP.BRepAdaptor import BRepAdaptor_Curve
 from OCP.BRepLib import BRepLib
 from OCP.BRepTools import BRepTools_WireExplorer
+import OCP.Geom as Geom
 from OCP.HLRAlgo import HLRAlgo_Projector
 from OCP.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape
-from OCP.TopAbs import TopAbs_REVERSED, TopAbs_EDGE
+from OCP.TopAbs import TopAbs_REVERSED, TopAbs_EDGE, TopAbs_FACE
 from OCP.TopExp import TopExp_Explorer
 from OCP.TopoDS import TopoDS_Shape, TopoDS
 from OCP.gp import gp_Ax2, gp_Pnt, gp_Dir
 from cadquery import cq, Edge
-from cadquery.occ_impl.shapes import TOLERANCE
+from cadquery.occ_impl.shapes import TOLERANCE, geom_LUT_EDGE
 
 
 def edge_end_point(edge: cq.Edge, precision=3) -> cq.Vector:
@@ -37,7 +39,7 @@ def edge_start_point(edge: cq.Edge, precision=3) -> cq.Vector:
 def edge_oriented_param(edge: cq.Edge, p1, p2):
     orientation = edge.wrapped.Orientation()
     if orientation == TopAbs_REVERSED:
-        return (1-p2), (1-p1), True
+        return (1 - p2), (1 - p1), True
     return p1, p2, False
 
 
@@ -406,6 +408,16 @@ def compound_to_edges(compound: cq.Compound):
     return edges
 
 
+def compound_to_faces(compound: cq.Compound) -> List[cq.Face]:
+    faces = []
+    explorer = TopExp_Explorer(compound.wrapped, TopAbs_FACE)
+    while explorer.More():
+        face = explorer.Current()
+        faces.append(cq.Face(face))
+        explorer.Next()
+    return faces
+
+
 def filter_edges_below_plane(edges: List[cq.Edge], plane: cq.Plane):
     """
     Given a list of edges, return edges whose center is below plane.
@@ -423,3 +435,81 @@ def optimize_float(v: float):
     iv = int(v)
     return iv if v == iv else v
 
+
+def get_edge_basis_curve(edge: cq.Edge):
+    # AdaptorCurve -> GeomCurve
+    curve = edge._geomAdaptor().Curve().Curve()
+    while True:
+        try:
+            curve = curve.BasisCurve()
+        except AttributeError:
+            break
+    return curve
+
+
+geom_LUT_CURVE = {
+    Geom.Geom_Line: "LINE",
+    Geom.Geom_Circle: "CIRCLE",
+    Geom.Geom_Ellipse: "ELLIPSE",
+    Geom.Geom_Hyperbola: "HYPERBOLA",
+    Geom.Geom_Parabola: "PARABOLA",
+    Geom.Geom_BezierCurve: "BEZIER",
+    Geom.Geom_BSplineCurve: "BSPLINE",
+}
+
+def get_underlying_geom_type(edge: cq.Edge):
+    curve = get_edge_basis_curve(edge)
+    return geom_LUT_CURVE[curve.__class__]
+
+
+def interpolate_edge(edge: cq.Edge, precision: float = 0.1) -> List[cq.Edge]:
+    # Interpolation must have at least two edges
+    n = max(int(edge.Length() / precision), 2)
+
+    orientation = edge.wrapped.Orientation()
+    if orientation == TopAbs_REVERSED:
+        i, j = 1, 0
+    else:
+        i, j = 0, 1
+
+    interpolations = []
+    for length in np.linspace(i, j, n):
+        interpolations.append(edge.positionAt(length))
+
+    result = []
+    for a, b in zip(interpolations, interpolations[1:]):
+        result.append(cq.Edge.makeLine(a, b))
+
+    return result
+
+
+def interpolate_edges_with_unstable_curves(edges: List[cq.Edge], precision: float = 0.1):
+    """
+    It appears some curves do not offset nicely with OCCT. BSPLINE is an example.
+    These curves unfortunately need to be interpolated to ensure stable offset performance.
+
+    :param edges:
+    :param precision:
+    :return:
+    """
+    result = []
+    interpolated = False
+    for edge in edges:
+        geom_type = edge.geomType()
+        if geom_type == 'OFFSET':
+            geom_type = get_underlying_geom_type(edge)
+
+        if geom_type == 'BSPLINE':
+            edges = interpolate_edge(edge, precision)
+            result += edges
+            interpolated = True
+        else:
+            result.append(edge)
+    return result, interpolated
+
+
+def interpolate_wire_with_unstable_edges(wire: cq.Wire, precision: float = 0.1) -> cq.Wire:
+    edges, interpolated = interpolate_edges_with_unstable_curves(wire.Edges(), precision)
+    if not interpolated:
+        return wire
+    return cq.Wire.assembleEdges(edges)

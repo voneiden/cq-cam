@@ -1,244 +1,202 @@
 import logging
-from collections import defaultdict
-from dataclasses import dataclass
-from typing import List, Tuple, Dict
+from math import isclose
+from typing import List, Tuple, Optional, TYPE_CHECKING, Literal
 
-import numpy as np
-from OCP.BRepFeat import BRepFeat
-from OCP.TopAbs import TopAbs_FACE
-from OCP.TopExp import TopExp_Explorer
 from cadquery import cq
 
-from cq_cam.command import Rapid, Plunge, Cut
-from cq_cam.operations.base_operation import FaceBaseOperation, OperationError
-from cq_cam.operations.mixin_operation import PlaneValidationMixin, ObjectsValidationMixin
-from cq_cam.operations.strategy import ZigZagStrategy, Strategy
-from cq_cam.utils.utils import WireClipper, flatten_list, flatten_wire_to_closed_2d
+from cq_cam.routers import route
+from cq_cam.utils.utils import flatten_list, compound_to_faces, interpolate_wire_with_unstable_edges
 
 logger = logging.getLogger(__name__)
 
+if TYPE_CHECKING:
+    from cq_cam.fluent import JobV2
 
-@dataclass(kw_only=True)
-class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
-    """ 2.5D Pocket operation
+DEBUG = []
 
-    All faces involved must be planes and parallel.
-    """
 
-    tool_diameter: float = 3.175
-    strategy: Strategy = ZigZagStrategy
-    """ Diameter of the tool that will be used to perform the operation.
-    """
+def sort_by_depth(faces: List[cq.Face]) -> List[Tuple[float, cq.Face]]:
+    faces = [(face.Center().z, face) for face in faces]
+    faces.sort(key=lambda x: x[0], reverse=True)
+    return faces
 
-    # TODO rotation angle for zigzag
 
-    @property
-    def _tool_diameter(self) -> float:
-        return self.tool_diameter
+def offset_face(face: cq.Face, outer_offset, inner_offset, log=True):
+    outers = interpolate_wire_with_unstable_edges(face.outerWire()).offset2D(outer_offset)
 
-    def __post_init__(self):
-        # Give each face an ID
-        super().__post_init__()
-        faces = [(i, face.copy()) for i, face in enumerate(self._faces)]
-        features, coplanar_faces, depth_info = self._discover_pocket_features(faces)
-        groups = self._group_faces_by_features(features, coplanar_faces)
-
-        for group_faces in groups.values():
-            boundaries = self._boundaries_by_group(group_faces, coplanar_faces, depth_info)
-            for boundary, start_depth, end_depth in boundaries:
-                self.process_boundary(boundary, start_depth, end_depth)
-
-    @staticmethod
-    def _group_faces_by_features(features: List[cq.Face], faces: List[Tuple[int, cq.Face]]):
-        feat = BRepFeat()
-        remaining = faces[:]
-        groups = defaultdict(lambda: [])
-        for feature in features:
-            for i, face in remaining[:]:
-                # IsInside_s works regardless the faces are co-planar
-                if feat.IsInside_s(face.wrapped, feature.wrapped):
-                    groups[feature].append((i, face))
-                    remaining.remove((i, face))
-
-        assert not remaining
-        return groups
-
-    def _discover_pocket_features(self, faces: List[Tuple[int, cq.Face]]):
-        """ Given a list of faces, creates fused feature faces and returns depth information """
-        # Move everything on the same plane
-        coplanar_faces = []
-        job_zdir = self.job.top.zDir
-        job_height = job_zdir.dot(self.job.top.origin)
-        depth_info = {}
-        for i, face in faces:
-            face_height = job_zdir.dot(face.Center())
-            # TODO rounding errors ([-0.10000000000000275, -0.1000000000000032])
-            face_depth = face_height - job_height
-            depth_info[i] = face_depth
-
-            # Move face to same level with job plane
-            translated_face = face.translate(job_zdir.multiply(-face_depth))
-            coplanar_faces.append((i, translated_face))
-
-        features = self._combine_coplanar_faces([f[1] for f in coplanar_faces])
-
-        return features, coplanar_faces, depth_info
-
-    @staticmethod
-    def _combine_coplanar_faces(faces: List[cq.Face]) -> List[cq.Face]:
-        """ Given a list of (coplanar) faces, fuse them together to form
-         bigger faces """
-
-        # This works also as a sanity check as it will
-        # raise if the faces are not coplanar
-        wp = cq.Workplane().add(faces).combine()
-        features = []
-        explorer = TopExp_Explorer(wp.objects[0].wrapped, TopAbs_FACE)
-        while explorer.More():
-            face = explorer.Current()
-            features.append(cq.Face(face))
-            explorer.Next()
-        return features
-
-    def _boundaries_by_group(self,
-                             group_faces: List[Tuple[int, cq.Face]],
-                             coplanar_faces: List[Tuple[int, cq.Face]],
-                             depth_info: Dict[int, float]):
-        face_depths = list(set(depth_info.values()))
-        face_depths.sort()
-        face_depths.reverse()
-        current_depth = 0
-        boundaries = []
-        group_i = [i for i, _ in group_faces]
-        for face_depth in face_depths:
-            depth_i = [i for i, depth in depth_info.items() if depth <= face_depth and i in group_i]
-            feature_faces = [f for i, f in coplanar_faces if i in depth_i and i in group_i]
-            if not feature_faces:
-                # Probably a bug
-                logger.warning('Empty feature faces encountered')
-                continue
-            features = self._combine_coplanar_faces(feature_faces)
-            assert len(features) == 1
-            boundary = features[0]
-            boundaries.append((boundary, current_depth, face_depth))
-            current_depth = face_depth
-        return boundaries
-
-    def _generate_depths(self, start_depth: float, end_depth: float):
-        if self.stepdown:
-            depths = list(np.arange(start_depth - self.stepdown, end_depth, -self.stepdown))
-            if depths[-1] != end_depth:
-                depths.append(end_depth)
-            return depths
-        else:
-            return [end_depth]
-
-    def _apply_avoid(self, outer_subject_wires, inner_subject_wires, avoid_objs, outer_offset, inner_offset):
-        avoid_clip = WireClipper()
-        for o in avoid_objs:
-            if isinstance(o, cq.Face):
-                # Use reverse offsets because avoid is like an anti-pocket
-                outer_avoid_wires = o.outerWire().offset2D(inner_offset)
-                inner_avoid_wires = flatten_list([wire.offset2D(outer_offset) for wire in o.innerWires()])
-            elif isinstance(o, cq.Wire):
-                # TODO check this
-                outer_avoid_wires = o.offset2D(inner_offset)
-                inner_avoid_wires = []
-            else:
-                raise OperationError('Avoid can only be a wire or a face')
-
-            for wire in outer_avoid_wires + inner_avoid_wires:
-                avoid_clip.add_clip_wire(wire)
-
-        for outer_subject in outer_subject_wires:
-            avoid_clip.add_subject_wire(outer_subject)
-
-        outer_boundaries = [list(boundary) for boundary in avoid_clip.execute_difference()]
-        avoid_clip.reset()
-
-        for inner_subject in inner_subject_wires:
-            avoid_clip.add_subject_wire(inner_subject)
-
-        inner_boundaries = [list(boundary) for boundary in avoid_clip.execute_difference()]
-
-        return outer_boundaries, inner_boundaries
-
-    def process_boundary(self, face: cq.Face, start_depth: float, end_depth: float):
-        # TODO break this function down into easily testable sections
-        # Perform validations
-        self.validate_face_plane(face)
-        face_workplane = cq.Workplane(obj=face)
-        self.validate_plane(self.job, face_workplane)
-
-        # Prepare profile paths
-        tool_radius = self._tool_diameter / 2
-        outer_wire_offset = tool_radius * self.outer_boundary_offset[0] + self.outer_boundary_offset[1]
-        inner_wire_offset = tool_radius * self.inner_boundary_offset[0] + self.inner_boundary_offset[1]
-
-        # These are the profile paths. They are done very last as a finishing pass
-        outer_profiles = face.outerWire().offset2D(outer_wire_offset)
-        inner_profiles = flatten_list([wire.offset2D(inner_wire_offset) for wire in face.innerWires()])
-
-        # Prepare primary clearing regions
-        if self.boundary_final_pass_stepover is None:
-            self.boundary_final_pass_stepover = self.stepover
-        final_pass_offset = tool_radius * self.boundary_final_pass_stepover
-
-        # Generate the primary clearing regions with stepover from the above profiles
-        # TODO these offsets can fail!
-        outer_boundaries = flatten_list([wire.offset2D(-final_pass_offset) for wire in outer_profiles])
-        inner_boundaries = []
-        for inner_wire in inner_profiles:
+    inners = []
+    if inner_offset:
+        for inner in face.innerWires():
             try:
-                inner_boundaries.append(inner_wire.offset2D(final_pass_offset))
+                # TODO interpolate wire with unstable edges?
+                for _inner in inner.offset2D(inner_offset):
+                    inners.append(_inner)
             except ValueError:
-                # TODO failure mode
-                logger.warning('Failed to offset wire')
+                if log:
+                    logger.warning('Failed to offset inner boundary')
                 continue
-        inner_boundaries = flatten_list(inner_boundaries)
-        # TODO apply "avoid" here using wire clipper? or in the strategy?
-        # Note: also apply avoid to the actual profiles
-        if self.avoid:
-            objs = self._o_objects(self.avoid)
-
-            outer_profiles, inner_profiles = self._apply_avoid(
-                outer_profiles,
-                inner_profiles,
-                objs,
-                outer_wire_offset,
-                inner_wire_offset
-            )
-
-            outer_boundaries, inner_boundaries = self._apply_avoid(
-                outer_boundaries,
-                inner_boundaries,
-                objs,
-                outer_wire_offset - final_pass_offset,
-                inner_wire_offset + final_pass_offset
-            )
-
-        cut_sequences = self.strategy.process(self, outer_boundaries, inner_boundaries)
-        if self.avoid:
-            cut_sequences += outer_profiles
-            cut_sequences += inner_profiles
+    else:
+        inners = face.innerWires()
+    inner_faces = [cq.Face.makeFromWires(inner) for inner in inners]
+    results = []
+    for outer in outers:
+        result = cq.Face.makeFromWires(outer)
+        if inner_faces:
+            compound = result.cut(*inner_faces)
+            compound_faces = compound_to_faces(compound)
+            if len(compound_faces) == 0:
+                continue
+            for face in compound_faces:
+                results.append(face)
         else:
-            outer_polygons = tuple(flatten_wire_to_closed_2d(outer_profile) for outer_profile in outer_profiles)
-            inner_polygons = tuple(flatten_wire_to_closed_2d(inner_profile) for inner_profile in inner_profiles)
-            cut_sequences += outer_polygons
-            cut_sequences += inner_polygons
+            results.append(result)
 
-        for i, depth in enumerate(self._generate_depths(start_depth, end_depth)):
-            for cut_sequence in cut_sequences:
-                cut_start = cut_sequence[0]
-                self.commands.append(Rapid.abs(z=self.clearance_height))
-                self.commands.append(Rapid.abs(x=cut_start[0], y=cut_start[1]))
-                self.commands.append(Rapid.abs(z=self.top_height))  # TODO plunge or rapid?
-                self.commands.append(Plunge.abs(z=depth))
-                for cut in cut_sequence[1:]:
-                    self.commands.append(Cut.abs(x=cut[0], y=cut[1]))
+    if not results:
+        raise ValueError('Empty result')
+
+    return results
 
 
-def pick_other_scanline_end(scanline, scanpoint):
-    if scanline[0] == scanpoint:
-        return scanline[1]
-    return scanline[0]
+def pocket(job: 'JobV2',
+           faces: List[cq.Face],
+           avoid: Optional[List[cq.Face]] = None,
+           stepover: float = 0.75,
+           boundary_offset: float = -1,
+           stepdown: Optional[float] = None,
+           strategy: Literal['contour'] = 'contour'
+           ):
+    for face in faces:
+        if face.geomType() != 'PLANE' and face.normalAt(face.wrapped.Location()) != job.top.zDir:
+            raise ValueError('Face is not planar with job plane')
+
+    if stepdown is not None and stepdown <= 0:
+        raise ValueError('Stepdown must be more than zero')
+
+    if strategy == 'contour':
+        strategy_f = lambda boundary: perform_contour(boundary, stepover_distance=stepover * job.tool_diameter)
+    else:
+        raise ValueError(f'Invalid strategy "{strategy}"')
+
+    faces = [face.transformShape(job.top.fG) for face in faces]
+    faces = sort_by_depth(faces)
+
+    boundaries = []
+    boundary_outer_offset = boundary_offset * job.tool_radius
+    boundary_inner_offset = -boundary_outer_offset
+    for depth, face in faces:
+        try:
+            for boundary in offset_face(face, boundary_outer_offset, boundary_inner_offset):
+                boundaries.append((depth, boundary))
+        except ValueError:
+            logger.error('Failed to offset initial boundary. Tool too big?')
+            raise
+
+    # TODO implement avoid
+
+    if stepdown is None:
+        toolpaths = flatten_list([strategy_f(boundary[1]) for boundary in boundaries])
+    else:
+        toolpaths = []
+    global DEBUG
+    DEBUG = toolpaths
+    return toolpaths
+
+
+def perform_contour(boundary: cq.Face, stepover_distance: float) -> List[cq.Wire]:
+    return perform_shrinking_contour(boundary, -stepover_distance)
+
+
+def perform_shrinking_contour(boundary: cq.Face, stepover_distance):
+    assert stepover_distance < 0
+    stepover_distance = -abs(stepover_distance)
+
+    outer = boundary.outerWire()
+    inner_faces = [cq.Face.makeFromWires(inner) for inner in boundary.innerWires()]
+    toolpaths = [outer]
+
+    todo = [outer]
+    while todo:
+        contour = todo.pop()
+        try:
+            sub_contours = contour.offset2D(stepover_distance)
+        except ValueError:
+            continue
+
+        for sub_contour in sub_contours:
+            if inner_faces:
+                try:
+                    sub_compound = cq.Face.makeFromWires(sub_contour).cut(*inner_faces)
+                    sub_faces = compound_to_faces(sub_compound)
+                    sub_contour_wires = [sub_face.outerWire() for sub_face in sub_faces]
+                except ValueError:
+                    continue
+            else:
+                sub_contour_wires = [sub_contour]
+
+            for sub_contour_wire in sub_contour_wires:
+                # TODO can we have some smartness here that converts a near zero area into  just a line?
+                if isclose(cq.Face.makeFromWires(sub_contour_wire).Area(), 0, abs_tol=0.001):
+                    toolpaths.append(sub_contour_wire)
+                    continue
+
+                toolpaths.append(sub_contour_wire)
+                todo.append(sub_contour_wire)
+
+    toolpaths += boundary.innerWires()
+    return toolpaths
+
+
+def perform_contour_both(boundary: cq.Face, stepover_distance: float) -> List[cq.Wire]:
+    assert stepover_distance > 0
+    outer_contours, inner_contours = perform_contour_helper(boundary, stepover_distance)
+    return outer_contours + inner_contours
+
+
+def perform_contour_helper(contour: cq.Face, stepover_distance: float):
+    outer_toolpaths = [contour.outerWire()]
+    inner_toolpaths = contour.innerWires()
+
+    try:
+        sub_contours = offset_face(contour, -stepover_distance, stepover_distance)
+    except ValueError:
+        try:
+            sub_contours = offset_face(contour, -stepover_distance, 0)
+            outer_toolpaths += [sub_contour.outerWire() for sub_contour in sub_contours]
+            return outer_toolpaths, inner_toolpaths
+        except ValueError:
+            return [], []
+
+    for sub_contour in sub_contours:
+        if sub_contour.Area() == 0:
+            sub_edges = sub_contour.Edges()
+            if len(sub_edges) == 2:
+                outer_toolpaths.append(sub_edges[0])
+        else:
+            sub_outer_toolpaths, sub_inner_toolpaths = perform_contour_helper(sub_contour, stepover_distance)
+            outer_toolpaths += sub_outer_toolpaths
+            inner_toolpaths = sub_inner_toolpaths + inner_toolpaths
+
+    return outer_toolpaths, inner_toolpaths
+
+
+
+
+def perform_shrinking_contour_step(contour: cq.Wire, inner_contours: List[cq.Wire], stepover_distance: float):
+    try:
+        sub_contours = contour.offset2D(-stepover_distance)
+    except ValueError:
+        return []
+
+    all_contours = []
+    for sub_contour in sub_contours:
+        if inner_contours:
+            sub_face = cq.Face.makeFromWires(sub_contour)
+
+        if sub_contour.Area() == 0:
+            sub_edges = sub_contour.Edges()
+            if len(sub_edges) == 2:
+                all_contours.append(sub_edges[0])
+            else:
+                logger.warning(f'Encountered a strange contour with {len(sub_edges)} edges')
+        else:
+            all_contours += perform_shrinking_contour()
