@@ -152,60 +152,6 @@ def perform_shrinking_contour(boundary: cq.Face, stepover_distance):
     return toolpaths
 
 
-def perform_contour_both(boundary: cq.Face, stepover_distance: float) -> List[cq.Wire]:
-    assert stepover_distance > 0
-    outer_contours, inner_contours = perform_contour_helper(boundary, stepover_distance)
-    return outer_contours + inner_contours
-
-
-def perform_contour_helper(contour: cq.Face, stepover_distance: float):
-    outer_toolpaths = [contour.outerWire()]
-    inner_toolpaths = contour.innerWires()
-
-    try:
-        sub_contours = offset_face(contour, -stepover_distance, stepover_distance)
-    except ValueError:
-        try:
-            sub_contours = offset_face(contour, -stepover_distance, 0)
-            outer_toolpaths += [sub_contour.outerWire() for sub_contour in sub_contours]
-            return outer_toolpaths, inner_toolpaths
-        except ValueError:
-            return [], []
-
-    for sub_contour in sub_contours:
-        if sub_contour.Area() == 0:
-            sub_edges = sub_contour.Edges()
-            if len(sub_edges) == 2:
-                outer_toolpaths.append(sub_edges[0])
-        else:
-            sub_outer_toolpaths, sub_inner_toolpaths = perform_contour_helper(sub_contour, stepover_distance)
-            outer_toolpaths += sub_outer_toolpaths
-            inner_toolpaths = sub_inner_toolpaths + inner_toolpaths
-
-    return outer_toolpaths, inner_toolpaths
-
-
-def perform_shrinking_contour_step(contour: cq.Wire, inner_contours: List[cq.Wire], stepover_distance: float):
-    try:
-        sub_contours = contour.offset2D(-stepover_distance)
-    except ValueError:
-        return []
-
-    all_contours = []
-    for sub_contour in sub_contours:
-        if inner_contours:
-            sub_face = cq.Face.makeFromWires(sub_contour)
-
-        if sub_contour.Area() == 0:
-            sub_edges = sub_contour.Edges()
-            if len(sub_edges) == 2:
-                all_contours.append(sub_edges[0])
-            else:
-                logger.warning(f'Encountered a strange contour with {len(sub_edges)} edges')
-        else:
-            all_contours += perform_shrinking_contour()
-
-
 def wire_to_path(wire: cq.Wire):
     edges = wire_to_ordered_edges(wire)
     sp = edge_start_point(edges[0])
@@ -226,6 +172,35 @@ def wire_to_path(wire: cq.Wire):
     return path
 
 
+def pyclipper_contour_helper(parent_contour, stepover_distance, scaled_inner_boundary_paths, chain, chains):
+
+    # clipper_offset.Clear()
+    clipper_offset = pyclipper.PyclipperOffset(arc_tolerance=pyclipper.scale_to_clipper(0.1))
+    clipper_offset.AddPath(path=parent_contour, join_type=pyclipper.JT_ROUND, end_type=pyclipper.ET_CLOSEDPOLYGON)
+    sub_contours = clipper_offset.Execute(stepover_distance)
+    for i, sub_contour in enumerate(sub_contours):
+        if i != 0:
+            chain = []
+            chains.append(chain)
+
+        if scaled_inner_boundary_paths:
+            clipper = pyclipper.Pyclipper()
+            clipper.AddPaths(paths=scaled_inner_boundary_paths, poly_type=pyclipper.PT_CLIP, closed=True)
+            clipper.AddPath(path=sub_contour, poly_type=pyclipper.PT_SUBJECT, closed=True)
+            split_sub_contours = clipper.Execute(pyclipper.CT_DIFFERENCE)
+            for j, split_sub_contour in enumerate(split_sub_contours):
+                if j != 0:
+                    chain = []
+                    chains.append(chain)
+                chain.append(pyclipper.scale_from_clipper(split_sub_contour))
+                pyclipper_contour_helper(split_sub_contour, stepover_distance, scaled_inner_boundary_paths, chain, chains)
+        else:
+            chain.append(pyclipper.scale_from_clipper(sub_contour))
+            pyclipper_contour_helper(sub_contour, stepover_distance, scaled_inner_boundary_paths, chain, chains)
+
+    return chains
+
+
 def perform_pyclipper_contour(boundary: cq.Face, stepover_distance: float):
     assert stepover_distance > 0
     stepover_distance = pyclipper.scale_to_clipper(-abs(stepover_distance))
@@ -240,63 +215,23 @@ def perform_pyclipper_contour(boundary: cq.Face, stepover_distance: float):
     scaled_inner_boundary_paths = [pyclipper.scale_to_clipper(inner) for inner in inner_boundary_paths]
 
     todo = [scaled_outer_boundary_path]
-    results = []
-    while todo:
-        parent_contour = todo.pop()
-        #clipper_offset.Clear()
-        clipper_offset = pyclipper.PyclipperOffset(arc_tolerance=pyclipper.scale_to_clipper(0.1))
-        clipper_offset.AddPath(path=parent_contour, join_type=pyclipper.JT_ROUND, end_type=pyclipper.ET_CLOSEDPOLYGON)
-        sub_contours = clipper_offset.Execute(stepover_distance)
-        for sub_contour in sub_contours:
-            if scaled_inner_boundary_paths:
-                clipper.Clear()
-                clipper.AddPaths(paths=scaled_inner_boundary_paths, poly_type=pyclipper.PT_CLIP, closed=True)
-                clipper.AddPath(path=sub_contour, poly_type=pyclipper.PT_SUBJECT, closed=True)
-                split_sub_contours = clipper.Execute(pyclipper.CT_DIFFERENCE)
-                for split_sub_contour in split_sub_contours:
-                    results.append(split_sub_contour)
-                    todo.append(split_sub_contour)
-            else:
-                results.append(sub_contour)
-                todo.append(sub_contour)
-        #break
-    results = [pyclipper.scale_from_clipper(result) for result in results]
+    chain = [outer_boundary_path]
+    chains = [chain]
+
+    chains = pyclipper_contour_helper(scaled_outer_boundary_path, stepover_distance, scaled_inner_boundary_paths, chain, chains)
+
+    #results = [pyclipper.scale_from_clipper(result) for result in results]
     z = boundary.Center().z
     # Clipper returns path without last vertex
-    for result in results:
-        if result[0] != result[-1]:
-            result.append(result[0][:])
+    for chain in chains:
+        for contour in chain:
+            if contour[0] != contour[-1]:
+                contour.append(contour[0][:])
 
-    results = [outer_boundary_path] + results + inner_boundary_paths
+    results = chains + [[inner] for inner in inner_boundary_paths]
 
-    for result in results:
-        for point in result:
-            point.append(z)
+    for chain in results:
+        for path in chain:
+            for point in path:
+                point.append(z)
     return results
-    # Reconstruct wires
-
-    result_wires = []
-    for result in results:
-        print("Makeline start")
-        first = result[0]
-        last = result[-1]
-        result.append(first)
-        edges = [cq.Edge.makeLine(
-            cq.Vector(p1[0], p1[1], z),
-            cq.Vector(p2[0], p2[1], z)) for p1, p2 in zip(result, result[1:])]
-        print(f"{len(edges)} edges")
-        print("Makeline end, assemble start")
-
-        print("Assemble end")
-        # check geomtype
-        try:
-            [edge.geomType() for edge in edges]
-        except:
-            print(result)
-            #for i,e in enumerate(edges):
-            #    print("edge i", i, e.geomType())
-            continue
-        result_wires.append(cq.Wire.assembleEdges(edges))
-
-    result_wires = [boundary.outerWire()] + result_wires + boundary.innerWires()
-    return result_wires

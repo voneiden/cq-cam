@@ -11,7 +11,7 @@ from cq_cam.command import Command
 from cq_cam.common import Unit
 from cq_cam.operations.pocket import pocket
 from cq_cam.operations.profile import profile
-from cq_cam.routers import route, route_paths
+from cq_cam.routers import route, route_paths, route_chains
 from cq_cam.utils.utils import extract_wires, flatten_list
 from cq_cam.visualize import visualize_job, visualize_job_as_edges
 
@@ -144,7 +144,8 @@ class JobV2:
                            stepdown=stepdown,
                            strategy=strategy)
 
-        commands = route_paths(self, toolpaths)
+        # Todo kinda hacky
+        commands = route_chains(self, toolpaths)
         logger.info(f"Pocket done in {time.time() - start} seconds")
         return self._add_operation('Pocket', commands)
 

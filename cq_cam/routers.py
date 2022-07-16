@@ -75,8 +75,29 @@ def route_paths(job: 'JobV2', paths: List[List[List[float]]]):
             commands += rapid_to(start, job.rapid_height, job.op_safe_height)
 
         for vector_i, vector in enumerate(vectors[1:]):
+            ep = vector
             end_cv = AbsoluteCV.from_vector(vector)
             commands.append(Cut(end_cv))
+
+    return commands
+
+def route_chains(job: 'JobV2', chains: List[List[List[List[float]]]]):
+    commands = []
+    ep = None
+    for chain in chains:
+        for path_i, path in enumerate(chain):
+            vectors = [cq.Vector(*point) for point in path]
+
+            start = vectors[0]
+            if ep and isclose(ep.x, start.x, abs_tol=0.001) and isclose(ep.y, start.y, abs_tol=0.001):
+                commands.append(Plunge.abs(start.z, arrow=True))
+            else:
+                commands += rapid_to(start, job.rapid_height if path_i == 0 else job.op_safe_height, job.op_safe_height)
+
+            for vector_i, vector in enumerate(vectors[1:]):
+                ep = vector
+                end_cv = AbsoluteCV.from_vector(vector)
+                commands.append(Cut(end_cv))
 
     return commands
 
