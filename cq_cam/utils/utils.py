@@ -457,6 +457,7 @@ geom_LUT_CURVE = {
     Geom.Geom_BSplineCurve: "BSPLINE",
 }
 
+
 def get_underlying_geom_type(edge: cq.Edge):
     curve = get_edge_basis_curve(edge)
     return geom_LUT_CURVE[curve.__class__]
@@ -481,6 +482,24 @@ def interpolate_edge(edge: cq.Edge, precision: float = 0.1) -> List[cq.Edge]:
         result.append(cq.Edge.makeLine(a, b))
 
     return result
+
+
+def interpolate_edge_as_2d_path(edge: cq.Edge, precision: float = 0.1) -> List[Tuple[float, float]]:
+    # Interpolation must have at least two edges
+    n = max(int(edge.Length() / precision), 2)
+
+    orientation = edge.wrapped.Orientation()
+    if orientation == TopAbs_REVERSED:
+        i, j = 1, 0
+    else:
+        i, j = 0, 1
+
+    interpolations = []
+    for length in np.linspace(i, j, n):
+        position = edge.positionAt(length)
+        interpolations.append([position.x, position.y])
+
+    return interpolations
 
 
 def interpolate_edges_with_unstable_curves(edges: List[cq.Edge], precision: float = 0.1):

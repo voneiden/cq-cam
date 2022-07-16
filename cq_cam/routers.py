@@ -58,7 +58,28 @@ def vertical_edge(edge: cq.Edge):
     p2 = edge.endPoint()
     return p1.x == p2.x and p1.y == p2.y
 
+
 DEBUG = []
+
+
+def route_paths(job: 'JobV2', paths: List[List[List[float]]]):
+    commands = []
+    ep = None
+    for path in paths:
+        vectors = [cq.Vector(*point) for point in path]
+
+        start = vectors[0]
+        if ep and isclose(ep.x, start.x, abs_tol=0.001) and isclose(ep.y, start.y, abs_tol=0.001):
+            commands.append(Plunge.abs(start.z, arrow=True))
+        else:
+            commands += rapid_to(start, job.rapid_height, job.op_safe_height)
+
+        for vector_i, vector in enumerate(vectors[1:]):
+            end_cv = AbsoluteCV.from_vector(vector)
+            commands.append(Cut(end_cv))
+
+    return commands
+
 
 def route(job: 'JobV2', wires: List[Union[cq.Wire, cq.Edge]]):
     commands = []
@@ -85,7 +106,8 @@ def route(job: 'JobV2', wires: List[Union[cq.Wire, cq.Edge]]):
             ep = edge_end_point(edge)
             end_cv = AbsoluteCV.from_vector(ep)
             if geom_type == 'LINE':
-                commands.append(Cut(end_cv, arrow=edge_i % 5 == 0))
+                # commands.append(Cut(end_cv, arrow=edge_i % 5 == 0))
+                commands.append(Cut(end_cv))
 
             elif geom_type == 'ARC' or geom_type == 'CIRCLE':
                 sp = edge_start_point(edge)

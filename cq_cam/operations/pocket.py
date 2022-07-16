@@ -2,10 +2,13 @@ import logging
 from math import isclose
 from typing import List, Tuple, Optional, TYPE_CHECKING, Literal
 
+import pyclipper
 from cadquery import cq
 
 from cq_cam.routers import route
-from cq_cam.utils.utils import flatten_list, compound_to_faces, interpolate_wire_with_unstable_edges
+from cq_cam.utils.utils import flatten_list, compound_to_faces, interpolate_wire_with_unstable_edges, \
+    wire_to_ordered_edges, edge_end_point, edge_start_point, interpolate_edge, interpolate_edge_as_2d_path, \
+    get_underlying_geom_type
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +76,10 @@ def pocket(job: 'JobV2',
         raise ValueError('Stepdown must be more than zero')
 
     if strategy == 'contour':
-        strategy_f = lambda boundary: perform_contour(boundary, stepover_distance=stepover * job.tool_diameter)
+        # offset 3.2 seconds and cuts 3.1 seconds
+        # strategy_f = lambda boundary: perform_contour(boundary, stepover_distance=stepover * job.tool_diameter)
+        strategy_f = lambda boundary: perform_pyclipper_contour(boundary,
+                                                                stepover_distance=stepover * job.tool_diameter)
     else:
         raise ValueError(f'Invalid strategy "{strategy}"')
 
@@ -179,8 +185,6 @@ def perform_contour_helper(contour: cq.Face, stepover_distance: float):
     return outer_toolpaths, inner_toolpaths
 
 
-
-
 def perform_shrinking_contour_step(contour: cq.Wire, inner_contours: List[cq.Wire], stepover_distance: float):
     try:
         sub_contours = contour.offset2D(-stepover_distance)
@@ -200,3 +204,99 @@ def perform_shrinking_contour_step(contour: cq.Wire, inner_contours: List[cq.Wir
                 logger.warning(f'Encountered a strange contour with {len(sub_edges)} edges')
         else:
             all_contours += perform_shrinking_contour()
+
+
+def wire_to_path(wire: cq.Wire):
+    edges = wire_to_ordered_edges(wire)
+    sp = edge_start_point(edges[0])
+    path = [[sp.x, sp.y]]
+    for edge in edges:
+        geom_type = edge.geomType()
+        if geom_type == 'OFFSET':
+            geom_type = get_underlying_geom_type(edge)
+        ep = edge_end_point(edge)
+        if geom_type == 'LINE':
+            path.append([ep.x, ep.y])
+
+        elif geom_type in ['ARC', 'CIRCLE', 'BSPLINE', 'BEZIER']:
+            path += interpolate_edge_as_2d_path(edge)[1:]
+
+        else:
+            raise RuntimeError(f'Unsupported geom type: {geom_type}')
+    return path
+
+
+def perform_pyclipper_contour(boundary: cq.Face, stepover_distance: float):
+    assert stepover_distance > 0
+    stepover_distance = pyclipper.scale_to_clipper(-abs(stepover_distance))
+
+    clipper = pyclipper.Pyclipper()
+    clipper_offset = pyclipper.PyclipperOffset()
+
+    outer_boundary_path = wire_to_path(boundary.outerWire())
+    inner_boundary_paths = [wire_to_path(inner) for inner in boundary.innerWires()]
+
+    scaled_outer_boundary_path = pyclipper.scale_to_clipper(outer_boundary_path)
+    scaled_inner_boundary_paths = [pyclipper.scale_to_clipper(inner) for inner in inner_boundary_paths]
+
+    todo = [scaled_outer_boundary_path]
+    results = []
+    while todo:
+        parent_contour = todo.pop()
+        #clipper_offset.Clear()
+        clipper_offset = pyclipper.PyclipperOffset(arc_tolerance=pyclipper.scale_to_clipper(0.1))
+        clipper_offset.AddPath(path=parent_contour, join_type=pyclipper.JT_ROUND, end_type=pyclipper.ET_CLOSEDPOLYGON)
+        sub_contours = clipper_offset.Execute(stepover_distance)
+        for sub_contour in sub_contours:
+            if scaled_inner_boundary_paths:
+                clipper.Clear()
+                clipper.AddPaths(paths=scaled_inner_boundary_paths, poly_type=pyclipper.PT_CLIP, closed=True)
+                clipper.AddPath(path=sub_contour, poly_type=pyclipper.PT_SUBJECT, closed=True)
+                split_sub_contours = clipper.Execute(pyclipper.CT_DIFFERENCE)
+                for split_sub_contour in split_sub_contours:
+                    results.append(split_sub_contour)
+                    todo.append(split_sub_contour)
+            else:
+                results.append(sub_contour)
+                todo.append(sub_contour)
+        #break
+    results = [pyclipper.scale_from_clipper(result) for result in results]
+    z = boundary.Center().z
+    # Clipper returns path without last vertex
+    for result in results:
+        if result[0] != result[-1]:
+            result.append(result[0][:])
+
+    results = [outer_boundary_path] + results + inner_boundary_paths
+
+    for result in results:
+        for point in result:
+            point.append(z)
+    return results
+    # Reconstruct wires
+
+    result_wires = []
+    for result in results:
+        print("Makeline start")
+        first = result[0]
+        last = result[-1]
+        result.append(first)
+        edges = [cq.Edge.makeLine(
+            cq.Vector(p1[0], p1[1], z),
+            cq.Vector(p2[0], p2[1], z)) for p1, p2 in zip(result, result[1:])]
+        print(f"{len(edges)} edges")
+        print("Makeline end, assemble start")
+
+        print("Assemble end")
+        # check geomtype
+        try:
+            [edge.geomType() for edge in edges]
+        except:
+            print(result)
+            #for i,e in enumerate(edges):
+            #    print("edge i", i, e.geomType())
+            continue
+        result_wires.append(cq.Wire.assembleEdges(edges))
+
+    result_wires = [boundary.outerWire()] + result_wires + boundary.innerWires()
+    return result_wires
