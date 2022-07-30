@@ -11,7 +11,7 @@ from cq_cam.command import Command
 from cq_cam.common import Unit
 from cq_cam.operations.pocket import pocket
 from cq_cam.operations.profile import profile
-from cq_cam.routers import route, route_paths, route_chains
+from cq_cam.routers import route, route_paths, route_contour_chain
 from cq_cam.utils.utils import extract_wires, flatten_list
 from cq_cam.visualize import visualize_job, visualize_job_as_edges
 
@@ -24,10 +24,12 @@ class Operation:
         self.name = name
         self.commands = commands
 
-    def to_gcode(self):
-        # Set starting position above rapid height so that
-        # we guarantee getting the correct Z rapid in the beginning
-        position = cq.Vector(0, 0, self.job.rapid_height + 1)
+    def to_gcode(self, position=None):
+        if not position:
+            # Set starting position above rapid height so that
+            # we guarantee getting the correct Z rapid in the beginning
+            position = cq.Vector(0, 0, self.job.rapid_height + 1)
+
         gcodes = [f'({self.job.name} - {self.name})']
         previous_command = None
         for command in self.commands:
@@ -35,7 +37,11 @@ class Operation:
             previous_command = command
             gcodes.append(gcode)
 
-        return '\n'.join(gcodes)
+        if position.z != self.job.rapid_height:
+            position.z = self.job.rapid_height
+            gcodes.append(f'G0Z{self.job.rapid_height}')
+
+        return '\n'.join(gcodes), position
 
 
 class JobV2:
@@ -81,13 +87,28 @@ class JobV2:
         task_break = "\n\n\n"
 
         to_home = f'G1Z0\nG0Z{self.rapid_height}\nX0Y0'
+        op_gcodes = []
+        position = None
+        for op in self.operations:
+            op_gcode, position = op.to_gcode(position)
+            op_gcodes.append(op_gcode)
         return (
             f"({self.name} - Feedrate: {self.feed} - Unit: {self.unit})\n"
             f"G90\n"
             f"{self.unit.to_gcode()}\n"
-            f"{task_break.join(task.to_gcode() for task in self.operations)}"
+            f"{task_break.join(op_gcodes)}"
             f"{to_home}"
         )
+
+    def save_gcode(self, file_name, prepend=None, append=None):
+        with open(file_name, 'w') as f:
+            if prepend:
+                f.write(prepend)
+                f.write('\n')
+            f.write(self.to_gcode())
+            if append:
+                f.write(append)
+                f.write('\n')
 
     def show(self, show_object):
         for i, operation in enumerate(self.operations):
@@ -105,6 +126,8 @@ class JobV2:
         return job
 
     def profile(self, shape, outer_offset=None, inner_offset=None, stepdown=None, tabs=None):
+        start = time.time()
+
         if self.tool_diameter is None:
             raise ValueError('Profile requires tool_diameter to be est')
 
@@ -121,6 +144,8 @@ class JobV2:
             stepdown=stepdown,
             tabs=tabs
         )
+
+        logger.info(f"Profile done in {time.time() - start} seconds")
         return self._add_operation('Profile', commands)
 
     def pocket(self,
@@ -136,16 +161,19 @@ class JobV2:
 
         # TODO extract faces
 
-        toolpaths = pocket(job=self,
-                           faces=faces,
-                           avoid=avoid,
-                           stepover=stepover,
-                           boundary_offset=boundary_offset,
-                           stepdown=stepdown,
-                           strategy=strategy)
+        contour_chains_with_inners = pocket(job=self,
+                                            faces=faces,
+                                            avoid=avoid,
+                                            stepover=stepover,
+                                            boundary_offset=boundary_offset,
+                                            stepdown=stepdown,
+                                            strategy=strategy)
 
         # Todo kinda hacky
-        commands = route_chains(self, toolpaths)
+        commands = []
+        for contour_chain, inners in contour_chains_with_inners:
+            commands += route_contour_chain(self, contour_chain)
+
         logger.info(f"Pocket done in {time.time() - start} seconds")
         return self._add_operation('Pocket', commands)
 

@@ -12,7 +12,7 @@ from OCP.TopAbs import TopAbs_REVERSED
 from cq_cam.operations.tabs import Tabs, Transition
 from cq_cam.routers import route
 from cq_cam.utils.utils import compound_to_edges, wire_to_ordered_edges, edge_oriented_param, edge_end_point, \
-    edge_start_point
+    edge_start_point, wire_to_offset_safe_wire
 
 if TYPE_CHECKING:
     from cq_cam.fluent import JobV2
@@ -33,11 +33,25 @@ def profile(job: 'JobV2',
     outers = [outer.transformShape(job.top.fG) for outer in outer_wires]
     inners = [inner.transformShape(job.top.fG) for inner in inner_wires]
 
+    # Make safe
+    outers = [wire_to_offset_safe_wire(outer) for outer in outers]
+    inners = [wire_to_offset_safe_wire(inner) for inner in inners]
+
     # Generate base features
     base_features = []
     if outer_offset is not None:
         for outer in outers:
-            base_features += outer.offset2D(outer_offset * job.tool_radius)
+            new_outers = outer.offset2D(outer_offset * job.tool_radius)
+            # FreeCAD style workaround for
+            # https://github.com/CadQuery/cadquery/issues/896
+            if len(outer.Edges()) == 1:
+                edge = outer.Edges()[0]
+                if edge.startPoint() == edge.endPoint():
+                    # OCCT bug with offsetting circles!
+                    for ni in new_outers:
+                        ni.wrapped.Location(outer.wrapped.Location().Inverted())
+
+            base_features += new_outers
 
     if inner_offset is not None:
         for inner in inners:
@@ -94,7 +108,7 @@ def profile(job: 'JobV2',
     commands = route(job, toolpaths)
     return commands
 
-
+OG_WIRE = []
 TAB_ERRORS = []
 
 

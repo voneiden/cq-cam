@@ -179,6 +179,8 @@ def wire_to_ordered_edges(wire: cq.Wire) -> List[cq.Edge]:
     return ordered_edges
 
 
+
+
 def cut_clockwise(positive_offset: bool, spindle_clockwise: bool, climb: bool):
     """
     If all 3 are true, then cut must be done clockwise.
@@ -301,6 +303,16 @@ def dist_to_segment_squared(p, v, w):
     t = max(0, min(1, t))
     closest_point = (v[0] + t * (w[0] - v[0]), v[1] + t * (w[1] - v[1]))
     return dist2(p, closest_point)
+
+
+def closest_point_and_distance_squared_to_segment(p: cq.Vector, s1: cq.Vector, s2: cq.Vector):
+    """ https://stackoverflow.com/a/1501725"""
+    l2 = dist2((s1.x, s1.y), (s2.x, s2.y))
+    t = ((p.x - s1.x) * (s2.x - s1.x) + (p.y - s1.y) * (s2.y - s1.y)) / l2
+    t = max(0, min(1, t))
+    closest_point = (s1.x + t * (s2.x - s1.x), s1.y + t * (s2.y - s1.y))
+    d2 = dist2((p.x, p.y), closest_point)
+    return cq.Vector(closest_point[0], closest_point[1], p.z), d2
 
 
 def pairwise(iterable):
@@ -484,24 +496,6 @@ def interpolate_edge(edge: cq.Edge, precision: float = 0.1) -> List[cq.Edge]:
     return result
 
 
-def interpolate_edge_as_2d_path(edge: cq.Edge, precision: float = 0.1) -> List[Tuple[float, float]]:
-    # Interpolation must have at least two edges
-    n = max(int(edge.Length() / precision), 2)
-
-    orientation = edge.wrapped.Orientation()
-    if orientation == TopAbs_REVERSED:
-        i, j = 1, 0
-    else:
-        i, j = 0, 1
-
-    interpolations = []
-    for length in np.linspace(i, j, n):
-        position = edge.positionAt(length)
-        interpolations.append([position.x, position.y])
-
-    return interpolations
-
-
 def interpolate_edges_with_unstable_curves(edges: List[cq.Edge], precision: float = 0.1):
     """
     It appears some curves do not offset nicely with OCCT. BSPLINE is an example.
@@ -532,3 +526,43 @@ def interpolate_wire_with_unstable_edges(wire: cq.Wire, precision: float = 0.1) 
     if not interpolated:
         return wire
     return cq.Wire.assembleEdges(edges)
+
+
+def wire_to_offset_safe_wire(wire: cq.Wire) -> cq.Wire:
+    """
+    Function to make wires safe for offsetting
+
+    1) Convert circles into two arcs
+    2) Convert everything else than lines and arcs into interpolated lines
+
+    :param wire:
+    :return:
+    """
+
+    edges, interpolated = interpolate_edges_with_unstable_curves(wire_to_ordered_edges(wire))
+    circles = False
+    new_edges = []
+    for edge in edges:
+        geom_type = edge.geomType()
+        if geom_type == 'OFFSET':
+            geom_type = get_underlying_geom_type(edge)
+        if geom_type == 'CIRCLE' and edge.startPoint() == edge.endPoint():
+            circles = True
+
+            p1 = edge.positionAt(0)
+            p2 = edge.positionAt(0.25)
+            p3 = edge.positionAt(0.5)
+            p4 = edge.positionAt(0.75)
+
+            new_edges.append(cq.Edge.makeThreePointArc(p1, p2, p3))
+            new_edges.append(cq.Edge.makeThreePointArc(p3, p4, p1))
+
+        else:
+            new_edges.append(edge)
+
+    if interpolated or circles:
+        return cq.Wire.assembleEdges(new_edges)
+
+    return wire
+
+
