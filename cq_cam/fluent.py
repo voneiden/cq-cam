@@ -11,7 +11,7 @@ from cq_cam.command import Command
 from cq_cam.common import Unit
 from cq_cam.operations.pocket import pocket
 from cq_cam.operations.profile import profile
-from cq_cam.routers import route, route_paths, route_contour_chain
+from cq_cam.routers import route, route_paths, route_contour_chain, route_path
 from cq_cam.utils.utils import extract_wires, flatten_list
 from cq_cam.visualize import visualize_job, visualize_job_as_edges
 
@@ -173,6 +173,9 @@ class JobV2:
         commands = []
         for contour_chain, inners in contour_chains_with_inners:
             commands += route_contour_chain(self, contour_chain)
+            for inner in inners:
+                inner_cmds, inner_pos = route_path(self, inner)
+                commands += inner_cmds
 
         logger.info(f"Pocket done in {time.time() - start} seconds")
         return self._add_operation('Pocket', commands)

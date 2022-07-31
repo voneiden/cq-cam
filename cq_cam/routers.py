@@ -139,6 +139,7 @@ def clipper_path_to_milled_zone(path: List[List[float]], tool_radius: float, arc
     return offset_paths[0]
 
 
+
 def route_contour_chain(job: 'JobV2', chain: ContourChain,
                         parent_end=None):
     # TODO consider inners and outer boundary?

@@ -8,7 +8,7 @@ from cadquery import cq
 from cq_cam.routers import ContourChain
 from cq_cam.utils.path_utils import wire_to_path
 from cq_cam.utils.utils import (
-    flatten_list, compound_to_faces, interpolate_wire_with_unstable_edges
+    flatten_list, compound_to_faces, interpolate_wire_with_unstable_edges, wire_to_offset_safe_wire
 )
 
 logger = logging.getLogger(__name__)
@@ -26,11 +26,12 @@ def sort_by_depth(faces: List[cq.Face]) -> List[Tuple[float, cq.Face]]:
 
 
 def offset_face(face: cq.Face, outer_offset, inner_offset, log=True):
-    outers = interpolate_wire_with_unstable_edges(face.outerWire()).offset2D(outer_offset)
+    outers = wire_to_offset_safe_wire(face.outerWire()).offset2D(outer_offset)
 
     inners = []
     if inner_offset:
         for inner in face.innerWires():
+            inner = wire_to_offset_safe_wire(inner)
             try:
                 # TODO interpolate wire with unstable edges?
                 for _inner in inner.offset2D(inner_offset):
