@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from abc import ABC, abstractmethod
 from typing import Union, Optional, Tuple
 
@@ -26,6 +27,7 @@ class CommandVector(ABC):
 
 class RelativeCV(CommandVector):
     def to_vector(self, origin: cq.Vector, relative=False):
+        warnings.warn("Relative CV is deprecated", DeprecationWarning)
         if relative:
             x = 0 if self.x is None else self.x
             y = 0 if self.y is None else self.y
@@ -73,6 +75,7 @@ class Command(ABC):
 
     @classmethod
     def rel(cls, x=None, y=None, z=None, **kwargs):
+        warnings.warn("Relative CV is deprecated", DeprecationWarning)
         return cls(end=RelativeCV(x=x, y=y, z=z), **kwargs)
 
     def print_modal(self, previous: Optional[Command]):
@@ -168,6 +171,7 @@ class Plunge(Cut):
 
     @classmethod
     def rel(cls, z=None, **kwargs):
+        warnings.warn("Relative CV is deprecated", DeprecationWarning)
         return cls(end=RelativeCV(z=z), **kwargs)
 
 
@@ -186,6 +190,7 @@ class Retract(Rapid):
 
     @classmethod
     def rel(cls, z=None, **kwargs):
+        warnings.warn("Relative CV is deprecated", DeprecationWarning)
         return cls(end=RelativeCV(z=z), **kwargs)
 
 
