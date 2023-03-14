@@ -13,7 +13,7 @@ from OCP.gp import gp_Pnt
 
 from cq_cam.command import Rapid, Cut, Plunge
 from cq_cam.operations.base_operation import FaceBaseOperation
-from cq_cam.operations.strategy import ZigZagStrategy
+from src.cq_cam.operations.strategy import ZigZagStrategy
 from cq_cam.utils import utils
 from cq_cam.utils.utils import flatten_list
 

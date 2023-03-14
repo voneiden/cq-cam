@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from math import isclose
 from typing import Union, Optional, Tuple
 
 import cadquery as cq
@@ -9,7 +8,7 @@ from OCP.AIS import AIS_Shape, AIS_Line
 from OCP.Geom import Geom_CartesianPoint
 
 from cq_cam.utils.utils import optimize_float
-from cq_cam.visualize import to_occ_color
+from src.cq_cam.visualize import to_occ_color
 
 
 class CommandVector(ABC):

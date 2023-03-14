@@ -11,8 +11,8 @@ from cadquery import cq
 
 from cq_cam.command import Rapid, Plunge, Cut
 from cq_cam.operations.base_operation import FaceBaseOperation, OperationError
-from cq_cam.operations.mixin_operation import PlaneValidationMixin, ObjectsValidationMixin
-from cq_cam.operations.strategy import ZigZagStrategy, Strategy
+from src.cq_cam.operations.mixin_operation import PlaneValidationMixin, ObjectsValidationMixin
+from src.cq_cam.operations.strategy import ZigZagStrategy, Strategy
 from cq_cam.utils.utils import WireClipper, flatten_list, flatten_wire_to_closed_2d
 
 logger = logging.getLogger(__name__)
