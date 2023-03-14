@@ -12,7 +12,6 @@ Highly experimental at this stage. Expect bugs and always inspect the generated 
 
 Requirements and installation
 ---
-* 
 * [cadquery=master=py3.10](https://github.com/CadQuery/cadquery)
 * Optional visualization: [cq-editor=master=py3.10](https://github.com/CadQuery/CQ-editor)
 * Optional 3D toolpaths: [opencamlib=2019.07](https://anaconda.org/conda-forge/opencamlib) (note, not available in PyPI)
