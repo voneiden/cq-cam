@@ -35,9 +35,8 @@ enabled = true
 dev_template = "{tag}.post{ccount}"
 
 
-[pytest]
+[tool.pytest.ini_options]
 addopts = "-p no:cacheprovider"
 
-
-[flake8]
+[tool.flake8]
 max-line-length = 100
