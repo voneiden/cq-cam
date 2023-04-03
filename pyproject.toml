@@ -33,3 +33,7 @@ dynamic = ["version"]
 [tool.setuptools-git-versioning]
 enabled = true
 dev_template = "{tag}.post{ccount}"
+
+
+[pytest]
+addopts = "-p no:cacheprovider"

@@ -1,6 +1,6 @@
 import cadquery as cq
 
-from cq_cam.fluent import JobV2
+from cq_cam.fluent import Job
 
 
 def demo():
@@ -10,7 +10,7 @@ def demo():
 
     job_wp = result.faces('>Z').workplane()
     cam = (
-        JobV2(job_wp.plane, feed=300, tool_diameter=3)
+        Job(job_wp.plane, feed=300, tool_diameter=3)
         .drill(depth=2, clearance_height=5, top_height=0, o=result.faces('>Z').objects[0].innerWires())
     )
     show_object(result, 'obj')

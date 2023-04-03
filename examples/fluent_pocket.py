@@ -1,5 +1,5 @@
 import cadquery as cq
-from cq_cam.fluent import JobV2
+from cq_cam.fluent import Job
 
 
 def demo():
@@ -21,7 +21,7 @@ def demo():
     # obj = op_plane.workplane().rect(2, 2).extrude(4)
 
     cam = (
-        JobV2(job_plane.plane, feed=300, tool_diameter=3.175)
+        Job(job_plane.plane, feed=300, tool_diameter=3.175)
         .pocket(op_plane)
     )
 
@@ -34,7 +34,7 @@ def demo2():
     # show_object(result.faces('<Z[1]'))
     job_wp = result.faces('>Z').workplane()
     cam = (
-        JobV2(job_wp.plane, feed=300, tool_diameter=1)
+        Job(job_wp.plane, feed=300, tool_diameter=1)
         .pocket(clearance_height=5, top_height=0, o=result.faces('<Z[1]'),
                 outer_boundary_offset=1, avoid=result.faces('>Z'))
     )

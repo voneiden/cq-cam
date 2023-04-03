@@ -1,5 +1,5 @@
 from cq_cam.common import Unit
-from src.cq_cam.operations.strategy import ZigZagStrategy, ContourStrategy
+from cq_cam.operations.strategy import ZigZagStrategy, ContourStrategy
 
 _extra = []
 try:

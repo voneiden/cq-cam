@@ -1,8 +1,7 @@
 import logging
 
-from OCP.AIS import AIS_MultipleConnectedInteractive, AIS_Shape, AIS_TextLabel
 import cadquery as cq
-from OCP.TCollection import TCollection_ExtendedString
+from OCP.AIS import AIS_MultipleConnectedInteractive, AIS_Shape
 
 logger = logging.getLogger(__name__)
 

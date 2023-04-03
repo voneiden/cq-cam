@@ -18,7 +18,7 @@ class OperationError(Exception):
 
 @dataclass
 class Operation(ABC):
-    job: 'JobV2'
+    job: 'Job'
     """ The `Job` which this task belongs to.
     """
 

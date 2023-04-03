@@ -15,13 +15,13 @@ from cq_cam.utils.utils import compound_to_edges, wire_to_ordered_edges, edge_or
     edge_start_point
 
 if TYPE_CHECKING:
-    from cq_cam.fluent import JobV2
+    from cq_cam.fluent import Job
 
 DEBUG = []
 logger = logging.getLogger(__name__)
 
 
-def profile(job: 'JobV2',
+def profile(job: 'Job',
             outer_wires: List[cq.Wire] = None,
             inner_wires: List[cq.Wire] = None,
             outer_offset: float = 1,

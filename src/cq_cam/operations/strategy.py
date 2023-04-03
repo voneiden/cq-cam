@@ -3,7 +3,7 @@ from typing import List, Tuple, Dict
 
 import cadquery as cq
 import numpy as np
-from src.cq_cam.utils.linked_polygon import LinkedPolygon
+from cq_cam.utils.linked_polygon import LinkedPolygon
 from cq_cam.utils.utils import WireClipper, pairwise, dist_to_segment_squared, cached_dist2
 
 Scanpoint = Tuple[float, float]

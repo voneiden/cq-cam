@@ -4,14 +4,14 @@ from typing import TYPE_CHECKING, List
 import cadquery as cq
 import numpy as np
 
-from cq_cam.command import Plunge, Rapid, ReferencePosition, AbsoluteCV, Cut, CircularCW, CircularCCW, Retract
+from cq_cam.command import Plunge, Rapid, AbsoluteCV, Cut, CircularCW, CircularCCW
 from cq_cam.utils.utils import wire_to_ordered_edges, edge_end_point, edge_start_point, is_arc_clockwise2
 
 if TYPE_CHECKING:
-    from cq_cam.fluent import JobV2
+    from cq_cam.fluent import Job
 
 
-def vertical_plunge(job: 'JobV2', layer1: cq.Wire, layer2: cq.Wire, p=0.0):
+def vertical_plunge(job: 'Job', layer1: cq.Wire, layer2: cq.Wire, p=0.0):
     p1 = layer1.positionAt(p, 'parameter')
     p2 = layer2.positionAt(p, 'parameter')
 
@@ -24,7 +24,7 @@ def vertical_plunge(job: 'JobV2', layer1: cq.Wire, layer2: cq.Wire, p=0.0):
     return [Rapid(z=job.op_safe_height), Rapid(x=p3.x, y=p3.y), Plunge(p3.z)]
 
 
-def vertical_ramp(job: 'JobV2', layer1: cq.Wire, layer2: cq.Wire, p=0.0, ramp_angle=10, reverse=False):
+def vertical_ramp(job: 'Job', layer1: cq.Wire, layer2: cq.Wire, p=0.0, ramp_angle=10, reverse=False):
     p1 = layer1.positionAt(p, 'parameter')
     p2 = layer2.positionAt(p, 'parameter')
 
@@ -58,7 +58,7 @@ def vertical_edge(edge: cq.Edge):
     return p1.x == p2.x and p1.y == p2.y
 
 
-def route(job: 'JobV2', wires: List[cq.Wire]):
+def route(job: 'Job', wires: List[cq.Wire]):
     commands = []
     previous_wire = None
     previous_wire_start = None

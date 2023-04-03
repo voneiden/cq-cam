@@ -1,8 +1,8 @@
 import unittest
+
 import cadquery as cq
 
 from cq_cam.command import Cut, CircularCW, AbsoluteCV, CircularCCW
-from cq_cam.utils.utils import is_arc_clockwise2
 
 
 class TestUtils(unittest.TestCase):

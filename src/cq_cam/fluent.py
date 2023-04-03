@@ -7,9 +7,9 @@ from cadquery import cq
 
 from cq_cam.command import Command
 from cq_cam.common import Unit
-from src.cq_cam.operations.profile import profile
+from cq_cam.operations.profile import profile
 from cq_cam.utils.utils import extract_wires, flatten_list
-from src.cq_cam.visualize import visualize_job, visualize_job_as_edges
+from cq_cam.visualize import visualize_job, visualize_job_as_edges
 
 
 class Operation:
@@ -32,7 +32,7 @@ class Operation:
         return '\n'.join(gcodes)
 
 
-class JobV2:
+class Job:
     def __init__(self,
                  top: cq.Plane,
                  feed: float,
