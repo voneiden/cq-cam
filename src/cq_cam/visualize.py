@@ -8,21 +8,28 @@ logger = logging.getLogger(__name__)
 
 def to_occ_color(*args):
     from cq_editor.cq_utils import to_occ_color as _to_occ_color
+
     return _to_occ_color(*args)
 
 
 def visualize_job_plane(job_plane: cq.Plane, length=1):
-    x_edge = cq.Edge.makeLine(job_plane.origin, job_plane.origin + job_plane.xDir * length)
+    x_edge = cq.Edge.makeLine(
+        job_plane.origin, job_plane.origin + job_plane.xDir * length
+    )
     x_shape = AIS_Shape(x_edge.wrapped)
-    x_shape.SetColor(to_occ_color('red'))
+    x_shape.SetColor(to_occ_color("red"))
 
-    y_edge = cq.Edge.makeLine(job_plane.origin, job_plane.origin + job_plane.yDir * length)
+    y_edge = cq.Edge.makeLine(
+        job_plane.origin, job_plane.origin + job_plane.yDir * length
+    )
     y_shape = AIS_Shape(y_edge.wrapped)
-    y_shape.SetColor(to_occ_color('green'))
+    y_shape.SetColor(to_occ_color("green"))
 
-    z_edge = cq.Edge.makeLine(job_plane.origin, job_plane.origin + job_plane.zDir * length)
+    z_edge = cq.Edge.makeLine(
+        job_plane.origin, job_plane.origin + job_plane.zDir * length
+    )
     z_shape = AIS_Shape(z_edge.wrapped)
-    z_shape.SetColor(to_occ_color('blue'))
+    z_shape.SetColor(to_occ_color("blue"))
 
     group = AIS_MultipleConnectedInteractive()
     group.Connect(x_shape)
@@ -50,7 +57,7 @@ def visualize_job(job_plane: cq.Plane, commands, start_height=10):
 
 
 def visualize_job_as_edges(job_plane: cq.Plane, commands, start_height=10):
-    """ To be used mainly for documentation purposes
+    """To be used mainly for documentation purposes
 
     :param job_plane:
     :param commands:
@@ -68,4 +75,3 @@ def visualize_job_as_edges(job_plane: cq.Plane, commands, start_height=10):
             edges.append(edge)
 
     return edges
-

@@ -4,7 +4,8 @@ from cq_cam.operations.strategy import ZigZagStrategy, ContourStrategy
 _extra = []
 try:
     from cq_cam.operations.op3d import Surface3D
-    _extra.append('Surface3D')
+
+    _extra.append("Surface3D")
 except ModuleNotFoundError:
     pass
 
@@ -12,14 +13,14 @@ METRIC = Unit.METRIC
 IMPERIAL = Unit.IMPERIAL
 
 __all__ = [
-    'JobV2',
-    'Pocket',
-    'Drill',
-    'Unit',
-    'ZigZagStrategy',
-    'ContourStrategy',
-    'EdgeTabs',
-    'WireTabs',
-    'METRIC',
-    'IMPERIAL',
+    "JobV2",
+    "Pocket",
+    "Drill",
+    "Unit",
+    "ZigZagStrategy",
+    "ContourStrategy",
+    "EdgeTabs",
+    "WireTabs",
+    "METRIC",
+    "IMPERIAL",
 ] + _extra

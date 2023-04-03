@@ -10,9 +10,12 @@ class LinkedPolygon:
     linked_points: List[Tuple[float, float]] = field(default_factory=list)
     _linked_points: List[Tuple[float, float]] = field(default_factory=list)
 
-    def link_point(self, point: Tuple[float, float], segment_start: Tuple[float, float],
-                   segment_end: Tuple[float, float]):
-
+    def link_point(
+        self,
+        point: Tuple[float, float],
+        segment_start: Tuple[float, float],
+        segment_end: Tuple[float, float],
+    ):
         assert point not in self.linked_points
 
         i = self.polygon.index(segment_start)
@@ -61,7 +64,7 @@ class LinkedPolygon:
             return None
 
         i = self.polygon.index(point)
-        search_polygon = self.polygon[i + 1:] + self.polygon[:i]
+        search_polygon = self.polygon[i + 1 :] + self.polygon[:i]
         # Search forward
         forward_distance = 0
         forward_sequence = []

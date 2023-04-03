@@ -30,7 +30,7 @@ class Drill(Operation):
             raise OperationError("o must be defined")
 
         if self.depth is None:
-            raise OperationError('depth must be defined')
+            raise OperationError("depth must be defined")
 
         for obj in self._o_objects(self.o):
             if isinstance(obj, cq.Vector):
@@ -40,36 +40,43 @@ class Drill(Operation):
             elif isinstance(obj, cq.Face):
                 if obj.innerWires():
                     for wire in obj.innerWires():
-                        drill_vectors.append(transform_f(cq.Face.makeFromWires(wire).Center()))
+                        drill_vectors.append(
+                            transform_f(cq.Face.makeFromWires(wire).Center())
+                        )
                 else:
-                    drill_vectors.append(transform_f(cq.Face.makeFromWires(obj.outerWire()).Center()))
+                    drill_vectors.append(
+                        transform_f(cq.Face.makeFromWires(obj.outerWire()).Center())
+                    )
             else:
-                raise OperationError(f'Object type "{type(obj)}" not supported by Profile operation')
+                raise OperationError(
+                    f'Object type "{type(obj)}" not supported by Profile operation'
+                )
 
         if not drill_vectors:
             raise OperationError("Given wp does not contain anything to do")
-
 
         drill_points = [(point.x, point.y) for point in drill_vectors]
         ordered_drill_points = []
         cut_sequences = []
         last = None
         while drill_points:
-            drill_point = Strategy._pick_nearest(last, drill_points) if last else drill_points[0]
+            drill_point = (
+                Strategy._pick_nearest(last, drill_points) if last else drill_points[0]
+            )
             ordered_drill_points.append(drill_point)
             drill_points.pop(drill_points.index(drill_point))
             last = drill_point
 
         depth = -abs(self.depth)
         for point in ordered_drill_points:
-            cut_sequences.append([
-                Rapid.abs(z=self.job.op_safe_height),
-                Rapid.abs(x=point[0], y=point[1]),
-                Rapid.abs(z=0),
-                Plunge.abs(z=depth),  # TODO depth
-                #Rapid.abs(z=self.job.op_safe_height),
-            ])
+            cut_sequences.append(
+                [
+                    Rapid.abs(z=self.job.op_safe_height),
+                    Rapid.abs(x=point[0], y=point[1]),
+                    Rapid.abs(z=0),
+                    Plunge.abs(z=depth),  # TODO depth
+                    # Rapid.abs(z=self.job.op_safe_height),
+                ]
+            )
         cut_sequences = flatten_list(cut_sequences)
         self.commands = cut_sequences
-
-

@@ -50,7 +50,9 @@ class Surface3D(FaceBaseOperation):
         else:
             base_boundaries = [combine_result]
 
-        op_boundaries = flatten_list([self.offset_boundary(boundary) for boundary in base_boundaries])
+        op_boundaries = flatten_list(
+            [self.offset_boundary(boundary) for boundary in base_boundaries]
+        )
 
         for op_boundary in op_boundaries:
             outer_boundary = op_boundary.outerWire()
@@ -76,7 +78,9 @@ class Surface3D(FaceBaseOperation):
             # Note, this interpolation doesn't consider depth at all
             # Ideally we'd have a point at every depth boundary  (TODO?)
             # Should be kinda easy?
-            interpolated_cut_sequences = [interpolate_cut_sequence(cut_sequence) for cut_sequence in cut_sequences]
+            interpolated_cut_sequences = [
+                interpolate_cut_sequence(cut_sequence) for cut_sequence in cut_sequences
+            ]
             cl_points = []
             for cut_sequence in interpolated_cut_sequences:
                 for point in cut_sequence:
@@ -109,17 +113,22 @@ class Surface3D(FaceBaseOperation):
 
             bottom_height = bb.zmin
             if self.stepdown:
-                depths = list(np.arange(self.top_height + self.stepdown, bottom_height, self.stepdown))
+                depths = list(
+                    np.arange(
+                        self.top_height + self.stepdown, bottom_height, self.stepdown
+                    )
+                )
                 if depths[-1] != bottom_height:
                     depths.append(bottom_height)
             else:
                 depths = [bottom_height]
 
             for i, depth in enumerate(depths):
-
                 # We want to include i-2 - otherwise we get gaps between depths
                 last_last_depth = depths[i - 2] if i > 1 else 0
-                depth_cut_sequences = self._chop_sequences_by_depth(interpolated_cut_sequences, last_last_depth)
+                depth_cut_sequences = self._chop_sequences_by_depth(
+                    interpolated_cut_sequences, last_last_depth
+                )
                 # TODO optimize order of cut sequences to minimize rapid distances
                 # note to self: in zigzag, I guess maintaining the order is the best bet
                 # TODO if there is a new cut sequence within radius of max_step then use it without retracting
@@ -127,10 +136,14 @@ class Surface3D(FaceBaseOperation):
                     cut_start = cut_sequence[0]
                     self.commands.append(Rapid.abs(z=self.job.rapid_height))
                     self.commands.append(Rapid.abs(x=cut_start[0], y=cut_start[1]))
-                    self.commands.append(Rapid.abs(z=self.job.op_safe_height))  # TODO plunge or rapid?
+                    self.commands.append(
+                        Rapid.abs(z=self.job.op_safe_height)
+                    )  # TODO plunge or rapid?
                     self.commands.append(Plunge.abs(z=cut_start[2]))
                     for cut in cut_sequence[1:]:
-                        self.commands.append(Cut.abs(x=cut[0], y=cut[1], z=max(depth, cut[2])))
+                        self.commands.append(
+                            Cut.abs(x=cut[0], y=cut[1], z=max(depth, cut[2]))
+                        )
 
         # for i, base_boundary in enumerate(base_boundaries):
         #    show_object(base_boundary, f'base_boundary-{i}')
@@ -141,20 +154,22 @@ class Surface3D(FaceBaseOperation):
         # show_object(faces, 'depth_boundary')
 
     @classmethod
-    def shape_to_triangles(cls,
-                           shape: cq.Shape,
-                           tolerance: float = 1e-3,
-                           angular_tolerance: float = 0.1) -> List[Tuple[Tuple[float, float, float], ...]]:
-
+    def shape_to_triangles(
+        cls, shape: cq.Shape, tolerance: float = 1e-3, angular_tolerance: float = 0.1
+    ) -> List[Tuple[Tuple[float, float, float], ...]]:
         # BRepMesh_IncrementalMesh gets mad if you try to pass a Compound to it
         if isinstance(shape, cq.Compound):
             faces = cls.break_compound_to_faces(shape)
             results = []
             for face in faces:
-                results.append(cls.shape_to_triangles(face, tolerance, angular_tolerance))
+                results.append(
+                    cls.shape_to_triangles(face, tolerance, angular_tolerance)
+                )
             return flatten_list(results)
 
-        mesh = BRepMesh_IncrementalMesh(shape.wrapped, tolerance, True, angular_tolerance)
+        mesh = BRepMesh_IncrementalMesh(
+            shape.wrapped, tolerance, True, angular_tolerance
+        )
         mesh.Perform()
 
         explorer = TopExp_Explorer(shape.wrapped, TopAbs_FACE)
@@ -166,7 +181,9 @@ class Surface3D(FaceBaseOperation):
             triangulation = brep_tool.Triangulation_s(shape.wrapped, location)
             for i in range(triangulation.NbTriangles()):
                 triangle = triangulation.Triangle(i + 1)
-                face_triangles = tuple(point_to_tuple(triangulation.Node(node)) for node in triangle.Get())
+                face_triangles = tuple(
+                    point_to_tuple(triangulation.Node(node)) for node in triangle.Get()
+                )
                 triangles.append(face_triangles)
 
             explorer.Next()
@@ -174,7 +191,9 @@ class Surface3D(FaceBaseOperation):
         return triangles
 
     @staticmethod
-    def _chop_sequences_by_depth(sequences: List[List[Tuple[float, float, float]]], last_depth: float):
+    def _chop_sequences_by_depth(
+        sequences: List[List[Tuple[float, float, float]]], last_depth: float
+    ):
         new_sequences = []
         for sequence in sequences:
             new_sequence = []
@@ -194,9 +213,9 @@ def point_to_tuple(point: gp_Pnt) -> Tuple[float, float, float]:
     return point.X(), point.Y(), point.Z()
 
 
-def shape_to_triangles(shape: cq.Shape,
-                       tolerance: float = 1e-3,
-                       angular_tolerance: float = 0.1) -> List[Tuple[Tuple[float, float, float], ...]]:
+def shape_to_triangles(
+    shape: cq.Shape, tolerance: float = 1e-3, angular_tolerance: float = 0.1
+) -> List[Tuple[Tuple[float, float, float], ...]]:
     mesh = BRepMesh_IncrementalMesh(shape.wrapped, tolerance, True, angular_tolerance)
     mesh.Perform()
 
@@ -209,7 +228,9 @@ def shape_to_triangles(shape: cq.Shape,
         triangulation = brep_tool.Triangulation_s(shape.wrapped, location)
         for i in range(triangulation.NbTriangles()):
             triangle = triangulation.Triangle(i + 1)
-            face_triangles = tuple(point_to_tuple(triangulation.Node(node)) for node in triangle.Get())
+            face_triangles = tuple(
+                point_to_tuple(triangulation.Node(node)) for node in triangle.Get()
+            )
             triangles.append(face_triangles)
 
         explorer.Next()

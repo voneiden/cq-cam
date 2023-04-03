@@ -42,4 +42,3 @@ class TestUtils(unittest.TestCase):
             cq.Vector(0, -1, -1),
         )
         self.assertTrue(is_arc_clockwise2(helical_cw_arc))
-

@@ -10,16 +10,20 @@ from cq_cam.utils.utils import is_parallel_plane
 
 class PlaneValidationMixin:
     @staticmethod
-    def validate_plane(job: 'Job', source_workplane: cq.Workplane):
+    def validate_plane(job: "Job", source_workplane: cq.Workplane):
         face_workplane = source_workplane.workplane()
         if not is_parallel_plane(job.top, face_workplane.plane):
-            raise OperationError('Face plane is not parallel with job plane')
+            raise OperationError("Face plane is not parallel with job plane")
         return face_workplane, source_workplane
 
     @staticmethod
     def validate_coplanar(source_workplanes: List[cq.Workplane]):
         # TODO
-        objs = [obj for source_workplane in source_workplanes for obj in source_workplane.objects]
+        objs = [
+            obj
+            for source_workplane in source_workplanes
+            for obj in source_workplane.objects
+        ]
         try:
             cq.Workplane().add(objs).workplane()
         except ValueError as ex:
@@ -29,14 +33,15 @@ class PlaneValidationMixin:
     def validate_face_plane(face: cq.Face):
         adaptor = BRepAdaptor_Surface(face.wrapped)
         if adaptor.GetType() != GeomAbs_SurfaceType.GeomAbs_Plane:
-            raise OperationError("2D operations can only work on flat faces. Given face is not of GeomAbs_Plane")
+            raise OperationError(
+                "2D operations can only work on flat faces. Given face is not of GeomAbs_Plane"
+            )
 
     @staticmethod
     def validate_face_planar(face: cq.Face):
         if not face.geomType() in ("PLANE", "CIRCLE"):
-            raise OperationError(
-                "Given face is not planar"
-            )
+            raise OperationError("Given face is not planar")
+
 
 class ObjectsValidationMixin:
     @staticmethod
@@ -62,4 +67,3 @@ class ObjectsValidationMixin:
     def validate_wires(self, source_workplane: cq.Workplane, count=None):
         self._validate_count(source_workplane, count)
         self._validate_class(source_workplane, cq.Wire)
-

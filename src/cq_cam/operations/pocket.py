@@ -11,7 +11,10 @@ from cadquery import cq
 
 from cq_cam.command import Rapid, Plunge, Cut
 from cq_cam.operations.base_operation import FaceBaseOperation, OperationError
-from src.cq_cam.operations.mixin_operation import PlaneValidationMixin, ObjectsValidationMixin
+from src.cq_cam.operations.mixin_operation import (
+    PlaneValidationMixin,
+    ObjectsValidationMixin,
+)
 from src.cq_cam.operations.strategy import ZigZagStrategy, Strategy
 from cq_cam.utils.utils import WireClipper, flatten_list, flatten_wire_to_closed_2d
 
@@ -20,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(kw_only=True)
 class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
-    """ 2.5D Pocket operation
+    """2.5D Pocket operation
 
     All faces involved must be planes and parallel.
     """
@@ -44,12 +47,16 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
         groups = self._group_faces_by_features(features, coplanar_faces)
 
         for group_faces in groups.values():
-            boundaries = self._boundaries_by_group(group_faces, coplanar_faces, depth_info)
+            boundaries = self._boundaries_by_group(
+                group_faces, coplanar_faces, depth_info
+            )
             for boundary, start_depth, end_depth in boundaries:
                 self.process_boundary(boundary, start_depth, end_depth)
 
     @staticmethod
-    def _group_faces_by_features(features: List[cq.Face], faces: List[Tuple[int, cq.Face]]):
+    def _group_faces_by_features(
+        features: List[cq.Face], faces: List[Tuple[int, cq.Face]]
+    ):
         feat = BRepFeat()
         remaining = faces[:]
         groups = defaultdict(lambda: [])
@@ -64,7 +71,7 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
         return groups
 
     def _discover_pocket_features(self, faces: List[Tuple[int, cq.Face]]):
-        """ Given a list of faces, creates fused feature faces and returns depth information """
+        """Given a list of faces, creates fused feature faces and returns depth information"""
         # Move everything on the same plane
         coplanar_faces = []
         job_zdir = self.job.top.zDir
@@ -86,8 +93,8 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
 
     @staticmethod
     def _combine_coplanar_faces(faces: List[cq.Face]) -> List[cq.Face]:
-        """ Given a list of (coplanar) faces, fuse them together to form
-         bigger faces """
+        """Given a list of (coplanar) faces, fuse them together to form
+        bigger faces"""
 
         # This works also as a sanity check as it will
         # raise if the faces are not coplanar
@@ -100,10 +107,12 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
             explorer.Next()
         return features
 
-    def _boundaries_by_group(self,
-                             group_faces: List[Tuple[int, cq.Face]],
-                             coplanar_faces: List[Tuple[int, cq.Face]],
-                             depth_info: Dict[int, float]):
+    def _boundaries_by_group(
+        self,
+        group_faces: List[Tuple[int, cq.Face]],
+        coplanar_faces: List[Tuple[int, cq.Face]],
+        depth_info: Dict[int, float],
+    ):
         face_depths = list(set(depth_info.values()))
         face_depths.sort()
         face_depths.reverse()
@@ -111,11 +120,17 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
         boundaries = []
         group_i = [i for i, _ in group_faces]
         for face_depth in face_depths:
-            depth_i = [i for i, depth in depth_info.items() if depth <= face_depth and i in group_i]
-            feature_faces = [f for i, f in coplanar_faces if i in depth_i and i in group_i]
+            depth_i = [
+                i
+                for i, depth in depth_info.items()
+                if depth <= face_depth and i in group_i
+            ]
+            feature_faces = [
+                f for i, f in coplanar_faces if i in depth_i and i in group_i
+            ]
             if not feature_faces:
                 # Probably a bug
-                logger.warning('Empty feature faces encountered')
+                logger.warning("Empty feature faces encountered")
                 continue
             features = self._combine_coplanar_faces(feature_faces)
             assert len(features) == 1
@@ -126,26 +141,37 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
 
     def _generate_depths(self, start_depth: float, end_depth: float):
         if self.stepdown:
-            depths = list(np.arange(start_depth - self.stepdown, end_depth, -self.stepdown))
+            depths = list(
+                np.arange(start_depth - self.stepdown, end_depth, -self.stepdown)
+            )
             if depths[-1] != end_depth:
                 depths.append(end_depth)
             return depths
         else:
             return [end_depth]
 
-    def _apply_avoid(self, outer_subject_wires, inner_subject_wires, avoid_objs, outer_offset, inner_offset):
+    def _apply_avoid(
+        self,
+        outer_subject_wires,
+        inner_subject_wires,
+        avoid_objs,
+        outer_offset,
+        inner_offset,
+    ):
         avoid_clip = WireClipper()
         for o in avoid_objs:
             if isinstance(o, cq.Face):
                 # Use reverse offsets because avoid is like an anti-pocket
                 outer_avoid_wires = o.outerWire().offset2D(inner_offset)
-                inner_avoid_wires = flatten_list([wire.offset2D(outer_offset) for wire in o.innerWires()])
+                inner_avoid_wires = flatten_list(
+                    [wire.offset2D(outer_offset) for wire in o.innerWires()]
+                )
             elif isinstance(o, cq.Wire):
                 # TODO check this
                 outer_avoid_wires = o.offset2D(inner_offset)
                 inner_avoid_wires = []
             else:
-                raise OperationError('Avoid can only be a wire or a face')
+                raise OperationError("Avoid can only be a wire or a face")
 
             for wire in outer_avoid_wires + inner_avoid_wires:
                 avoid_clip.add_clip_wire(wire)
@@ -153,13 +179,17 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
         for outer_subject in outer_subject_wires:
             avoid_clip.add_subject_wire(outer_subject)
 
-        outer_boundaries = [list(boundary) for boundary in avoid_clip.execute_difference()]
+        outer_boundaries = [
+            list(boundary) for boundary in avoid_clip.execute_difference()
+        ]
         avoid_clip.reset()
 
         for inner_subject in inner_subject_wires:
             avoid_clip.add_subject_wire(inner_subject)
 
-        inner_boundaries = [list(boundary) for boundary in avoid_clip.execute_difference()]
+        inner_boundaries = [
+            list(boundary) for boundary in avoid_clip.execute_difference()
+        ]
 
         return outer_boundaries, inner_boundaries
 
@@ -172,12 +202,18 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
 
         # Prepare profile paths
         tool_radius = self._tool_diameter / 2
-        outer_wire_offset = tool_radius * self.outer_boundary_offset[0] + self.outer_boundary_offset[1]
-        inner_wire_offset = tool_radius * self.inner_boundary_offset[0] + self.inner_boundary_offset[1]
+        outer_wire_offset = (
+            tool_radius * self.outer_boundary_offset[0] + self.outer_boundary_offset[1]
+        )
+        inner_wire_offset = (
+            tool_radius * self.inner_boundary_offset[0] + self.inner_boundary_offset[1]
+        )
 
         # These are the profile paths. They are done very last as a finishing pass
         outer_profiles = face.outerWire().offset2D(outer_wire_offset)
-        inner_profiles = flatten_list([wire.offset2D(inner_wire_offset) for wire in face.innerWires()])
+        inner_profiles = flatten_list(
+            [wire.offset2D(inner_wire_offset) for wire in face.innerWires()]
+        )
 
         # Prepare primary clearing regions
         if self.boundary_final_pass_stepover is None:
@@ -186,14 +222,16 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
 
         # Generate the primary clearing regions with stepover from the above profiles
         # TODO these offsets can fail!
-        outer_boundaries = flatten_list([wire.offset2D(-final_pass_offset) for wire in outer_profiles])
+        outer_boundaries = flatten_list(
+            [wire.offset2D(-final_pass_offset) for wire in outer_profiles]
+        )
         inner_boundaries = []
         for inner_wire in inner_profiles:
             try:
                 inner_boundaries.append(inner_wire.offset2D(final_pass_offset))
             except ValueError:
                 # TODO failure mode
-                logger.warning('Failed to offset wire')
+                logger.warning("Failed to offset wire")
                 continue
         inner_boundaries = flatten_list(inner_boundaries)
         # TODO apply "avoid" here using wire clipper? or in the strategy?
@@ -206,7 +244,7 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
                 inner_profiles,
                 objs,
                 outer_wire_offset,
-                inner_wire_offset
+                inner_wire_offset,
             )
 
             outer_boundaries, inner_boundaries = self._apply_avoid(
@@ -214,7 +252,7 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
                 inner_boundaries,
                 objs,
                 outer_wire_offset - final_pass_offset,
-                inner_wire_offset + final_pass_offset
+                inner_wire_offset + final_pass_offset,
             )
 
         cut_sequences = self.strategy.process(self, outer_boundaries, inner_boundaries)
@@ -222,8 +260,14 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
             cut_sequences += outer_profiles
             cut_sequences += inner_profiles
         else:
-            outer_polygons = tuple(flatten_wire_to_closed_2d(outer_profile) for outer_profile in outer_profiles)
-            inner_polygons = tuple(flatten_wire_to_closed_2d(inner_profile) for inner_profile in inner_profiles)
+            outer_polygons = tuple(
+                flatten_wire_to_closed_2d(outer_profile)
+                for outer_profile in outer_profiles
+            )
+            inner_polygons = tuple(
+                flatten_wire_to_closed_2d(inner_profile)
+                for inner_profile in inner_profiles
+            )
             cut_sequences += outer_polygons
             cut_sequences += inner_polygons
 
@@ -232,7 +276,9 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
                 cut_start = cut_sequence[0]
                 self.commands.append(Rapid.abs(z=self.clearance_height))
                 self.commands.append(Rapid.abs(x=cut_start[0], y=cut_start[1]))
-                self.commands.append(Rapid.abs(z=self.top_height))  # TODO plunge or rapid?
+                self.commands.append(
+                    Rapid.abs(z=self.top_height)
+                )  # TODO plunge or rapid?
                 self.commands.append(Plunge.abs(z=depth))
                 for cut in cut_sequence[1:]:
                     self.commands.append(Cut.abs(x=cut[0], y=cut[1]))

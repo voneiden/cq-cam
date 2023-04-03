@@ -37,7 +37,7 @@ def edge_start_point(edge: cq.Edge, precision=3) -> cq.Vector:
 def edge_oriented_param(edge: cq.Edge, p1, p2):
     orientation = edge.wrapped.Orientation()
     if orientation == TopAbs_REVERSED:
-        return (1-p2), (1-p1), True
+        return (1 - p2), (1 - p1), True
     return p1, p2, False
 
 
@@ -55,7 +55,9 @@ def vertex_to_vector(vertex: TopoDS_Shape) -> cq.Vector:
 
 
 def orient_vector(vector: cq.Vector, plane: cq.Plane):
-    return cq.Vector(plane.xDir.dot(vector), plane.yDir.dot(vector), plane.zDir.dot(vector))
+    return cq.Vector(
+        plane.xDir.dot(vector), plane.yDir.dot(vector), plane.zDir.dot(vector)
+    )
 
 
 def drop_z(vector: cq.Vector) -> Tuple[float, float]:
@@ -69,9 +71,7 @@ def flatten_wire_to_closed_2d(wire: cq.Wire):
 
 
 def vectors_to_xy(plane: cq.Plane, *vectors: cq.Vector):
-    return tuple((plane.xDir.dot(vector),
-                  plane.yDir.dot(vector))
-                 for vector in vectors)
+    return tuple((plane.xDir.dot(vector), plane.yDir.dot(vector)) for vector in vectors)
 
 
 def position_space(edge: cq.Edge, tolerance=0.1):
@@ -107,7 +107,9 @@ def flatten_wire(wire: cq.Wire) -> List[cq.Vector]:
 def is_arc_clockwise(start: cq.Vector, mid: cq.Vector, end: cq.Vector):
     # https://stackoverflow.com/questions/33960924/is-arc-clockwise-or-counter-clockwise
     if start.z != mid.z:
-        raise NotImplementedError('Helical arcs not supported yet', start.z, mid.z, end.z)
+        raise NotImplementedError(
+            "Helical arcs not supported yet", start.z, mid.z, end.z
+        )
 
     # start -> end
     se = (end.x - start.x, end.y - start.y)
@@ -126,7 +128,7 @@ def is_arc_clockwise2(arc: cq.Edge):
     normal = arc.normal()
     # TODO support other axes besides Z?
     if normal.z == 0:
-        raise RuntimeError('Only Z axis arcs are supported')
+        raise RuntimeError("Only Z axis arcs are supported")
     if arc.wrapped.Orientation() == TopAbs_REVERSED:
         return normal.z > 0
     return normal.z < 0
@@ -204,7 +206,9 @@ class WireClipper:
         self._pt_clip_cache = []
 
     def add_clip_wire(self, wire: cq.Wire, cache=True):
-        return self._add_wire(wire, pyclipper.PT_CLIP, cache=cache, is_closed=wire.IsClosed())
+        return self._add_wire(
+            wire, pyclipper.PT_CLIP, cache=cache, is_closed=wire.IsClosed()
+        )
 
     def add_subject_wire(self, wire: cq.Wire, is_closed=None):
         is_closed = is_closed if is_closed is not None else wire.IsClosed()
@@ -218,13 +222,19 @@ class WireClipper:
         self._add_path(pyclipper.scale_to_clipper(polygon), pt, is_closed, cache)
         return polygon
 
-    def add_clip_polygon(self, polygon: Iterable[Tuple[float, float]], is_closed=False, cache=False):
+    def add_clip_polygon(
+        self, polygon: Iterable[Tuple[float, float]], is_closed=False, cache=False
+    ):
         return self._add_polygon(polygon, pyclipper.PT_CLIP, is_closed, cache)
 
-    def add_subject_polygon(self, polygon: Iterable[Tuple[float, float]], is_closed=False):
+    def add_subject_polygon(
+        self, polygon: Iterable[Tuple[float, float]], is_closed=False
+    ):
         return self._add_polygon(polygon, pyclipper.PT_SUBJECT, is_closed)
 
-    def _add_polygon(self, polygon: Iterable[Tuple[float, float]], pt, is_closed=False, cache=False):
+    def _add_polygon(
+        self, polygon: Iterable[Tuple[float, float]], pt, is_closed=False, cache=False
+    ):
         self._add_path(pyclipper.scale_to_clipper(polygon), pt, is_closed, cache)
 
     def _add_path(self, path, pt, closed, cache):
@@ -240,44 +250,53 @@ class WireClipper:
     def bounds(self):
         bounds: pyclipper.PyIntRect = self._clipper.GetBounds()
         return {
-            'left': pyclipper.scale_from_clipper(bounds.left),
-            'top': pyclipper.scale_from_clipper(bounds.top),
-            'right': pyclipper.scale_from_clipper(bounds.right),
-            'bottom': pyclipper.scale_from_clipper(bounds.bottom),
+            "left": pyclipper.scale_from_clipper(bounds.left),
+            "top": pyclipper.scale_from_clipper(bounds.top),
+            "right": pyclipper.scale_from_clipper(bounds.right),
+            "bottom": pyclipper.scale_from_clipper(bounds.bottom),
         }
 
     def max_bounds(self):
         bounds = self.bounds()
         diagonal_length = self._bounds_diagonal_length(bounds)
         half_diagonal = diagonal_length / 2
-        x_center = (bounds['left'] + bounds['right']) / 2
-        y_center = (bounds['top'] + bounds['bottom']) / 2
+        x_center = (bounds["left"] + bounds["right"]) / 2
+        y_center = (bounds["top"] + bounds["bottom"]) / 2
 
         return {
-            'left': math.floor(x_center - half_diagonal),
-            'top': math.ceil(y_center + half_diagonal),
-            'right': math.ceil(x_center + half_diagonal),
-            'bottom': math.floor(y_center - half_diagonal),
+            "left": math.floor(x_center - half_diagonal),
+            "top": math.ceil(y_center + half_diagonal),
+            "right": math.ceil(x_center + half_diagonal),
+            "bottom": math.floor(y_center - half_diagonal),
         }
 
     def _bounds_diagonal_length(self, bounds=None):
         bounds = bounds if bounds else self.bounds()
-        top_left = cq.Vector(bounds['left'], bounds['top'])
-        bottom_right = cq.Vector(bounds['right'], bounds['bottom'])
+        top_left = cq.Vector(bounds["left"], bounds["top"])
+        bottom_right = cq.Vector(bounds["right"], bounds["bottom"])
         diagonal = top_left.sub(bottom_right)
         return diagonal.Length
 
-    def execute(self, clip_type=pyclipper.CT_INTERSECTION) -> Tuple[Tuple[Tuple[float, float], Tuple[float, float]]]:
+    def execute(
+        self, clip_type=pyclipper.CT_INTERSECTION
+    ) -> Tuple[Tuple[Tuple[float, float], Tuple[float, float]]]:
         # TODO detect if there's nothing to do?
         polytree = self._clipper.Execute2(clip_type)
         # TODO option to return nested structure?
-        open_paths = pyclipper.scale_from_clipper(pyclipper.OpenPathsFromPolyTree(polytree))
-        closed_paths = pyclipper.scale_from_clipper(pyclipper.ClosedPathsFromPolyTree(polytree))
+        open_paths = pyclipper.scale_from_clipper(
+            pyclipper.OpenPathsFromPolyTree(polytree)
+        )
+        closed_paths = pyclipper.scale_from_clipper(
+            pyclipper.ClosedPathsFromPolyTree(polytree)
+        )
         # noinspection PyTypeChecker
         for closed_path in closed_paths:
             closed_path.append(closed_path[0])
 
-        return tuple(tuple(tuple(point) for point in path) for path in (closed_paths + open_paths))
+        return tuple(
+            tuple(tuple(point) for point in path)
+            for path in (closed_paths + open_paths)
+        )
 
     def execute_difference(self):
         return self.execute(pyclipper.CT_DIFFERENCE)
@@ -359,7 +378,9 @@ def project_face(face: cq.Face, projection_dir=(0, 0, 1)) -> cq.Face:
     visible_wires = cq.Wire.combine(visible_shapes)
 
     # Calculate Area for each wire and use the biggest as the outer wire of the final result
-    wires_with_area = [(cq.Face.makeFromWires(wire).Area(), wire) for wire in visible_wires]
+    wires_with_area = [
+        (cq.Face.makeFromWires(wire).Area(), wire) for wire in visible_wires
+    ]
     wires_with_area.sort(key=lambda v: v[0], reverse=True)
 
     wires = [wire for (_, wire) in wires_with_area]
@@ -385,7 +406,7 @@ def extract_wires(shape: Union[cq.Workplane, List[cq.Shape]]):
             outers.append(shape_obj.outerWire())
             inners += shape_obj.innerWires()
         else:
-            raise ValueError(f'Unsupported shape {type(shape_obj)}')
+            raise ValueError(f"Unsupported shape {type(shape_obj)}")
 
     return outers, inners
 
@@ -419,7 +440,6 @@ def filter_edges_below_plane(edges: List[cq.Edge], plane: cq.Plane):
 
 
 def optimize_float(v: float):
-    """ Drop trailing zeroes from a float that is exactly an int to save some bytes in the gcode """
+    """Drop trailing zeroes from a float that is exactly an int to save some bytes in the gcode"""
     iv = int(v)
     return iv if v == iv else v
-

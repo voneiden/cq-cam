@@ -13,7 +13,7 @@ from cq_cam.visualize import to_occ_color
 
 
 class CommandVector(ABC):
-    __slots__ = ('x', 'y', 'z')
+    __slots__ = ("x", "y", "z")
 
     def __init__(self, x=None, y=None, z=None):
         self.x = x
@@ -59,7 +59,7 @@ class AbsoluteCV(CommandVector):
 class Command(ABC):
     modal = None
     max_depth: Optional[float]
-    ais_color = to_occ_color('red')
+    ais_color = to_occ_color("red")
     end: CommandVector
     tab: bool  # TODO not the right place to carry tab information imo?
 
@@ -81,7 +81,7 @@ class Command(ABC):
     def print_modal(self, previous: Optional[Command]):
         if self.modal and (previous is None or previous.modal != self.modal):
             return self.modal
-        return ''
+        return ""
 
     def xyz_gcode(self, start: cq.Vector, precision=3) -> (str, cq.Vector):
         coords = []
@@ -91,19 +91,21 @@ class Command(ABC):
         # TODO use isclose
 
         if start.x != end.x:
-            coords.append(f'X{optimize_float(round(end.x, precision))}')
+            coords.append(f"X{optimize_float(round(end.x, precision))}")
 
         if start.y != end.y:
-            coords.append(f'Y{optimize_float(round(end.y, precision))}')
+            coords.append(f"Y{optimize_float(round(end.y, precision))}")
 
         if start.z != end.z:
-            coords.append(f'Z{optimize_float(round(end.z, precision))}')
+            coords.append(f"Z{optimize_float(round(end.z, precision))}")
 
-        return ''.join(coords), end
+        return "".join(coords), end
 
     @abstractmethod
-    def to_gcode(self, previous_command: Union[Command, None], start: cq.Vector) -> (str, cq.Vector):
-        """ Output all the necessary G-Code required to perform the command """
+    def to_gcode(
+        self, previous_command: Union[Command, None], start: cq.Vector
+    ) -> (str, cq.Vector):
+        """Output all the necessary G-Code required to perform the command"""
         pass
 
     @abstractmethod
@@ -112,17 +114,21 @@ class Command(ABC):
 
 
 class ReferencePosition(Command):
-    def to_gcode(self, previous_command: Union[Command, None], start: cq.Vector) -> (str, cq.Vector):
-        raise RuntimeError('Reference position may not generate gcode')
+    def to_gcode(
+        self, previous_command: Union[Command, None], start: cq.Vector
+    ) -> (str, cq.Vector):
+        raise RuntimeError("Reference position may not generate gcode")
 
     def to_ais_shape(self, start: cq.Vector, as_edges=False) -> (AIS_Shape, cq.Vector):
-        raise RuntimeError('Reference position may not generate shape')
+        raise RuntimeError("Reference position may not generate shape")
 
 
 class Linear(Command, ABC):
-    def to_gcode(self, previous_command: Optional[Command], start: cq.Vector) -> Tuple[str, cq.Vector]:
+    def to_gcode(
+        self, previous_command: Optional[Command], start: cq.Vector
+    ) -> Tuple[str, cq.Vector]:
         xyz, end = self.xyz_gcode(start)
-        return f'{self.print_modal(previous_command)}{xyz}', end
+        return f"{self.print_modal(previous_command)}{xyz}", end
 
     def to_ais_shape(self, start, as_edges=False):
         end = self.end.to_vector(start)
@@ -133,8 +139,7 @@ class Linear(Command, ABC):
             return cq.Edge.makeLine(start, end), end
 
         shape = AIS_Line(
-            Geom_CartesianPoint(start.toPnt()),
-            Geom_CartesianPoint(end.toPnt())
+            Geom_CartesianPoint(start.toPnt()), Geom_CartesianPoint(end.toPnt())
         )
         if self.arrow:
             shape.Attributes().SetLineArrowDraw(True)
@@ -147,22 +152,22 @@ class Linear(Command, ABC):
 
 
 class Rapid(Linear):
-    modal = 'G0'
-    ais_color = to_occ_color('green')
+    modal = "G0"
+    ais_color = to_occ_color("green")
 
 
 class Cut(Linear):
-    modal = 'G1'
+    modal = "G1"
 
 
 class Plunge(Cut):
-    ais_color = to_occ_color('yellow')
+    ais_color = to_occ_color("yellow")
 
     # TODO apply plunge feed rate
 
     def __init__(self, end, **kwargs):
         if end.x is not None or end.y is not None:
-            raise RuntimeError('Plunge can only operate on z axis')
+            raise RuntimeError("Plunge can only operate on z axis")
         super().__init__(end, **kwargs)
 
     @classmethod
@@ -176,12 +181,13 @@ class Plunge(Cut):
 
 
 class Retract(Rapid):
-    """ Rapid retract """
-    ais_color = to_occ_color('blue')
+    """Rapid retract"""
+
+    ais_color = to_occ_color("blue")
 
     def __init__(self, end, **kwargs):
         if end.x is not None or end.y is not None:
-            raise RuntimeError('Retract can only operate on z axis')
+            raise RuntimeError("Retract can only operate on z axis")
         super().__init__(end, **kwargs)
 
     @classmethod
@@ -196,12 +202,15 @@ class Retract(Rapid):
 
 # CIRCULAR MOTION
 
+
 class Circular(Command, ABC):
     end: CommandVector
     center: CommandVector
     mid: CommandVector
 
-    def __init__(self, end: CommandVector, center: CommandVector, mid: CommandVector, **kwargs):
+    def __init__(
+        self, end: CommandVector, center: CommandVector, mid: CommandVector, **kwargs
+    ):
         super().__init__(end, **kwargs)
         self.center = center
         self.mid = mid
@@ -214,20 +223,22 @@ class Circular(Command, ABC):
 
         ijk = []
         if self.center.x is not None:
-            ijk.append(f'I{i}')
+            ijk.append(f"I{i}")
 
         if self.center.y is not None:
-            ijk.append(f'J{j}')
+            ijk.append(f"J{j}")
 
         if self.center.z is not None:
-            ijk.append(f'K{k}')
+            ijk.append(f"K{k}")
 
-        return ''.join(ijk)
+        return "".join(ijk)
 
-    def to_gcode(self, previous_command: Optional[Command], start: cq.Vector) -> Tuple[str, cq.Vector]:
+    def to_gcode(
+        self, previous_command: Optional[Command], start: cq.Vector
+    ) -> Tuple[str, cq.Vector]:
         xyz, end = self.xyz_gcode(start)
         ijk = self.ijk_gcode(start)
-        return f'{self.print_modal(previous_command)}{xyz}{ijk}', end
+        return f"{self.print_modal(previous_command)}{xyz}{ijk}", end
 
     def to_ais_shape(self, start, as_edges=False):
         end = self.end.to_vector(start)
@@ -248,8 +259,8 @@ class Circular(Command, ABC):
 
 
 class CircularCW(Circular):
-    modal = 'G2'
+    modal = "G2"
 
 
 class CircularCCW(Circular):
-    modal = 'G3'
+    modal = "G3"

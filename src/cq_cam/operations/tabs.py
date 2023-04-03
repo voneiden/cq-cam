@@ -32,17 +32,14 @@ class NoTabs(Tabs):
         pass
 
     def edge_tab_transitions(self, edge_index):
-        return [
-            (0, Transition.NORMAL),
-            (1, Transition.NORMAL)
-        ]
+        return [(0, Transition.NORMAL), (1, Transition.NORMAL)]
 
 
 class EdgeTabs(Tabs):
     def __init__(self, *, spacing: float, width: float, height: float, only=None):
         super().__init__(width=width, height=height)
         if spacing <= width:
-            raise ValueError('Spacing must be larger than tab width')
+            raise ValueError("Spacing must be larger than tab width")
         self.edges_ds = None
         self.spacing = spacing
         self.only = only
@@ -165,9 +162,9 @@ class WireTabs(Tabs):
 
 
 # TODO WireTabs EdgeTabs+ .,n
-if 'show_object' in locals() or __name__ == '__main__':
+if "show_object" in locals() or __name__ == "__main__":
     box = cq.Workplane().box(5, 5, 5)
-    bottom = box.wires('<Z')
+    bottom = box.wires("<Z")
     tabs = Tabs(1, 1, 4)
     tabs.process(bottom.objects[0])
-    show_object(box, 'box')
+    show_object(box, "box")

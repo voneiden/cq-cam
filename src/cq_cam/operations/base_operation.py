@@ -18,7 +18,7 @@ class OperationError(Exception):
 
 @dataclass
 class Operation(ABC):
-    job: 'Job'
+    job: "Job"
     """ The `Job` which this task belongs to.
     """
 
@@ -62,8 +62,11 @@ class Operation(ABC):
 
     @staticmethod
     def combine_faces(faces: List[cq.Face]) -> List[Union[cq.Compound, cq.Face]]:
-        return [compound for compound in cq.Workplane().add(faces).combine().objects if
-                isinstance(compound, cq.Compound) or isinstance(compound, cq.Face)]
+        return [
+            compound
+            for compound in cq.Workplane().add(faces).combine().objects
+            if isinstance(compound, cq.Compound) or isinstance(compound, cq.Face)
+        ]
 
     @classmethod
     def combine_faces_and_break(cls, faces: List[cq.Face]) -> List[List[cq.Face]]:
@@ -94,8 +97,7 @@ class Operation(ABC):
 
 @dataclass
 class FaceBaseOperation(Operation, ABC):
-    """ Base class for any operation that operates primarily on face(s)
-    """
+    """Base class for any operation that operates primarily on face(s)"""
 
     _op_o_shapes = Union[cq.Wire, cq.Face]
 
@@ -156,30 +158,45 @@ class FaceBaseOperation(Operation, ABC):
             elif isinstance(obj, cq.Wire):
                 faces.append(cq.Face.makeFromWires(obj))
             else:
-                raise OperationError(f'Object type "{type(obj)}" not supported by a face operation')
+                raise OperationError(
+                    f'Object type "{type(obj)}" not supported by a face operation'
+                )
 
         if not faces:
-            raise OperationError(f'{name} selection must contain at least one face or wire')
+            raise OperationError(
+                f"{name} selection must contain at least one face or wire"
+            )
 
         return faces
 
     @property
     def _faces(self):
-        return self._wp_to_faces('o', self.o)
+        return self._wp_to_faces("o", self.o)
 
     @property
     def _avoid(self):
-        return self._wp_to_faces('avoid', self.avoid)
+        return self._wp_to_faces("avoid", self.avoid)
 
     def offset_boundary(self, boundary: cq.Face) -> List[cq.Face]:
         assert boundary.geomType() in ("PLANE", "CIRCLE")
 
-        outer_offset = self._tool_diameter * self.outer_boundary_offset[0] + self.outer_boundary_offset[1]
-        inner_offset = self._tool_diameter * self.inner_boundary_offset[0] + self.inner_boundary_offset[1]
+        outer_offset = (
+            self._tool_diameter * self.outer_boundary_offset[0]
+            + self.outer_boundary_offset[1]
+        )
+        inner_offset = (
+            self._tool_diameter * self.inner_boundary_offset[0]
+            + self.inner_boundary_offset[1]
+        )
 
         outer_wires = boundary.outerWire().offset2D(outer_offset)
-        inner_wires = [] if inner_offset is None else flatten_list(
-            [inner.offset2D(inner_offset) for inner in boundary.innerWires()])
+        inner_wires = (
+            []
+            if inner_offset is None
+            else flatten_list(
+                [inner.offset2D(inner_offset) for inner in boundary.innerWires()]
+            )
+        )
 
         outer_faces = [cq.Face.makeFromWires(wire) for wire in outer_wires]
         inner_faces = [cq.Face.makeFromWires(wire) for wire in inner_wires]

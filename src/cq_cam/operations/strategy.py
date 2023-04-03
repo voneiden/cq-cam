@@ -4,7 +4,12 @@ from typing import List, Tuple, Dict
 import cadquery as cq
 import numpy as np
 from cq_cam.utils.linked_polygon import LinkedPolygon
-from cq_cam.utils.utils import WireClipper, pairwise, dist_to_segment_squared, cached_dist2
+from cq_cam.utils.utils import (
+    WireClipper,
+    pairwise,
+    dist_to_segment_squared,
+    cached_dist2,
+)
 
 Scanpoint = Tuple[float, float]
 Scanline = List[Scanpoint]
@@ -18,7 +23,9 @@ class Strategy:
         raise NotImplementedError()
 
     @staticmethod
-    def _pick_nearest(point: Tuple[float, float], options: List[Tuple[float, float]]) -> Tuple[float, float]:
+    def _pick_nearest(
+        point: Tuple[float, float], options: List[Tuple[float, float]]
+    ) -> Tuple[float, float]:
         nearest = (cached_dist2(point, options[0]), options[0])
         for option in options[1:]:
             dist2 = cached_dist2(point, option)
@@ -27,7 +34,9 @@ class Strategy:
         return nearest[1]
 
     @classmethod
-    def _sort_clipper_output(cls, output_paths: Tuple[Tuple[Tuple[float, float], Tuple[float, float]]]):
+    def _sort_clipper_output(
+        cls, output_paths: Tuple[Tuple[Tuple[float, float], Tuple[float, float]]]
+    ):
         paths = [output_paths[0]]
         point = output_paths[0][-1]
         for path in output_paths[1:]:
@@ -75,8 +84,16 @@ class ZigZagStrategy(Strategy):
         max_bounds = clipper.max_bounds()
 
         # Generate ZigZag scanlines
-        y_scanpoints = list(np.arange(max_bounds['bottom'], max_bounds['top'], task._tool_diameter * task.stepover))
-        scanline_templates = [((max_bounds['left'], y), (max_bounds['right'], y)) for y in y_scanpoints]
+        y_scanpoints = list(
+            np.arange(
+                max_bounds["bottom"],
+                max_bounds["top"],
+                task._tool_diameter * task.stepover,
+            )
+        )
+        scanline_templates = [
+            ((max_bounds["left"], y), (max_bounds["right"], y)) for y in y_scanpoints
+        ]
 
         for scanline_template in scanline_templates:
             clipper.add_subject_polygon(scanline_template)
@@ -85,13 +102,19 @@ class ZigZagStrategy(Strategy):
 
         scanpoint_to_scanline, scanpoints = cls._scanline_end_map(scanlines)
 
-        linked_polygons, scanpoint_to_linked_polygon = cls._link_scanpoints_to_boundaries(
-            scanpoints, outer_polygons + inner_polygons)
+        (
+            linked_polygons,
+            scanpoint_to_linked_polygon,
+        ) = cls._link_scanpoints_to_boundaries(
+            scanpoints, outer_polygons + inner_polygons
+        )
 
-        cut_sequences = cls._route_zig_zag(linked_polygons,
-                                           scanlines,
-                                           scanpoint_to_linked_polygon,
-                                           scanpoint_to_scanline)
+        cut_sequences = cls._route_zig_zag(
+            linked_polygons,
+            scanlines,
+            scanpoint_to_linked_polygon,
+            scanpoint_to_scanline,
+        )
         return cut_sequences
 
     @staticmethod
@@ -107,8 +130,9 @@ class ZigZagStrategy(Strategy):
         return scanline_end_map, scanpoints
 
     @staticmethod
-    def _link_scanpoints_to_boundaries(scanpoints: List[Scanpoint],
-                                       boundaries: List[List[Tuple[float, float]]]):
+    def _link_scanpoints_to_boundaries(
+        scanpoints: List[Scanpoint], boundaries: List[List[Tuple[float, float]]]
+    ):
         remaining_scanpoints = scanpoints[:]
         scanpoint_to_linked_polygon = {}
         linked_polygons = []
@@ -128,12 +152,12 @@ class ZigZagStrategy(Strategy):
         return linked_polygons, scanpoint_to_linked_polygon
 
     @staticmethod
-    def _route_zig_zag(linked_polygons: List[LinkedPolygon],
-                       scanlines: Tuple[Tuple[Tuple[float, float], Tuple[float, float]]],
-                       scanpoint_to_linked_polygon: Dict[Tuple[float, float], LinkedPolygon],
-                       scanpoint_to_scanline: Dict[Tuple[float, float], List[Tuple[float, float]]]) -> List[
-        List[Tuple[float, float]]]:
-
+    def _route_zig_zag(
+        linked_polygons: List[LinkedPolygon],
+        scanlines: Tuple[Tuple[Tuple[float, float], Tuple[float, float]]],
+        scanpoint_to_linked_polygon: Dict[Tuple[float, float], LinkedPolygon],
+        scanpoint_to_scanline: Dict[Tuple[float, float], List[Tuple[float, float]]],
+    ) -> List[List[Tuple[float, float]]]:
         # Prepare to route the zigzag
         for linked_polygon in linked_polygons:
             linked_polygon.reset()
@@ -180,7 +204,9 @@ class ContourStrategy(Strategy):
     """
 
     @classmethod
-    def process(cls, task, outer_boundaries: List[cq.Wire], inner_boundaries: List[cq.Wire]):
+    def process(
+        cls, task, outer_boundaries: List[cq.Wire], inner_boundaries: List[cq.Wire]
+    ):
         # We generate shrinking contours from all the outer boundaries
         offset_step = -abs(task._tool_diameter * task.stepover)
         clipper = WireClipper()
@@ -198,7 +224,7 @@ class ContourStrategy(Strategy):
                 try:
                     new_sub_contours = contour.offset2D(offset_step)
                 except ValueError:
-                    logger.warning('Failed to do subcontour')
+                    logger.warning("Failed to do subcontour")
                     continue
                 for new_sub_contour in new_sub_contours:
                     clipper.add_subject_wire(new_sub_contour)
