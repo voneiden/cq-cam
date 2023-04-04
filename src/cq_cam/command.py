@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import warnings
 from abc import ABC, abstractmethod
-from typing import Union, Optional, Tuple
+from typing import Optional, Tuple, Union
 
 import cadquery as cq
-from OCP.AIS import AIS_Shape, AIS_Line
+from OCP.AIS import AIS_Line, AIS_Shape
 from OCP.Geom import Geom_CartesianPoint
 
 from cq_cam.utils.utils import optimize_float

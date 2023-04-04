@@ -2,7 +2,7 @@ import unittest
 
 import cadquery as cq
 
-from cq_cam.command import Cut, CircularCW, AbsoluteCV, CircularCCW
+from cq_cam.command import AbsoluteCV, CircularCCW, CircularCW, Cut
 
 
 class TestUtils(unittest.TestCase):

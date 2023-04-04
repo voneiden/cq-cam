@@ -1,21 +1,21 @@
 from dataclasses import dataclass
-from typing import Tuple, List
+from typing import List, Tuple
 
 import cadquery as cq
 import numpy as np
 import ocl
 from OCP.BRep import BRep_Tool
 from OCP.BRepMesh import BRepMesh_IncrementalMesh
+from OCP.gp import gp_Pnt
 from OCP.TopAbs import TopAbs_FACE
 from OCP.TopExp import TopExp_Explorer
 from OCP.TopLoc import TopLoc_Location
-from OCP.gp import gp_Pnt
 
-from cq_cam.command import Rapid, Cut, Plunge
+from cq_cam.command import Cut, Plunge, Rapid
 from cq_cam.operations.base_operation import FaceBaseOperation
-from src.cq_cam.operations.strategy import ZigZagStrategy
 from cq_cam.utils import utils
 from cq_cam.utils.utils import flatten_list
+from src.cq_cam.operations.strategy import ZigZagStrategy
 
 
 @dataclass

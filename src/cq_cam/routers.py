@@ -4,12 +4,12 @@ from typing import TYPE_CHECKING, List
 import cadquery as cq
 import numpy as np
 
-from cq_cam.command import Plunge, Rapid, AbsoluteCV, Cut, CircularCW, CircularCCW
+from cq_cam.command import AbsoluteCV, CircularCCW, CircularCW, Cut, Plunge, Rapid
 from cq_cam.utils.utils import (
-    wire_to_ordered_edges,
     edge_end_point,
     edge_start_point,
     is_arc_clockwise2,
+    wire_to_ordered_edges,
 )
 
 if TYPE_CHECKING:

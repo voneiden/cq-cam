@@ -1,21 +1,21 @@
 import itertools
 import math
 from functools import cache
-from typing import List, Tuple, Iterable, Union
+from typing import Iterable, List, Tuple, Union
 
 import numpy as np
 import pyclipper
+from cadquery import Edge, cq
+from cadquery.occ_impl.shapes import TOLERANCE
 from OCP.BRep import BRep_Tool
 from OCP.BRepLib import BRepLib
 from OCP.BRepTools import BRepTools_WireExplorer
+from OCP.gp import gp_Ax2, gp_Dir, gp_Pnt
 from OCP.HLRAlgo import HLRAlgo_Projector
 from OCP.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape
-from OCP.TopAbs import TopAbs_REVERSED, TopAbs_EDGE
+from OCP.TopAbs import TopAbs_EDGE, TopAbs_REVERSED
 from OCP.TopExp import TopExp_Explorer
-from OCP.TopoDS import TopoDS_Shape, TopoDS
-from OCP.gp import gp_Ax2, gp_Pnt, gp_Dir
-from cadquery import cq, Edge
-from cadquery.occ_impl.shapes import TOLERANCE
+from OCP.TopoDS import TopoDS, TopoDS_Shape
 
 
 def edge_end_point(edge: cq.Edge, precision=3) -> cq.Vector:

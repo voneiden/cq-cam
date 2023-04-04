@@ -1,14 +1,15 @@
 import logging
-from typing import List, Tuple, Dict
+from typing import Dict, List, Tuple
 
 import cadquery as cq
 import numpy as np
+
 from cq_cam.utils.linked_polygon import LinkedPolygon
 from cq_cam.utils.utils import (
     WireClipper,
-    pairwise,
-    dist_to_segment_squared,
     cached_dist2,
+    dist_to_segment_squared,
+    pairwise,
 )
 
 Scanpoint = Tuple[float, float]

@@ -1,22 +1,22 @@
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import List, Tuple, Dict
+from typing import Dict, List, Tuple
 
 import numpy as np
+from cadquery import cq
 from OCP.BRepFeat import BRepFeat
 from OCP.TopAbs import TopAbs_FACE
 from OCP.TopExp import TopExp_Explorer
-from cadquery import cq
 
-from cq_cam.command import Rapid, Plunge, Cut
+from cq_cam.command import Cut, Plunge, Rapid
 from cq_cam.operations.base_operation import FaceBaseOperation, OperationError
-from src.cq_cam.operations.mixin_operation import (
-    PlaneValidationMixin,
-    ObjectsValidationMixin,
-)
-from src.cq_cam.operations.strategy import ZigZagStrategy, Strategy
 from cq_cam.utils.utils import WireClipper, flatten_list, flatten_wire_to_closed_2d
+from src.cq_cam.operations.mixin_operation import (
+    ObjectsValidationMixin,
+    PlaneValidationMixin,
+)
+from src.cq_cam.operations.strategy import Strategy, ZigZagStrategy
 
 logger = logging.getLogger(__name__)
 

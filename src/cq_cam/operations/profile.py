@@ -1,7 +1,6 @@
 import itertools
 import logging
-from math import isclose
-from typing import List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Optional
 
 import cadquery as cq
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge
@@ -13,10 +12,10 @@ from cq_cam.operations.tabs import Tabs, Transition
 from cq_cam.routers import route
 from cq_cam.utils.utils import (
     compound_to_edges,
-    wire_to_ordered_edges,
-    edge_oriented_param,
     edge_end_point,
+    edge_oriented_param,
     edge_start_point,
+    wire_to_ordered_edges,
 )
 
 if TYPE_CHECKING:

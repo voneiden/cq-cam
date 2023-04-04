@@ -1,8 +1,8 @@
 from typing import List
 
+from cadquery import cq
 from OCP.BRepAdaptor import BRepAdaptor_Surface
 from OCP.GeomAbs import GeomAbs_SurfaceType
-from cadquery import cq
 
 from cq_cam.operations.base_operation import OperationError
 from cq_cam.utils.utils import is_parallel_plane

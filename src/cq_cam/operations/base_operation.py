@@ -1,14 +1,13 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import List, Union, Optional, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Optional, Tuple, Union
 
+from cadquery import cq
 from OCP.BRepFeat import BRepFeat
 from OCP.TopAbs import TopAbs_FACE
 from OCP.TopExp import TopExp_Explorer
-from cadquery import cq
 
 from cq_cam.command import Command
-
 from cq_cam.utils.utils import flatten_list
 
 
