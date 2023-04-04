@@ -40,3 +40,6 @@ addopts = "-p no:cacheprovider"
 
 [tool.flake8]
 max-line-length = 100
+
+[tool.isort]
+profile = "black"
