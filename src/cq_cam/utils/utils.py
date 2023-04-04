@@ -388,13 +388,16 @@ def project_face(face: cq.Face, projection_dir=(0, 0, 1)) -> cq.Face:
     return cq.Face.makeFromWires(wires[0], wires[1:])
 
 
-def extract_wires(shape: Union[cq.Workplane, List[cq.Shape]]):
+def extract_wires(
+    shape: Union[cq.Workplane, cq.Shape, List[cq.Shape]]
+) -> Tuple[List[cq.Wire], List[cq.Wire]]:
     if isinstance(shape, cq.Workplane):
         return extract_wires(shape.objects)
-    try:
-        shape_objs = [shape_obj for shape_obj in shape]
-    except TypeError:
+
+    if isinstance(shape, cq.Shape):
         shape_objs = [shape]
+    else:
+        shape_objs = [shape_obj for shape_obj in shape]
 
     outers = []
     inners = []

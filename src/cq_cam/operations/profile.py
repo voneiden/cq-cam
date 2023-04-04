@@ -25,42 +25,46 @@ DEBUG = []
 logger = logging.getLogger(__name__)
 
 
+def circle_bug_workaround(source_wire: cq.Wire, target_wires: List[cq.Wire]):
+    """
+    FreeCAD style workaround for
+    https://github.com/CadQuery/cadquery/issues/896
+
+    :param source_wire:
+    :param target_wires:
+    :return:
+    """
+    if len(source_wire.Edges()) == 1:
+        edge = source_wire.Edges()[0]
+        if edge.startPoint() == edge.endPoint():
+            # OCCT bug with offsetting circles!
+            for target in target_wires:
+                target.wrapped.Location(source_wire.wrapped.Location().Inverted())
+
+
 def profile(
     job: "Job",
-    outer_wires: List[cq.Wire] = None,
-    inner_wires: List[cq.Wire] = None,
-    outer_offset: float = 1,
-    inner_offset: float = -1,
+    wire: cq.Wire,
+    offset: float,
     stepdown: Optional[int] = None,
     tabs: Optional[Tabs] = None,
 ):
+    """
+    A 2.5D profile operation
+
+    :param job:
+    :param wire: Wire that will be profiled with offset
+    :param offset: Multiplier for tool radius
+    :param stepdown:
+    :param tabs:
+    :return:
+    """
     # Transform to relative coordinates
-    outers = [outer.transformShape(job.top.fG) for outer in outer_wires]
-    inners = [inner.transformShape(job.top.fG) for inner in inner_wires]
+    wire = wire.transformShape(job.top.fG)
 
     # Generate base features
-    base_features = []
-    if outer_offset is not None:
-        for outer in outers:
-            base_features += outer.offset2D(outer_offset * job.tool_radius)
-
-    if inner_offset is not None:
-        for inner in inners:
-            try:
-                new_inners = inner.offset2D(inner_offset * job.tool_radius)
-                # FreeCAD style workaround for
-                # https://github.com/CadQuery/cadquery/issues/896
-                if len(inner.Edges()) == 1:
-                    edge = inner.Edges()[0]
-                    if edge.startPoint() == edge.endPoint():
-                        # OCCT bug with offsetting circles!
-                        for ni in new_inners:
-                            ni.wrapped.Location(inner.wrapped.Location().Inverted())
-
-                base_features += new_inners
-
-            except ValueError:
-                logger.warning("Failed to do inner offset")
+    base_features = wire.offset2D(offset * job.tool_radius)
+    circle_bug_workaround(wire, base_features)
 
     toolpaths = []
     for base_feature in base_features:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from copy import copy
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from cadquery import cq
 
@@ -67,6 +67,83 @@ class Job:
 
         self.operations: List[Operation] = []
 
+    # ##################
+    # Fluent operations
+    # ##################
+    def profile(
+        self,
+        shape: Union[cq.Workplane, cq.Shape, List[cq.Shape]],
+        outer_offset=1,
+        inner_offset=-1,
+        stepdown=None,
+        tabs=None,
+    ) -> Job:
+        if self.tool_diameter is None:
+            raise ValueError("Profile requires tool_diameter to be est")
+
+        if outer_offset is None and inner_offset is None:
+            raise ValueError('Set at least one of "outer_offset" or "inner_offset"')
+        outer_wires, inner_wires = extract_wires(shape)
+
+        # Prefer inner wires first
+        commands = []
+        if inner_wires and inner_offset is not None:
+            for inner_wire in inner_wires:
+                commands += profile(
+                    job=self,
+                    wire=inner_wire,
+                    offset=inner_offset,
+                    stepdown=stepdown,
+                    tabs=tabs,
+                )
+
+        if outer_wires and outer_offset is not None:
+            for outer_wire in outer_wires:
+                commands += profile(
+                    job=self,
+                    wire=outer_wire,
+                    offset=outer_offset,
+                    stepdown=stepdown,
+                    tabs=tabs,
+                )
+
+        return self._add_operation("Profile", commands)
+
+    def wire_profile(
+        self, wires: cq.Wire | [cq.Wire], offset=1, stepdown=None, tabs=None
+    ):
+        if isinstance(wires, cq.Wire):
+            wires = [wires]
+
+        commands = []
+        for wire in wires:
+            commands += profile(
+                job=self, wire=wire, offset=offset, stepdown=stepdown, tabs=tabs
+            )
+        return self._add_operation("Wire Profile", commands)
+
+    def pocket(self, *args, **kwargs) -> Job:
+        from cq_cam import Pocket
+
+        if self.tool_diameter is None:
+            raise ValueError("Profile requires tool_diameter to be est")
+        if "tool_diameter" not in kwargs:
+            kwargs["tool_diameter"] = self.tool_diameter
+        pocket = Pocket(self, *args, **kwargs)
+        return self._add_operation("Pocket", pocket.commands)
+
+    def drill(self, *args, **kwargs) -> Job:
+        from cq_cam import Drill
+
+        drill = Drill(self, *args, **kwargs)
+        return self._add_operation("Drill", drill.commands)
+
+    def surface3d(self, *args, **kwargs) -> Job:
+        from cq_cam import Surface3D
+
+        surface3d = Surface3D(self, *args, **kwargs)
+        return self._add_operation("Surface 3D", surface3d.commands)
+
     @staticmethod
     def _default_rapid_height(unit: Unit):
         if unit == Unit.METRIC:
@@ -115,46 +192,3 @@ class Job:
         job = copy(self)
         job.operations = [*self.operations, Operation(job, name, commands)]
         return job
-
-    def profile(
-        self, shape, outer_offset=None, inner_offset=None, stepdown=None, tabs=None
-    ):
-        if self.tool_diameter is None:
-            raise ValueError("Profile requires tool_diameter to be est")
-
-        if outer_offset is None and inner_offset is None:
-            raise ValueError('Set at least one of "outer_offset" or "inner_offset"')
-        outer_wires, inner_wires = extract_wires(shape)
-
-        commands = profile(
-            job=self,
-            outer_wires=outer_wires,
-            inner_wires=inner_wires,
-            outer_offset=outer_offset,
-            inner_offset=inner_offset,
-            stepdown=stepdown,
-            tabs=tabs,
-        )
-        return self._add_operation("Profile", commands)
-
-    def pocket(self, *args, **kwargs):
-        from cq_cam import Pocket
-
-        if self.tool_diameter is None:
-            raise ValueError("Profile requires tool_diameter to be est")
-        if "tool_diameter" not in kwargs:
-            kwargs["tool_diameter"] = self.tool_diameter
-        pocket = Pocket(self, *args, **kwargs)
-        return self._add_operation("Pocket", pocket.commands)
-
-    def drill(self, *args, **kwargs):
-        from cq_cam import Drill
-
-        drill = Drill(self, *args, **kwargs)
-        return self._add_operation("Drill", drill.commands)
-
-    def surface3d(self, *args, **kwargs):
-        from cq_cam import Surface3D
-
-        surface3d = Surface3D(self, *args, **kwargs)
-        return self._add_operation("Surface 3D", surface3d.commands)
