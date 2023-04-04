@@ -9,7 +9,7 @@ from OCP.AIS import AIS_Line, AIS_Shape
 from OCP.Geom import Geom_CartesianPoint
 
 from cq_cam.utils.utils import optimize_float
-from cq_cam.visualize import to_occ_color
+from cq_cam.visualize import cached_occ_color
 
 
 class CommandVector(ABC):
@@ -59,7 +59,7 @@ class AbsoluteCV(CommandVector):
 class Command(ABC):
     modal = None
     max_depth: Optional[float]
-    ais_color = to_occ_color("red")
+    ais_color = "red"
     end: CommandVector
     tab: bool  # TODO not the right place to carry tab information imo?
 
@@ -143,7 +143,7 @@ class Linear(Command, ABC):
         )
         if self.arrow:
             shape.Attributes().SetLineArrowDraw(True)
-        shape.SetColor(self.ais_color)
+        shape.SetColor(cached_occ_color(self.ais_color))
         return shape, end
 
     def flip(self, new_end: cq.Vector) -> (Command, cq.Vector):
@@ -153,7 +153,7 @@ class Linear(Command, ABC):
 
 class Rapid(Linear):
     modal = "G0"
-    ais_color = to_occ_color("green")
+    ais_color = "green"
 
 
 class Cut(Linear):
@@ -161,7 +161,7 @@ class Cut(Linear):
 
 
 class Plunge(Cut):
-    ais_color = to_occ_color("yellow")
+    ais_color = "yellow"
 
     # TODO apply plunge feed rate
 
@@ -183,7 +183,7 @@ class Plunge(Cut):
 class Retract(Rapid):
     """Rapid retract"""
 
-    ais_color = to_occ_color("blue")
+    ais_color = "blue"
 
     def __init__(self, end, **kwargs):
         if end.x is not None or end.y is not None:
@@ -254,7 +254,7 @@ class Circular(Command, ABC):
         if as_edges:
             return edge, end
         shape = AIS_Shape(edge.wrapped)
-        shape.SetColor(self.ais_color)
+        shape.SetColor(cached_occ_color(self.ais_color))
         return shape, end
 
 
