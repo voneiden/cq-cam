@@ -1,7 +1,16 @@
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Dict, List, Tuple
+from typing import (
+    Dict,
+    List,
+    Tuple,
+    TYPE_CHECKING,
+    ForwardRef,
+    Union,
+    TypeAlias,
+    Optional,
+)
 
 import numpy as np
 from cadquery import cq
@@ -16,9 +25,149 @@ from src.cq_cam.operations.mixin_operation import (
     ObjectsValidationMixin,
     PlaneValidationMixin,
 )
-from src.cq_cam.operations.strategy import Strategy, ZigZagStrategy
+from src.cq_cam.operations.strategy import Strategy, ZigZagStrategy, ContourStrategy
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from cq_cam.fluent import Job
+
+
+def group_by_depth(wires: List[cq.Wire]):
+    depth_map = defaultdict(list)
+    for wire in wires:
+        wire.po
+
+
+def build_pocket_geometry_layers(
+        top: cq.Plane,
+        op_areas: List[cq.Wire],
+        avoid_areas: List[cq.Wire],
+):
+    return []
+
+
+def pocket(
+        job: "Job",
+        outer_wire: cq.Wire,
+        inner_wires: List[cq.Wire],
+        strategy: Strategy = ContourStrategy,
+        outer_offset: float = -1,
+        inner_offset: float = 1,
+):
+    pass
+
+
+OffsetToolRadiusMultiplier: TypeAlias = float
+OffsetDistance: TypeAlias = float
+OffsetInput: TypeAlias = Union[
+    OffsetToolRadiusMultiplier, Tuple[OffsetToolRadiusMultiplier, OffsetDistance]
+]
+
+
+def calculate_offset(tool_radius: float, offset: Optional[OffsetInput], default=None):
+    if offset is None:
+        return default or 0
+
+    try:
+        multiplier, distance = offset
+        return tool_radius * multiplier + distance
+
+    except TypeError:
+        return tool_radius * offset
+
+
+def offset_face(face: cq.Face, outer_offset: float, inner_offset: float) -> List[cq.Face]:
+    offset_faces = []
+    op_outers = face.outerWire().offset2D(outer_offset)
+    op_inners = []
+    for inner in face.innerWires():
+        op_inners += inner.offset2D(inner_offset)
+    for op_outer in op_outers:
+        offset_faces.append(cq.Face.makeFromWires(op_outer, op_inners))
+    return offset_faces
+
+
+def generate_depth_map(faces: List[cq.Face]):
+    depth_map = defaultdict(list)
+
+    for face in faces:
+        bbox = face.BoundingBox()
+        if bbox.zmin != bbox.zmax:
+            raise ValueError("Face is not parallel")
+        if bbox.zmin > 0:
+            raise ValueError("Face is above job plane")
+
+        depth_map[bbox.zmin].append(face)
+
+    depths = list(depth_map.keys())
+    depths.sort(reverse=True)
+
+    return depth_map, depths
+
+
+def combine_faces(faces: List[cq.Face]) -> List[cq.Face]:
+    """Given a list of faces, fuse them together to form
+    bigger faces"""
+
+    # This works also as a sanity check as it will
+    # raise if the faces are not coplanar
+    wp = cq.Workplane().add(faces).combine()
+    new_faces = []
+    explorer = TopExp_Explorer(wp.objects[0].wrapped, TopAbs_FACE)
+    while explorer.More():
+        face = explorer.Current()
+        new_faces.append(cq.Face(face))
+        explorer.Next()
+    return new_faces
+
+
+def pocket2(
+        job: "Job",
+        op_areas: List[cq.Face],
+        avoid_areas: List[cq.Face],
+        outer_offset: Optional[OffsetInput] = None,
+        inner_offset: Optional[OffsetInput] = None,
+        avoid_outer_offset: Optional[OffsetInput] = None,
+        avoid_inner_offset: Optional[OffsetInput] = None,
+):
+    if avoid_areas and outer_offset is None:
+        outer_offset = 0
+
+    # Determine absolute offsets
+    outer_offset = calculate_offset(job.tool_radius, outer_offset, -1)
+    inner_offset = calculate_offset(job.tool_radius, inner_offset, 1)
+    avoid_outer_offset = calculate_offset(job.tool_radius, avoid_outer_offset, 1)
+    avoid_inner_offset = calculate_offset(job.tool_radius, avoid_inner_offset, -1)
+
+    # Transform to job plane
+    op_areas = [face.transformShape(job.top.fG) for face in op_areas]
+    avoid_areas = [face.transformShape(job.top.fG) for face in avoid_areas]
+
+    # Offset faces
+    offset_op_areas = []
+    offset_avoid_areas = []
+
+    for face in op_areas:
+        offset_op_areas += offset_face(face, outer_offset, inner_offset)
+
+    for face in avoid_areas:
+        offset_avoid_areas += offset_face(face, avoid_outer_offset, avoid_inner_offset)
+
+    # Determine depth of each face
+    depth_map, depths = generate_depth_map(op_areas)
+    avoid_depth_map, avoid_depths = generate_depth_map(avoid_areas)
+
+    # Iterate though each depth and construct the depth geometry
+    for i, depth in enumerate(depths):
+        depth_faces = depth_map[i]
+        for sub_depth in depths[i + 1:]:
+            depth_faces += [face.translate(job.top.zDir.multiply(depth - sub_depth)) for face in depth_map[sub_depth]]
+
+        depth_ops = combine_faces(depth_faces)
+
+        # TODO debug that this works somehow
+        show_object(depth_faces, f"depth-{depth}")
 
 
 @dataclass(kw_only=True)
@@ -55,7 +204,7 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
 
     @staticmethod
     def _group_faces_by_features(
-        features: List[cq.Face], faces: List[Tuple[int, cq.Face]]
+            features: List[cq.Face], faces: List[Tuple[int, cq.Face]]
     ):
         feat = BRepFeat()
         remaining = faces[:]
@@ -108,10 +257,10 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
         return features
 
     def _boundaries_by_group(
-        self,
-        group_faces: List[Tuple[int, cq.Face]],
-        coplanar_faces: List[Tuple[int, cq.Face]],
-        depth_info: Dict[int, float],
+            self,
+            group_faces: List[Tuple[int, cq.Face]],
+            coplanar_faces: List[Tuple[int, cq.Face]],
+            depth_info: Dict[int, float],
     ):
         face_depths = list(set(depth_info.values()))
         face_depths.sort()
@@ -151,12 +300,12 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
             return [end_depth]
 
     def _apply_avoid(
-        self,
-        outer_subject_wires,
-        inner_subject_wires,
-        avoid_objs,
-        outer_offset,
-        inner_offset,
+            self,
+            outer_subject_wires,
+            inner_subject_wires,
+            avoid_objs,
+            outer_offset,
+            inner_offset,
     ):
         avoid_clip = WireClipper()
         for o in avoid_objs:
@@ -203,10 +352,10 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
         # Prepare profile paths
         tool_radius = self._tool_diameter / 2
         outer_wire_offset = (
-            tool_radius * self.outer_boundary_offset[0] + self.outer_boundary_offset[1]
+                tool_radius * self.outer_boundary_offset[0] + self.outer_boundary_offset[1]
         )
         inner_wire_offset = (
-            tool_radius * self.inner_boundary_offset[0] + self.inner_boundary_offset[1]
+                tool_radius * self.inner_boundary_offset[0] + self.inner_boundary_offset[1]
         )
 
         # These are the profile paths. They are done very last as a finishing pass
