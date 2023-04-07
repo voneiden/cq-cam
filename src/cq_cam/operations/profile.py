@@ -10,6 +10,7 @@ from OCP.TopAbs import TopAbs_REVERSED
 
 from cq_cam.operations.tabs import Tabs, Transition
 from cq_cam.routers import route
+from cq_cam.utils.offset import offset_wire
 from cq_cam.utils.utils import (
     compound_to_edges,
     edge_end_point,
@@ -23,23 +24,6 @@ if TYPE_CHECKING:
 
 DEBUG = []
 logger = logging.getLogger(__name__)
-
-
-def circle_bug_workaround(source_wire: cq.Wire, target_wires: List[cq.Wire]):
-    """
-    FreeCAD style workaround for
-    https://github.com/CadQuery/cadquery/issues/896
-
-    :param source_wire:
-    :param target_wires:
-    :return:
-    """
-    if len(source_wire.Edges()) == 1:
-        edge = source_wire.Edges()[0]
-        if edge.startPoint() == edge.endPoint():
-            # OCCT bug with offsetting circles!
-            for target in target_wires:
-                target.wrapped.Location(source_wire.wrapped.Location().Inverted())
 
 
 def profile(
@@ -63,8 +47,7 @@ def profile(
     wire = wire.transformShape(job.top.fG)
 
     # Generate base features
-    base_features = wire.offset2D(offset * job.tool_radius)
-    circle_bug_workaround(wire, base_features)
+    base_features = offset_wire(wire, offset * job.tool_radius)
 
     toolpaths = []
     for base_feature in base_features:
