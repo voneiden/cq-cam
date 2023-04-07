@@ -10,6 +10,7 @@ def test_calculate_offset():
     assert calculate_offset(1, -1) == -1
     assert calculate_offset(1, (-1, 0.5)) == -0.5
     assert calculate_offset(1, (0, 1.05)) == 1.05
+    assert calculate_offset(0.5, None, 3) == 1.5
 
 
 def test_offset_face():

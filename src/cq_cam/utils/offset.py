@@ -11,7 +11,7 @@ OffsetInput: TypeAlias = Union[
 
 def calculate_offset(tool_radius: float, offset: Optional[OffsetInput], default=None):
     if offset is None:
-        return default or 0
+        offset = default or 0
 
     try:
         multiplier, distance = offset
