@@ -15,8 +15,8 @@ from cq_cam.operations.mixin_operation import (
     ObjectsValidationMixin,
     PlaneValidationMixin,
 )
-from cq_cam.operations.strategy import ContourStrategy, Strategy, ZigZagStrategy
-from cq_cam.utils.offset import OffsetInput, calculate_offset, offset_face
+from cq_cam.operations.strategy import Strategy, ZigZagStrategy
+from cq_cam.utils.offset import OffsetInput, calculate_offset, offset_face, offset_wire
 from cq_cam.utils.utils import WireClipper, flatten_list, flatten_wire_to_closed_2d
 
 logger = logging.getLogger(__name__)
@@ -37,17 +37,6 @@ def build_pocket_geometry_layers(
     avoid_areas: List[cq.Wire],
 ):
     return []
-
-
-def pocket(
-    job: "Job",
-    outer_wire: cq.Wire,
-    inner_wires: List[cq.Wire],
-    strategy: Strategy = ContourStrategy,
-    outer_offset: float = -1,
-    inner_offset: float = 1,
-):
-    pass
 
 
 def generate_depth_map(faces: List[cq.Face]):
@@ -82,6 +71,80 @@ def combine_faces(faces: List[cq.Face]) -> List[cq.Face]:
     return new_faces
 
 
+def build_pocket_ops(
+    job: "Job", op_areas: List[cq.Face], avoid_areas: List[cq.Face]
+) -> List[cq.Face]:
+    # Determine depth of each face
+    depth_map, depths = generate_depth_map(op_areas)
+    avoid_depth_map, avoid_depths = generate_depth_map(avoid_areas)
+
+    pocket_ops = []
+    # Iterate though each depth and construct the depth geometry
+    for i, depth in enumerate(depths):
+        depth_faces = depth_map[depth]
+        for sub_depth in depths[i + 1 :]:
+            # Move faces UP
+            depth_faces += [
+                face.translate(job.top.zDir.multiply(depth - sub_depth))
+                for face in depth_map[sub_depth]
+            ]
+
+        depth_ops = combine_faces(depth_faces)
+
+        if avoid_depths:
+            active_avoid_depths = [
+                avoid_depth for avoid_depth in avoid_depths if avoid_depth >= depth
+            ]
+            avoid_faces = []
+            for avoid_depth in active_avoid_depths:
+                # Move faces DOWN
+                avoid_faces += [
+                    face.translate(job.top.zDir.multiply(depth - avoid_depth))
+                    for face in avoid_depth_map[avoid_depth]
+                ]
+            depth_ops_with_avoid = []
+            for i, depth_op in enumerate(depth_ops):
+                for avoid_face in avoid_faces:
+                    depth_op = depth_op.cut(avoid_face)
+                depth_ops_with_avoid.append(depth_op)
+
+            pocket_ops += depth_ops_with_avoid
+
+        else:
+            pocket_ops += depth_ops
+
+    return pocket_ops
+
+
+def fill_pocket(pocket: cq.Face, offset: float) -> List[List[cq.Wire]]:
+    return fill_pocket_contour_shrink(pocket, offset)
+
+
+def fill_pocket_contour_shrink(pocket: cq.Face, offset: float) -> List[List[cq.Wire]]:
+    outer = pocket.outerWire()
+    inners = pocket.innerWires()
+    sequence = [outer]
+    other_sequences = []
+    i = 0
+
+    while True:
+        # TODO some kind of tree implementation would be nice
+
+        if iteration_method(i) == "expand":
+            offset_inners = flatten_list(
+                [offset_wire(inner, offset) for inner in inners]
+            )
+            for outer in outers:
+                new_outer_inners = cq.Face.makeFromWires(
+                    outer, offset_inners
+                ).innerWires()
+
+        else:
+            pass
+
+    return sequence + other_sequences
+
+
 def pocket2(
     job: "Job",
     op_areas: List[cq.Face],
@@ -96,7 +159,6 @@ def pocket2(
         outer_offset = 0
 
     # Determine absolute offsets
-
     outer_offset = calculate_offset(job.tool_radius, outer_offset, -1)
     inner_offset = calculate_offset(job.tool_radius, inner_offset, 1)
     avoid_outer_offset = calculate_offset(job.tool_radius, avoid_outer_offset, 1)
@@ -116,40 +178,14 @@ def pocket2(
     for face in avoid_areas:
         offset_avoid_areas += offset_face(face, avoid_outer_offset, avoid_inner_offset)
 
-    # Determine depth of each face
-    depth_map, depths = generate_depth_map(offset_op_areas)
-    avoid_depth_map, avoid_depths = generate_depth_map(offset_avoid_areas)
+    # Build pocket boundary geometry
+    pocket_ops = build_pocket_ops(job, offset_op_areas, offset_avoid_areas)
 
-    # Iterate though each depth and construct the depth geometry
-    for i, depth in enumerate(depths):
-        depth_faces = depth_map[depth]
-        for sub_depth in depths[i + 1 :]:
-            # Move faces UP
-            depth_faces += [
-                face.translate(job.top.zDir.multiply(depth - sub_depth))
-                for face in depth_map[sub_depth]
-            ]
+    # Apply pocket fill
 
-        active_avoid_depths = [
-            avoid_depth for avoid_depth in avoid_depths if avoid_depth >= depth
-        ]
-        avoid_faces = []
-        for avoid_depth in active_avoid_depths:
-            # Move faces DOWN
-            avoid_faces += [
-                face.translate(job.top.zDir.multiply(depth - avoid_depth))
-                for face in avoid_depth_map[avoid_depth]
-            ]
+    # Route wires
 
-        depth_ops = combine_faces(depth_faces)
-
-        depth_ops_with_avoid = []
-        for i, depth_op in enumerate(depth_ops):
-            for avoid_face in avoid_faces:
-                depth_op = depth_op.cut(avoid_face)
-            depth_ops_with_avoid.append(depth_op)
-            # TODO debug that this works somehow
-            show_object(depth_op, f"depth-{depth}-op-{i}")
+    # Route depths
 
 
 @dataclass(kw_only=True)
