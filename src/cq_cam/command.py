@@ -243,14 +243,17 @@ class Circular(Command, ABC):
     def to_ais_shape(self, start, as_edges=False):
         end = self.end.to_vector(start)
         mid = self.mid.to_vector(start)
-        if start == end:
-            center = self.center.to_vector(start).toPnt()
-            radius = (start - center).Length
-            # uh oh
 
-            edge = cq.Edge.makeCircle(radius, center, zDir)
-        else:
-            edge = cq.Edge.makeThreePointArc(start, mid, end)
+        # Note: precision of __eq__ on vectors can cause false positive circles with very small arcs
+        # TODO: Neutralise small arcs, these can cause similar problem with grbl as far as I remember
+        # if start == end:
+        #    center = self.center.to_vector(start)
+        #    radius = center.Length
+        #    # uh oh
+        #
+        #    edge = cq.Edge.makeCircle(radius, center, cq.Vector(0,0,1))
+        # else:
+        edge = cq.Edge.makeThreePointArc(start, mid, end)
         if as_edges:
             return edge, end
         shape = AIS_Shape(edge.wrapped)

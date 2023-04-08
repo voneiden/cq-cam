@@ -7,6 +7,7 @@ from cadquery import cq
 
 from cq_cam.command import Command
 from cq_cam.common import Unit
+from cq_cam.operations.pocket import pocket2
 from cq_cam.operations.profile import profile
 from cq_cam.utils.utils import extract_wires, flatten_list
 from cq_cam.visualize import visualize_job, visualize_job_as_edges
@@ -122,15 +123,17 @@ class Job:
             )
         return self._add_operation("Wire Profile", commands)
 
-    def pocket(self, *args, **kwargs) -> Job:
-        from cq_cam import Pocket
-
+    def pocket(
+        self, op_areas: List[cq.Face], avoid_areas: List[cq.Face], **kwargs
+    ) -> Job:
+        # TODO
         if self.tool_diameter is None:
             raise ValueError("Profile requires tool_diameter to be est")
         if "tool_diameter" not in kwargs:
             kwargs["tool_diameter"] = self.tool_diameter
-        pocket = Pocket(self, *args, **kwargs)
-        return self._add_operation("Pocket", pocket.commands)
+
+        commands = pocket2(self, op_areas, avoid_areas)
+        return self._add_operation("Pocket", commands)
 
     def drill(self, *args, **kwargs) -> Job:
         from cq_cam import Drill

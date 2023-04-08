@@ -4,7 +4,7 @@ import cadquery as cq
 import pyclipper as pc
 
 from cq_cam.utils.circle_bug_workaround import circle_bug_workaround
-from cq_cam.utils.interpolation import wire_to_vectors, vectors_to_2d_tuples
+from cq_cam.utils.interpolation import vectors_to_2d_tuples, wire_to_vectors
 from cq_cam.utils.utils import pairwise
 
 OffsetToolRadiusMultiplier: TypeAlias = float
@@ -23,7 +23,10 @@ class PolyFace:
 
     @classmethod
     def from_cq_face(cls, cq_face: cq.Face):
-        return cls(wire_to_polygon(cq_face.outerWire()), [wire_to_polygon(wire) for wire in cq_face.innerWires()])
+        return cls(
+            wire_to_polygon(cq_face.outerWire()),
+            [wire_to_polygon(wire) for wire in cq_face.innerWires()],
+        )
 
 
 def calculate_offset(tool_radius: float, offset: Optional[OffsetInput], default=None):
@@ -39,7 +42,7 @@ def calculate_offset(tool_radius: float, offset: Optional[OffsetInput], default=
 
 
 def offset_wire(
-        wire: cq.Wire, offset, kind: Literal["arc", "intersection", "tangent"] = "arc"
+    wire: cq.Wire, offset, kind: Literal["arc", "intersection", "tangent"] = "arc"
 ) -> List[cq.Wire]:
     try:
         offset_wires = wire.offset2D(offset, kind)
@@ -69,7 +72,12 @@ def offset_polygon(polygon: Polygon, offset: float) -> List[Polygon]:
     # noinspection PyArgumentList
     pco = pc.PyclipperOffset(pc.scale_to_clipper(2.0), precision)
     pco.AddPath(scaled_polygon, pc.JT_ROUND, pc.ET_CLOSEDPOLYGON)
-    offset_polygons = [pc.scale_from_clipper(offset_polygon) for offset_polygon in pc.CleanPolygons(pco.Execute(scaled_offset), precision / 100)]
+    offset_polygons = [
+        pc.scale_from_clipper(offset_polygon)
+        for offset_polygon in pc.CleanPolygons(
+            pco.Execute(scaled_offset), precision / 100
+        )
+    ]
     return offset_polygons
 
 
@@ -83,7 +91,9 @@ def polygon_to_wire(polygon: Polygon, reference: Union[cq.Wire, float]) -> cq.Wi
     else:
         z = reference
 
-    edges = [cq.Edge.makeLine((a[0], a[1], z), (b[0], b[1], z)) for a, b in pairwise(polygon)]
+    edges = [
+        cq.Edge.makeLine((a[0], a[1], z), (b[0], b[1], z)) for a, b in pairwise(polygon)
+    ]
 
     # This can be fairly slow
     wire = cq.Wire.assembleEdges(edges)
@@ -91,7 +101,7 @@ def polygon_to_wire(polygon: Polygon, reference: Union[cq.Wire, float]) -> cq.Wi
 
 
 def offset_face(
-        face: cq.Face, outer_offset: float, inner_offset: float
+    face: cq.Face, outer_offset: float, inner_offset: float
 ) -> List[cq.Face]:
     offset_faces = []
     op_outers = offset_wire(face.outerWire(), outer_offset)

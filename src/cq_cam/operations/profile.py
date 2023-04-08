@@ -9,7 +9,7 @@ from OCP.GeomProjLib import GeomProjLib
 from OCP.TopAbs import TopAbs_REVERSED
 
 from cq_cam.operations.tabs import Tabs, Transition
-from cq_cam.routers import route
+from cq_cam.routers import route_wires
 from cq_cam.utils.geometry_op import offset_wire
 from cq_cam.utils.utils import (
     compound_to_edges,
@@ -83,7 +83,7 @@ def profile(
 
         toolpaths += layers
 
-    commands = route(job, toolpaths)
+    commands = route_wires(job, toolpaths)
     return commands
 
 

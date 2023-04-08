@@ -36,7 +36,7 @@ def get_underlying_geom_type(edge: cq.Edge):
 
 
 def interpolate_edge_to_vectors(
-        edge: cq.Edge, precision: float = 0.1
+    edge: cq.Edge, precision: float = 0.1
 ) -> List[cq.Vector]:
     # Interpolation must have at least two edges
     n = max(int(edge.Length() / precision), 2)
@@ -65,7 +65,7 @@ def interpolate_edge(edge: cq.Edge, precision: float = 0.1) -> List[cq.Edge]:
 
 
 def interpolate_edges_with_unstable_curves(
-        edges: List[cq.Edge], precision: float = 0.1
+    edges: List[cq.Edge], precision: float = 0.1
 ):
     """
     It appears some curves do not offset nicely with OCCT. BSPLINE is an example.
@@ -106,7 +106,7 @@ def edge_to_vectors(edge: cq.Edge, precision: float = 0.01) -> List[cq.Vector]:
 
 
 def wire_to_vectors(
-        wire: cq.Wire, precision: float = 0.01, close=True
+    wire: cq.Wire, precision: float = 0.01, close=True
 ) -> List[cq.Vector]:
     edges = wire_to_ordered_edges(wire)
 
@@ -131,7 +131,7 @@ def wire_to_vectors(
 
 
 def interpolate_wire_with_unstable_edges(
-        wire: cq.Wire, precision: float = 0.1
+    wire: cq.Wire, precision: float = 0.1
 ) -> cq.Wire:
     edges, interpolated = interpolate_edges_with_unstable_curves(
         wire.Edges(), precision

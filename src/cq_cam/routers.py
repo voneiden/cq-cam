@@ -1,8 +1,9 @@
 from math import isclose
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, List, Union
 
 import cadquery as cq
 import numpy as np
+from OCP.TopAbs import TopAbs_REVERSED
 
 from cq_cam.command import AbsoluteCV, CircularCCW, CircularCW, Cut, Plunge, Rapid
 from cq_cam.utils.utils import (
@@ -62,13 +63,66 @@ def vertical_edge(edge: cq.Edge):
     return p1.x == p2.x and p1.y == p2.y
 
 
-def route(job: "Job", wires: List[cq.Wire]):
+"""
+def route_sequence(job: 'Job', sequence: List[cq.Wire]):
+
+    commands = []
+    commands += rapid_to(sequence[0]start, job.rapid_height, job.op_safe_height)
+
+
+    commands, end_point = route_path(job, chain.path)
+    # Initial position
+    vectors = chain.path
+    start = vectors[0]
+
+    end_point = vectors[-1]
+
+    # Give 10% error margin (arbitrarily chosen)
+    # stepover_distance_margin = stepover_distance * 1.1
+    closest = None
+    path_d = None
+    segment_i = None
+    keep_down = False
+    #if parent_end:
+    #    closest, distance_squared, path_d, segment_i = find_closest_in_path(parent_end, chain.path)
+    #    keep_down = True
+
+    if keep_down:
+        commands.append(Cut(AbsoluteCV.from_vector(closest)))
+        for vector_i, vector in enumerate(vectors[segment_i + 1:]):
+            end_cv = AbsoluteCV.from_vector(vector)
+            commands.append(Cut(end_cv))
+        for vector_i, vector in enumerate(vectors[:segment_i + 1]):
+            end_cv = AbsoluteCV.from_vector(vector)
+            commands.append(Cut(end_cv))
+        commands.append(Cut(AbsoluteCV.from_vector(closest)))
+        end_point = closest
+
+    else:
+        commands += rapid_to(start, job.rapid_height, job.op_safe_height)
+
+        for vector_i, vector in enumerate(vectors[1:]):
+            end_cv = AbsoluteCV.from_vector(vector)
+            commands.append(Cut(end_cv))
+
+        end_point = vectors[-1]
+
+    for sub_contour in chain.sub_chains:
+        commands += route_contour_chain(job, sub_contour, end_point)
+    return commands
+"""
+
+
+def route_wires(job: "Job", wires: List[Union[cq.Wire, cq.Edge]]):
     commands = []
     previous_wire = None
     previous_wire_start = None
     ep = None
     for wire in wires:
-        edges = wire_to_ordered_edges(wire)
+        if isinstance(wire, cq.Edge):
+            edges = [wire]
+        else:
+            edges = wire_to_ordered_edges(wire)
         if not edges:
             return []
         start = edge_start_point(edges[0])
@@ -88,7 +142,8 @@ def route(job: "Job", wires: List[cq.Wire]):
             ep = edge_end_point(edge)
             end_cv = AbsoluteCV.from_vector(ep)
             if geom_type == "LINE":
-                commands.append(Cut(end_cv, arrow=edge_i % 5 == 0))
+                # commands.append(Cut(end_cv, arrow=edge_i % 5 == 0))
+                commands.append(Cut(end_cv))
 
             elif geom_type == "ARC" or geom_type == "CIRCLE":
                 sp = edge_start_point(edge)
@@ -105,9 +160,20 @@ def route(job: "Job", wires: List[cq.Wire]):
                     mid = AbsoluteCV.from_vector(edge.positionAt(0.5))
                     commands.append(cmd(end=end_cv, center=center, mid=mid))
 
-            elif geom_type == "SPLINE":
-                # TODO?
-                raise RuntimeError("Unsupported geom type: SPLINE")
+            elif geom_type == "SPLINE" or geom_type == "OFFSET":
+                n = max(int(edge.Length() / 0.1), 2)
+
+                orientation = edge.wrapped.Orientation()
+                if orientation == TopAbs_REVERSED:
+                    i, j = 1, 0
+                else:
+                    i, j = 0, 1
+
+                for length in np.linspace(i, j, n):
+                    # [e._geomAdaptor().Curve().Curve().BasisCurve().BasisCurve() for e in pocket.DEBUG[0].Edges()]
+                    commands.append(
+                        Cut(AbsoluteCV.from_vector(edge.positionAt(length)))
+                    )
 
             else:
                 raise RuntimeError(f"Unsupported geom type: {geom_type}")
