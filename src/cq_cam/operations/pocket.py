@@ -228,6 +228,6 @@ def pocket(
     # Route wires
     commands = []
     for sequence_wires in sequences:
-        commands += route_wires(job, sequence_wires)
+        commands += route_wires(job, sequence_wires, stepover=stepover)
 
     return commands

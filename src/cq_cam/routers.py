@@ -3,6 +3,8 @@ from typing import TYPE_CHECKING, List, Union
 
 import cadquery as cq
 import numpy as np
+from OCP.BRepExtrema import BRepExtrema_DistShapeShape, BRepExtrema_SupportType
+from OCP.GeomAPI import GeomAPI_ProjectPointOnCurve
 from OCP.TopAbs import TopAbs_REVERSED
 
 from cq_cam.command import AbsoluteCV, CircularCCW, CircularCW, Cut, Plunge, Rapid
@@ -113,10 +115,27 @@ def route_sequence(job: 'Job', sequence: List[cq.Wire]):
 """
 
 
-def route_wires(job: "Job", wires: List[Union[cq.Wire, cq.Edge]]):
+def distance_to_wire(v: cq.Vector, wire2: cq.Wire):
+    vx = cq.Vertex.makeVertex(*v.toTuple())
+    extrema = BRepExtrema_DistShapeShape(vx.wrapped, wire2.wrapped)
+    extrema.Perform()
+    if extrema.IsDone():
+        distance = extrema.Value()
+        if extrema.SupportTypeShape2(1) == BRepExtrema_SupportType.BRepExtrema_IsVertex:
+            vertex = extrema.SupportOnShape2(1)
+            return distance, vertex, None
+        edge = extrema.SupportOnShape2(1)
+        param = extrema.ParOnEdgeS2(1)
+        return distance, edge, param
+
+    return None, None, None
+
+
+def route_wires(job: "Job", wires: List[Union[cq.Wire, cq.Edge]], stepover=None):
     commands = []
     previous_wire = None
     previous_wire_start = None
+    previous_wire_end = None
     ep = None
     for wire in wires:
         if isinstance(wire, cq.Edge):
@@ -126,15 +145,24 @@ def route_wires(job: "Job", wires: List[Union[cq.Wire, cq.Edge]]):
         if not edges:
             return []
         start = edge_start_point(edges[0])
+        end = edge_end_point(edges[-1])
 
         # Determine how to access the wire
         # Direct plunge option
+        if previous_wire_end:
+            distance, edge, param = distance_to_wire(previous_wire_end, wire)
+        else:
+            distance, edge, param = None, None, None
+
         if (
             ep
             and isclose(ep.x, start.x, abs_tol=0.001)
             and isclose(ep.y, start.y, abs_tol=0.001)
         ):
             commands.append(Plunge.abs(start.z, arrow=True))
+        elif stepover and distance and distance <= stepover:
+            # Determine the index of the edge, shift edges and use param?
+            commands.append(Cut(AbsoluteCV.from_vector(start)))
         else:
             commands += rapid_to(start, job.rapid_height, job.op_safe_height)
         for edge_i, edge in enumerate(edges):
@@ -180,4 +208,5 @@ def route_wires(job: "Job", wires: List[Union[cq.Wire, cq.Edge]]):
 
         previous_wire = wire
         previous_wire_start = start
+        previous_wire_end = end
     return commands
