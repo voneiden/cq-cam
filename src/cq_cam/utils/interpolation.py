@@ -1,11 +1,11 @@
 from typing import List
 
 import cadquery as cq
+import numpy as np
 from OCP import Geom
 from OCP.TopAbs import TopAbs_REVERSED
-import numpy as np
 
-from cq_cam.utils.utils import wire_to_ordered_edges, edge_start_end
+from cq_cam.utils.utils import edge_start_end, wire_to_ordered_edges
 
 
 def get_edge_basis_curve(edge: cq.Edge):
@@ -35,7 +35,9 @@ def get_underlying_geom_type(edge: cq.Edge):
     return geom_LUT_CURVE[curve.__class__]
 
 
-def interpolate_edge_to_vectors(edge: cq.Edge, precision: float = 0.1) -> List[cq.Vector]:
+def interpolate_edge_to_vectors(
+    edge: cq.Edge, precision: float = 0.1
+) -> List[cq.Vector]:
     # Interpolation must have at least two edges
     n = max(int(edge.Length() / precision), 2)
 
@@ -62,7 +64,9 @@ def interpolate_edge(edge: cq.Edge, precision: float = 0.1) -> List[cq.Edge]:
     return result
 
 
-def interpolate_edges_with_unstable_curves(edges: List[cq.Edge], precision: float = 0.1):
+def interpolate_edges_with_unstable_curves(
+    edges: List[cq.Edge], precision: float = 0.1
+):
     """
     It appears some curves do not offset nicely with OCCT. BSPLINE is an example.
     These curves unfortunately need to be interpolated to ensure stable offset performance.
@@ -74,10 +78,10 @@ def interpolate_edges_with_unstable_curves(edges: List[cq.Edge], precision: floa
     interpolated = False
     for edge in edges:
         geom_type = edge.geomType()
-        if geom_type == 'OFFSET':
+        if geom_type == "OFFSET":
             geom_type = get_underlying_geom_type(edge)
 
-        if geom_type == 'BSPLINE':
+        if geom_type == "BSPLINE":
             edges = interpolate_edge(edge, precision)
             result += edges
             interpolated = True
@@ -88,16 +92,18 @@ def interpolate_edges_with_unstable_curves(edges: List[cq.Edge], precision: floa
 
 def edge_to_vectors(edge: cq.Edge, precision: float = 0.1) -> List[cq.Vector]:
     geom_type = edge.geomType()
-    if geom_type == 'OFFSET':
+    if geom_type == "OFFSET":
         geom_type = get_underlying_geom_type(edge)
 
-    if geom_type == 'LINE':
+    if geom_type == "LINE":
         return list(edge_start_end(edge))
     else:
         return interpolate_edge_to_vectors(edge, precision)
 
 
-def wire_to_vectors(wire: cq.Wire, precision: float = 0.1, close=True) -> List[cq.Vector]:
+def wire_to_vectors(
+    wire: cq.Wire, precision: float = 0.1, close=True
+) -> List[cq.Vector]:
     edges = wire_to_ordered_edges(wire)
 
     if not edges:
@@ -120,8 +126,12 @@ def wire_to_vectors(wire: cq.Wire, precision: float = 0.1, close=True) -> List[c
     return vectors
 
 
-def interpolate_wire_with_unstable_edges(wire: cq.Wire, precision: float = 0.1) -> cq.Wire:
-    edges, interpolated = interpolate_edges_with_unstable_curves(wire.Edges(), precision)
+def interpolate_wire_with_unstable_edges(
+    wire: cq.Wire, precision: float = 0.1
+) -> cq.Wire:
+    edges, interpolated = interpolate_edges_with_unstable_curves(
+        wire.Edges(), precision
+    )
     if not interpolated:
         return wire
     return cq.Wire.assembleEdges(edges)
