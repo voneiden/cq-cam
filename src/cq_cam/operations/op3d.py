@@ -13,9 +13,9 @@ from OCP.TopLoc import TopLoc_Location
 
 from cq_cam.command import Cut, Plunge, Rapid
 from cq_cam.operations.base_operation import FaceBaseOperation
+from cq_cam.operations.strategy import ZigZagStrategy
 from cq_cam.utils import utils
 from cq_cam.utils.utils import flatten_list
-from src.cq_cam.operations.strategy import ZigZagStrategy
 
 
 @dataclass
