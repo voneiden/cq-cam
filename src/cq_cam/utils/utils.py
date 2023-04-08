@@ -13,7 +13,7 @@ from OCP.BRepTools import BRepTools_WireExplorer
 from OCP.gp import gp_Ax2, gp_Dir, gp_Pnt
 from OCP.HLRAlgo import HLRAlgo_Projector
 from OCP.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape
-from OCP.TopAbs import TopAbs_EDGE, TopAbs_REVERSED
+from OCP.TopAbs import TopAbs_EDGE, TopAbs_FACE, TopAbs_REVERSED, TopAbs_ShapeEnum
 from OCP.TopExp import TopExp_Explorer
 from OCP.TopoDS import TopoDS, TopoDS_Shape
 
@@ -446,3 +446,19 @@ def optimize_float(v: float):
     """Drop trailing zeroes from a float that is exactly an int to save some bytes in the gcode"""
     iv = int(v)
     return iv if v == iv else v
+
+
+def break_compound_to(
+    compound: cq.Compound, shape_type: TopAbs_ShapeEnum
+) -> List[TopoDS_Shape]:
+    shapes = []
+    explorer = TopExp_Explorer(compound.wrapped, shape_type)
+    while explorer.More():
+        shape = explorer.Current()
+        shapes.append(shape)
+        explorer.Next()
+    return shapes
+
+
+def break_compound_to_faces(compound: cq.Compound):
+    return [cq.Face(shape) for shape in break_compound_to(compound, TopAbs_FACE)]
