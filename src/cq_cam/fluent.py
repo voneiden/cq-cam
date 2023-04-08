@@ -9,6 +9,7 @@ from cq_cam.command import Command
 from cq_cam.common import Unit
 from cq_cam.operations.pocket import pocket
 from cq_cam.operations.profile import profile
+from cq_cam.utils.geometry_op import OffsetInput
 from cq_cam.utils.utils import extract_wires, flatten_list
 from cq_cam.visualize import visualize_job, visualize_job_as_edges
 
@@ -124,15 +125,27 @@ class Job:
         return self._add_operation("Wire Profile", commands)
 
     def pocket(
-        self, op_areas: List[cq.Face], avoid_areas: List[cq.Face], **kwargs
+        self,
+        op_areas: List[cq.Face],
+        avoid_areas: List[cq.Face],
+        outer_offset: Optional[OffsetInput] = None,
+        inner_offset: Optional[OffsetInput] = None,
+        avoid_outer_offset: Optional[OffsetInput] = None,
+        avoid_inner_offset: Optional[OffsetInput] = None,
+        stepover: Optional[OffsetInput] = None,
+        stepdown: Optional[float] = None,
     ) -> Job:
-        # TODO
-        if self.tool_diameter is None:
-            raise ValueError("Profile requires tool_diameter to be est")
-        if "tool_diameter" not in kwargs:
-            kwargs["tool_diameter"] = self.tool_diameter
-
-        commands = pocket(self, op_areas, avoid_areas)
+        commands = pocket(
+            self,
+            op_areas,
+            avoid_areas,
+            outer_offset=outer_offset,
+            inner_offset=inner_offset,
+            avoid_outer_offset=avoid_outer_offset,
+            avoid_inner_offset=avoid_inner_offset,
+            stepover=stepover,
+            stepdown=stepdown,
+        )
         return self._add_operation("Pocket", commands)
 
     def drill(self, *args, **kwargs) -> Job:

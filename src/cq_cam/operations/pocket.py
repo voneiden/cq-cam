@@ -185,6 +185,8 @@ def pocket(
     inner_offset: Optional[OffsetInput] = None,
     avoid_outer_offset: Optional[OffsetInput] = None,
     avoid_inner_offset: Optional[OffsetInput] = None,
+    stepover: Optional[OffsetInput] = None,
+    stepdown: Optional[float] = None,
 ):
     if avoid_areas and outer_offset is None:
         outer_offset = 0
@@ -194,6 +196,9 @@ def pocket(
     inner_offset = calculate_offset(job.tool_radius, inner_offset, 1)
     avoid_outer_offset = calculate_offset(job.tool_radius, avoid_outer_offset, 1)
     avoid_inner_offset = calculate_offset(job.tool_radius, avoid_inner_offset, -1)
+    stepover = calculate_offset(job.tool_radius, stepover, 0.5)
+
+    # TODO stepdown
 
     # Transform to job plane
     op_areas = [face.transformShape(job.top.fG) for face in op_areas]
@@ -215,8 +220,7 @@ def pocket(
     # Apply pocket fill
     sequences: List[List[cq.Wire]] = []
     for pocket_op in pocket_ops:
-        sequences += fill_pocket_contour_shrink(pocket_op, job.tool_diameter * 0.5)
-        # return fill_pocket_contour_shrink_clipper(PolyFace.from_cq_face(pocket_op), job.tool_diameter * 0.5)
+        sequences += fill_pocket_contour_shrink(pocket_op, stepover)
 
     # Route wires
     commands = []
