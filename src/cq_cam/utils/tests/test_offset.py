@@ -1,6 +1,6 @@
 import cadquery as cq
 
-from cq_cam.utils.offset import calculate_offset, offset_face
+from cq_cam.utils.geometry_op import calculate_offset, offset_face
 
 
 def test_calculate_offset():

@@ -16,7 +16,7 @@ from cq_cam.operations.mixin_operation import (
     PlaneValidationMixin,
 )
 from cq_cam.operations.strategy import Strategy, ZigZagStrategy
-from cq_cam.utils.offset import OffsetInput, calculate_offset, offset_face, offset_wire
+from cq_cam.utils.geometry_op import OffsetInput, calculate_offset, offset_face, offset_wire, Polygon, PolyFace, offset_polygon
 from cq_cam.utils.tree import Tree
 from cq_cam.utils.utils import (
     WireClipper,
@@ -29,20 +29,6 @@ logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from cq_cam.fluent import Job
-
-
-def group_by_depth(wires: List[cq.Wire]):
-    depth_map = defaultdict(list)
-    for wire in wires:
-        wire.po
-
-
-def build_pocket_geometry_layers(
-    top: cq.Plane,
-    op_areas: List[cq.Wire],
-    avoid_areas: List[cq.Wire],
-):
-    return []
 
 
 def generate_depth_map(faces: List[cq.Face]):
@@ -78,7 +64,7 @@ def combine_faces(faces: List[cq.Face]) -> List[cq.Face]:
 
 
 def build_pocket_ops(
-    job: "Job", op_areas: List[cq.Face], avoid_areas: List[cq.Face]
+        job: "Job", op_areas: List[cq.Face], avoid_areas: List[cq.Face]
 ) -> List[cq.Face]:
     # Determine depth of each face
     depth_map, depths = generate_depth_map(op_areas)
@@ -88,7 +74,7 @@ def build_pocket_ops(
     # Iterate though each depth and construct the depth geometry
     for i, depth in enumerate(depths):
         depth_faces = depth_map[depth]
-        for sub_depth in depths[i + 1 :]:
+        for sub_depth in depths[i + 1:]:
             # Move faces UP
             depth_faces += [
                 face.translate(job.top.zDir.multiply(depth - sub_depth))
@@ -158,16 +144,53 @@ def fill_pocket_contour_shrink(pocket: cq.Face, step: float) -> List[List[cq.Wir
 
     return tree.sequences
 
+def fill_pocket_contour_shrink_clipper(pocket: PolyFace, step: float) -> List[Polygon]:
+    inner_polygons = pocket.inners
+    tree = Tree(pocket.outer)
+    i = 0
+
+    # TODO sanify the variable names here
+    try:
+        while True:
+            if i > 50:
+                break
+            i += 1
+            node = tree.next_unlocked
+            next_outer_candidates = offset_polygon(node.obj, -step)
+            next_outers = []
+
+            if inner_polygons:
+                for next_outer in next_outer_candidates:
+                    outer_face = cq.Face.makeFromWires(next_outer)
+                    outer_compound = outer_face.cut(*inner_polygons)
+                    compound_faces = break_compound_to_faces(outer_compound)
+                    if compound_faces:
+                        next_outers += [face.outerWire() for face in compound_faces]
+            else:
+                next_outers = next_outer_candidates
+
+            if next_outers:
+                node.branch(next_outers)
+            else:
+                node.lock()
+
+            i += 1
+
+    except StopIteration:
+        pass
+
+    return tree.sequences
+
 
 def pocket2(
-    job: "Job",
-    op_areas: List[cq.Face],
-    avoid_areas: List[cq.Face],
-    outer_offset: Optional[OffsetInput] = None,
-    inner_offset: Optional[OffsetInput] = None,
-    avoid_outer_offset: Optional[OffsetInput] = None,
-    avoid_inner_offset: Optional[OffsetInput] = None,
-    show_object=None,
+        job: "Job",
+        op_areas: List[cq.Face],
+        avoid_areas: List[cq.Face],
+        outer_offset: Optional[OffsetInput] = None,
+        inner_offset: Optional[OffsetInput] = None,
+        avoid_outer_offset: Optional[OffsetInput] = None,
+        avoid_inner_offset: Optional[OffsetInput] = None,
+        show_object=None,
 ):
     if avoid_areas and outer_offset is None:
         outer_offset = 0
@@ -198,6 +221,7 @@ def pocket2(
     # Apply pocket fill
     for pocket_op in pocket_ops:
         return fill_pocket_contour_shrink(pocket_op, job.tool_diameter * 0.5)
+        #return fill_pocket_contour_shrink_clipper(PolyFace.from_cq_face(pocket_op), job.tool_diameter * 0.5)
 
     # Route wires
 
@@ -238,7 +262,7 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
 
     @staticmethod
     def _group_faces_by_features(
-        features: List[cq.Face], faces: List[Tuple[int, cq.Face]]
+            features: List[cq.Face], faces: List[Tuple[int, cq.Face]]
     ):
         feat = BRepFeat()
         remaining = faces[:]
@@ -291,10 +315,10 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
         return features
 
     def _boundaries_by_group(
-        self,
-        group_faces: List[Tuple[int, cq.Face]],
-        coplanar_faces: List[Tuple[int, cq.Face]],
-        depth_info: Dict[int, float],
+            self,
+            group_faces: List[Tuple[int, cq.Face]],
+            coplanar_faces: List[Tuple[int, cq.Face]],
+            depth_info: Dict[int, float],
     ):
         face_depths = list(set(depth_info.values()))
         face_depths.sort()
@@ -334,12 +358,12 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
             return [end_depth]
 
     def _apply_avoid(
-        self,
-        outer_subject_wires,
-        inner_subject_wires,
-        avoid_objs,
-        outer_offset,
-        inner_offset,
+            self,
+            outer_subject_wires,
+            inner_subject_wires,
+            avoid_objs,
+            outer_offset,
+            inner_offset,
     ):
         avoid_clip = WireClipper()
         for o in avoid_objs:
@@ -386,10 +410,10 @@ class Pocket(PlaneValidationMixin, ObjectsValidationMixin, FaceBaseOperation):
         # Prepare profile paths
         tool_radius = self._tool_diameter / 2
         outer_wire_offset = (
-            tool_radius * self.outer_boundary_offset[0] + self.outer_boundary_offset[1]
+                tool_radius * self.outer_boundary_offset[0] + self.outer_boundary_offset[1]
         )
         inner_wire_offset = (
-            tool_radius * self.inner_boundary_offset[0] + self.inner_boundary_offset[1]
+                tool_radius * self.inner_boundary_offset[0] + self.inner_boundary_offset[1]
         )
 
         # These are the profile paths. They are done very last as a finishing pass
