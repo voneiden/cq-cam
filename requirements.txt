@@ -6,5 +6,7 @@
 #
 numpy==1.24.2
     # via -r requirements.in
+opencamlib==2023.1.11
+    # via -r requirements.in
 pyclipper==1.3.0.post4
     # via -r requirements.in

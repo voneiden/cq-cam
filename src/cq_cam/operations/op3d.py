@@ -3,7 +3,7 @@ from typing import List, Tuple
 
 import cadquery as cq
 import numpy as np
-import ocl
+import opencamlib as ocl
 from OCP.BRep import BRep_Tool
 from OCP.BRepMesh import BRepMesh_IncrementalMesh
 from OCP.gp import gp_Pnt
