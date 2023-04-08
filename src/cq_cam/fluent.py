@@ -7,7 +7,7 @@ from cadquery import cq
 
 from cq_cam.command import Command
 from cq_cam.common import Unit
-from cq_cam.operations.pocket import pocket2
+from cq_cam.operations.pocket import pocket
 from cq_cam.operations.profile import profile
 from cq_cam.utils.utils import extract_wires, flatten_list
 from cq_cam.visualize import visualize_job, visualize_job_as_edges
@@ -132,7 +132,7 @@ class Job:
         if "tool_diameter" not in kwargs:
             kwargs["tool_diameter"] = self.tool_diameter
 
-        commands = pocket2(self, op_areas, avoid_areas)
+        commands = pocket(self, op_areas, avoid_areas)
         return self._add_operation("Pocket", commands)
 
     def drill(self, *args, **kwargs) -> Job:

@@ -192,7 +192,7 @@ def fill_pocket_contour_shrink_clipper(pocket: PolyFace, step: float) -> List[Po
     return tree.sequences
 
 
-def pocket2(
+def pocket(
     job: "Job",
     op_areas: List[cq.Face],
     avoid_areas: List[cq.Face],
