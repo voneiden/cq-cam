@@ -126,8 +126,8 @@ class Job:
 
     def pocket(
         self,
-        op_areas: List[cq.Face],
-        avoid_areas: List[cq.Face],
+        op_areas: Union[cq.Workplane, cq.Face, List[cq.Face]],
+        avoid_areas: Optional[Union[cq.Workplane, cq.Face, List[cq.Face]]] = None,
         outer_offset: Optional[OffsetInput] = None,
         inner_offset: Optional[OffsetInput] = None,
         avoid_outer_offset: Optional[OffsetInput] = None,
@@ -135,10 +135,20 @@ class Job:
         stepover: Optional[OffsetInput] = None,
         stepdown: Optional[float] = None,
     ) -> Job:
+        if isinstance(op_areas, cq.Workplane):
+            op_areas = op_areas.objects
+        elif isinstance(op_areas, cq.Face):
+            op_areas = [op_areas]
+
+        if isinstance(avoid_areas, cq.Workplane):
+            avoid_areas = avoid_areas.objects
+        elif isinstance(avoid_areas, cq.Face):
+            avoid_areas = [avoid_areas]
+
         commands = pocket(
             self,
             op_areas,
-            avoid_areas,
+            avoid_areas=avoid_areas,
             outer_offset=outer_offset,
             inner_offset=inner_offset,
             avoid_outer_offset=avoid_outer_offset,

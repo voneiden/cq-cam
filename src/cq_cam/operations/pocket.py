@@ -180,7 +180,7 @@ def fill_pocket_contour_shrink_clipper(pocket: PolyFace, step: float) -> List[Po
 def pocket(
     job: "Job",
     op_areas: List[cq.Face],
-    avoid_areas: List[cq.Face],
+    avoid_areas: Optional[List[cq.Face]] = None,
     outer_offset: Optional[OffsetInput] = None,
     inner_offset: Optional[OffsetInput] = None,
     avoid_outer_offset: Optional[OffsetInput] = None,
@@ -188,6 +188,9 @@ def pocket(
     stepover: Optional[OffsetInput] = None,
     stepdown: Optional[float] = None,
 ):
+    if avoid_areas is None:
+        avoid_areas = []
+
     if avoid_areas and outer_offset is None:
         outer_offset = 0
 

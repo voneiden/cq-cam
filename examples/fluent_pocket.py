@@ -37,11 +37,8 @@ def demo2():
     # show_object(result.faces('<Z[1]'))
     job_wp = result.faces(">Z").workplane()
     cam = Job(job_wp.plane, feed=300, tool_diameter=1).pocket(
-        clearance_height=5,
-        top_height=0,
-        o=result.faces("<Z[1]"),
-        outer_boundary_offset=1,
-        avoid=result.faces(">Z"),
+        result.faces("<Z[1]"),
+        avoid_areas=result.faces(">Z"),
     )
 
     show_object(result, "obj")
