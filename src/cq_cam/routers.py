@@ -23,7 +23,7 @@ def vertical_plunge(job: "Job", layer1: cq.Wire, layer2: cq.Wire, p=0.0):
 
     assert p1.z > p2.z
 
-    if p1.x == p2.x and p1.y == p1.y:
+    if p1.x == p2.x and p1.y == p2.y:
         return [Plunge(p1.z - p2.z)]
 
     p3 = layer2.positionAt(0)
