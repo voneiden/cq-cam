@@ -17,7 +17,13 @@ from cq_cam.operations.mixin_operation import (
 )
 from cq_cam.operations.strategy import Strategy, ZigZagStrategy
 from cq_cam.utils.offset import OffsetInput, calculate_offset, offset_face, offset_wire
-from cq_cam.utils.utils import WireClipper, flatten_list, flatten_wire_to_closed_2d
+from cq_cam.utils.tree import Tree
+from cq_cam.utils.utils import (
+    WireClipper,
+    break_compound_to_faces,
+    flatten_list,
+    flatten_wire_to_closed_2d,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -104,9 +110,9 @@ def build_pocket_ops(
                 ]
             depth_ops_with_avoid = []
             for i, depth_op in enumerate(depth_ops):
-                for avoid_face in avoid_faces:
-                    depth_op = depth_op.cut(avoid_face)
-                depth_ops_with_avoid.append(depth_op)
+                depth_ops_with_avoid += break_compound_to_faces(
+                    depth_op.cut(*avoid_faces)
+                )
 
             pocket_ops += depth_ops_with_avoid
 
@@ -120,29 +126,37 @@ def fill_pocket(pocket: cq.Face, offset: float) -> List[List[cq.Wire]]:
     return fill_pocket_contour_shrink(pocket, offset)
 
 
-def fill_pocket_contour_shrink(pocket: cq.Face, offset: float) -> List[List[cq.Wire]]:
-    outer = pocket.outerWire()
-    inners = pocket.innerWires()
-    sequence = [outer]
-    other_sequences = []
+def fill_pocket_contour_shrink(pocket: cq.Face, step: float) -> List[List[cq.Wire]]:
+    inner_faces = [cq.Face.makeFromWires(inner) for inner in pocket.innerWires()]
+    tree = Tree(pocket.outerWire())
     i = 0
 
-    while True:
-        # TODO some kind of tree implementation would be nice
+    # TODO sanify the variable names here
+    try:
+        while True:
+            node = tree.next_unlocked
+            next_outer_candidates = offset_wire(node.obj, -step + 0.0000001, "arc")
+            if inner_faces:
+                for next_outer in next_outer_candidates:
+                    outer_face = cq.Face.makeFromWires(next_outer)
+                    outer_compound = outer_face.cut(*inner_faces)
+                    compound_faces = break_compound_to_faces(outer_compound)
+                    if compound_faces:
+                        next_outers += [face.outerWire() for face in compound_faces]
+            else:
+                next_outers = next_outer_candidates
 
-        if iteration_method(i) == "expand":
-            offset_inners = flatten_list(
-                [offset_wire(inner, offset) for inner in inners]
-            )
-            for outer in outers:
-                new_outer_inners = cq.Face.makeFromWires(
-                    outer, offset_inners
-                ).innerWires()
+            if next_outers:
+                node.branch(next_outers)
+            else:
+                node.lock()
 
-        else:
-            pass
+            i += 1
 
-    return sequence + other_sequences
+    except StopIteration:
+        pass
+
+    return tree.sequences
 
 
 def pocket2(
@@ -182,6 +196,8 @@ def pocket2(
     pocket_ops = build_pocket_ops(job, offset_op_areas, offset_avoid_areas)
 
     # Apply pocket fill
+    for pocket_op in pocket_ops:
+        return fill_pocket_contour_shrink(pocket_op, job.tool_diameter * 0.5)
 
     # Route wires
 

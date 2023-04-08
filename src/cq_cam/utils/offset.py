@@ -26,8 +26,16 @@ def calculate_offset(tool_radius: float, offset: Optional[OffsetInput], default=
 def offset_wire(
     wire: cq.Wire, offset, kind: Literal["arc", "intersection", "tangent"] = "arc"
 ) -> List[cq.Wire]:
-    offset_wires = wire.offset2D(offset, kind)
-    return circle_bug_workaround(wire, offset_wires)
+    try:
+        offset_wires = wire.offset2D(offset, kind)
+    except ValueError:
+        return []
+    circle_bug_workaround(wire, offset_wires)
+    return offset_wires
+
+
+def offset_wire_pyclipper(wire: cq.Wire, offset: float):
+    pass
 
 
 def offset_face(
