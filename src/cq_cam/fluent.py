@@ -9,6 +9,7 @@ from cq_cam.command import Command
 from cq_cam.common import Unit
 from cq_cam.operations.pocket import pocket
 from cq_cam.operations.profile import profile
+from cq_cam.operations.tabs import Tabs
 from cq_cam.utils.geometry_op import OffsetInput
 from cq_cam.utils.utils import extract_wires, flatten_list
 from cq_cam.visualize import visualize_job, visualize_job_as_edges
@@ -29,6 +30,11 @@ class Operation:
         for command in self.commands:
             gcode, position = command.to_gcode(previous_command, position)
             previous_command = command
+
+            # Skip blank lines. These can happen for example if we try to issue
+            # a move to the same position where we already are
+            if not gcode:
+                continue
             gcodes.append(gcode)
 
         return "\n".join(gcodes)
@@ -78,7 +84,7 @@ class Job:
         outer_offset=1,
         inner_offset=-1,
         stepdown=None,
-        tabs=None,
+        tabs: Optional[Tabs] = None,
     ) -> Job:
         if self.tool_diameter is None:
             raise ValueError("Profile requires tool_diameter to be est")
