@@ -5,8 +5,8 @@ import cadquery as cq
 
 from cq_cam.command import Plunge, Rapid
 from cq_cam.operations.base_operation import Operation, OperationError
+from cq_cam.operations.strategy import Strategy
 from cq_cam.utils.utils import flatten_list
-from src.cq_cam.operations.strategy import Strategy
 
 _op_o_shapes = Union[cq.Wire, cq.Face, cq.Vector]
 

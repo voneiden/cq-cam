@@ -1,8 +1,8 @@
 import cadquery as cq
 
-from cq_cam import EdgeTabs
 from cq_cam.fluent import Job
-from src.cq_cam.operations import profile
+from cq_cam.operations import profile
+from cq_cam.operations.tabs import EdgeTabs
 
 if __name__ == "temp" or __name__ == "__main__":
     wp = cq.Workplane().box(15, 10, 5)
