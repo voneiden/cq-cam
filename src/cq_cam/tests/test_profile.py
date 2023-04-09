@@ -1,7 +1,7 @@
 import cadquery as cq
 
 from cq_cam.fluent import Job
-from cq_cam.operations.tabs import EdgeTabs
+from cq_cam.operations.tabs import EdgeTabs, WireTabs
 from cq_cam.utils.circle_bug_workaround import circle_bug_workaround
 
 
@@ -158,6 +158,36 @@ def test_profile_tabs(job, bottom_face):
         "Z-1\n"
         "Y-1.333\n"
         "Z-2\n"
+        "Y-2.5G1Z0\n"
+        "G0Z10\n"
+        "X0Y0"
+    )
+
+
+def test_profile_wire_tabs(job, bottom_face):
+    code = job.profile(
+        bottom_face, outer_offset=0, tabs=WireTabs(count=2, width=1, height=1)
+    ).to_gcode()
+    assert code == (
+        "(Job - Feedrate: 200 - Unit: Unit.METRIC)\n"
+        "G90\n"
+        "G21\n"
+        "(Job - Profile)\n"
+        "G0Z10\n"
+        "X2.5Y-2.5\n"
+        "Z1\n"
+        "G1Z-1\n"
+        "X2\n"
+        "Z-2\n"
+        "X-2.5\n"
+        "Y2\n"
+        "Z-1\n"
+        "Y2.5\n"
+        "X-2\n"
+        "Z-2\n"
+        "X2.5\n"
+        "Y-2\n"
+        "Z-1\n"
         "Y-2.5G1Z0\n"
         "G0Z10\n"
         "X0Y0"
