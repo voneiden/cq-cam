@@ -200,6 +200,11 @@ class Job:
             f"{to_home}"
         )
 
+    def save_gcode(self, file_name):
+        gcode = self.to_gcode()
+        with open(file_name, "w") as f:
+            f.write(gcode)
+
     def show(self, show_object):
         for i, operation in enumerate(self.operations):
             show_object(

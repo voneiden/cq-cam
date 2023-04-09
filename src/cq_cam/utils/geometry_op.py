@@ -1,12 +1,15 @@
+import logging
 from typing import List, Literal, Optional, Tuple, TypeAlias, Union
 
 import cadquery as cq
 import pyclipper as pc
+from OCP.StdFail import StdFail_NotDone
 
 from cq_cam.utils.circle_bug_workaround import circle_bug_workaround
 from cq_cam.utils.interpolation import vectors_to_2d_tuples, wire_to_vectors
 from cq_cam.utils.utils import pairwise
 
+logger = logging.getLogger(__name__)
 OffsetToolRadiusMultiplier: TypeAlias = float
 OffsetDistance: TypeAlias = float
 OffsetInput: TypeAlias = Union[
@@ -54,8 +57,22 @@ def offset_wire(
             offset_wires = wire.offset2D(offset + 0.000001, kind)
         except ValueError:
             return []
-    circle_bug_workaround(wire, offset_wires)
-    return offset_wires
+
+    validated_wires = []
+    for wire in offset_wires:
+        try:
+            face = cq.Face.makeFromWires(wire)
+            # Todo arbitrary..
+            # How should one detect whether offset is possible??
+            if face.Area() > 0.1:
+                validated_wires.append(wire)
+        except StdFail_NotDone:
+            logger.warning("Failed to offset wire")
+        except:
+            logger.error("NOT PLANAR!")
+
+    circle_bug_workaround(wire, validated_wires)
+    return validated_wires
 
 
 def offset_polygon(polygon: Polygon, offset: float) -> List[Polygon]:

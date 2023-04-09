@@ -150,7 +150,7 @@ def route_edge(
             mid = AbsoluteCV.from_vector(edge.positionAt(mid_p, "parameter"))
             commands.append(cmd(end=end_cv, center=center, mid=mid, arrow=arrow))
 
-    elif geom_type == "SPLINE" or geom_type == "OFFSET":
+    elif geom_type == "BSPLINE" or geom_type == "SPLINE" or geom_type == "OFFSET":
         # TODO precision
         n = max(int(edge.Length() / 0.1), 2)
 

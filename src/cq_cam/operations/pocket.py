@@ -3,6 +3,7 @@ from collections import defaultdict
 from typing import TYPE_CHECKING, List, Optional
 
 import cadquery as cq
+from OCP.StdFail import StdFail_NotDone
 from OCP.TopAbs import TopAbs_FACE
 from OCP.TopExp import TopExp_Explorer
 
@@ -115,10 +116,14 @@ def fill_pocket_contour_shrink(pocket: cq.Face, step: float) -> List[List[cq.Wir
     try:
         while True:
             node = tree.next_unlocked
-            next_outer_candidates = offset_wire(node.obj, -step + 0.0000001, "arc")
+            next_outer_candidates = offset_wire(node.obj, -step, "arc")
             if inner_faces:
+                next_outers = []
                 for next_outer in next_outer_candidates:
-                    outer_face = cq.Face.makeFromWires(next_outer)
+                    try:
+                        outer_face = cq.Face.makeFromWires(next_outer)
+                    except StdFail_NotDone:
+                        continue
                     outer_compound = outer_face.cut(*inner_faces)
                     compound_faces = break_compound_to_faces(outer_compound)
                     if compound_faces:
