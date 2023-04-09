@@ -164,14 +164,14 @@ class Job:
         )
         return self._add_operation("Pocket", commands)
 
-    def drill(self, *args, **kwargs) -> Job:
-        from cq_cam import Drill
+    def drill(self, op_areas, **kwargs) -> Job:
+        from cq_cam.operations.drill import Drill
 
-        drill = Drill(self, *args, **kwargs)
+        drill = Drill(self, o=op_areas, **kwargs)
         return self._add_operation("Drill", drill.commands)
 
     def surface3d(self, *args, **kwargs) -> Job:
-        from cq_cam import Surface3D
+        from cq_cam.operations.op3d import Surface3D
 
         surface3d = Surface3D(self, *args, **kwargs)
         return self._add_operation("Surface 3D", surface3d.commands)
