@@ -34,6 +34,20 @@ def edge_start_point(edge: cq.Edge, precision=3) -> cq.Vector:
     return edge.startPoint()
 
 
+def edge_start_param(edge: cq.Edge) -> float:
+    orientation = edge.wrapped.Orientation()
+    if orientation == TopAbs_REVERSED:
+        return edge.paramAt(1)
+    return edge.paramAt(0)
+
+
+def edge_end_param(edge: cq.Edge) -> float:
+    orientation = edge.wrapped.Orientation()
+    if orientation == TopAbs_REVERSED:
+        return edge.paramAt(0)
+    return edge.paramAt(1)
+
+
 def edge_oriented_param(edge: cq.Edge, p1, p2):
     orientation = edge.wrapped.Orientation()
     if orientation == TopAbs_REVERSED:

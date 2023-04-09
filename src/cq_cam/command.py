@@ -253,7 +253,14 @@ class Circular(Command, ABC):
         #
         #    edge = cq.Edge.makeCircle(radius, center, cq.Vector(0,0,1))
         # else:
-        edge = cq.Edge.makeThreePointArc(start, mid, end)
+        try:
+            edge = cq.Edge.makeThreePointArc(start, mid, end)
+        except:
+            try:
+                edge = cq.Edge.makeLine(start, end)
+            except:
+                # Too small to render ?
+                return None, end
         if as_edges:
             return edge, end
         shape = AIS_Shape(edge.wrapped)
