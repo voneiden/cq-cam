@@ -2,9 +2,9 @@ name: cq-cam-ci
 
 on:
   push:
-    branches: [ master, towards-stability ]
+    branches: [ unstable, towards-stability ]
   pull_request:
-    branches: [ master, towards-stability ]
+    branches: [ unstable, towards-stability ]
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
