@@ -29,7 +29,7 @@ def test_make_polyface():
         outers.append(wire_to_polygon(face.outerWire()))
         inners += [wire_to_polygon(inner) for inner in face.innerWires()]
 
-    polyfaces = make_polyfaces(outers, inners)
+    polyfaces = make_polyfaces(outers, inners, 0)
     assert len(polyfaces) == 2
 
     # The order changes a bit during processing with clipper

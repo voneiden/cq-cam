@@ -15,12 +15,14 @@ from cq_cam.command import (
     Plunge,
     Rapid,
 )
+from cq_cam.utils.geometry_op import Polygon
 from cq_cam.utils.utils import (
     edge_end_param,
     edge_end_point,
     edge_start_param,
     edge_start_point,
     is_arc_clockwise2,
+    pairwise,
     wire_to_ordered_edges,
 )
 
@@ -228,4 +230,46 @@ def route_wires(job: "Job", wires: List[Union[cq.Wire, cq.Edge]], stepover=None)
         previous_wire = wire
         previous_wire_start = start
         previous_wire_end = end
+    return commands
+
+
+def route_polygons(job: "Job", polygons: List[Polygon], stepover=None):
+    commands = []
+    previous_wire = None
+    previous_wire_start = None
+    previous_wire_end = None
+    ep = None
+    for poly in polygons:
+        start = cq.Vector(*poly[0], 0)
+
+        # Determine how to access the wire
+        # Direct plunge option
+        if previous_wire_end:
+            # distance, target, param = distance_to_wire(previous_wire_end, poly)
+            distance, target, param = None, None, None
+        else:
+            distance, target, param = None, None, None
+
+        if stepover and distance and distance <= stepover:
+            # Determine the index of the edge, shift edges and use param?
+            # edges = shift_edges(edges, target)
+            # start = edge_start_point(edges[0])
+            # if param:
+            #    start = edges[0].positionAt(param, "parameter")
+            # commands.append(Cut(AbsoluteCV.from_vector(start)))
+            pass
+        else:
+            commands += rapid_to(start, job.rapid_height, job.op_safe_height)
+
+        for x, y in poly[1:]:
+            commands.append(Cut.abs(x, y, 0))
+
+        if param:
+            # new_commands, end = route_edge(edges[0], end_p=param)
+            # commands += new_commands
+            pass
+
+        previous_wire = poly
+        previous_wire_start = start
+        previous_wire_end = None  # tODO
     return commands

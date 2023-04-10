@@ -20,15 +20,21 @@ Polygon: TypeAlias = List[Tuple[float, float]]
 
 
 class PolyFace:
-    def __init__(self, outer: Polygon, inners: List[Polygon]):
+    def __init__(self, outer: Polygon, inners: List[Polygon], depth: float):
         self.outer: Polygon = outer
         self.inners: List[Polygon] = inners
+        self.depth = depth
 
     @classmethod
     def from_cq_face(cls, cq_face: cq.Face):
+        bbox = cq_face.BoundingBox()
+        if bbox.zmin != bbox.zmax:
+            raise ValueError("PolyFace supports only flat faces")
+
         return cls(
             wire_to_polygon(cq_face.outerWire()),
             [wire_to_polygon(wire) for wire in cq_face.innerWires()],
+            bbox.zmax,
         )
 
 
@@ -89,8 +95,10 @@ def offset_polygon(polygon: Polygon, offset: float) -> List[Polygon]:
     # noinspection PyArgumentList
     pco = pc.PyclipperOffset(pc.scale_to_clipper(2.0), precision)
     pco.AddPath(scaled_polygon, pc.JT_ROUND, pc.ET_CLOSEDPOLYGON)
+
+    # TODO determine good value for the CleanPolygons
     offset_polygons = [
-        pc.scale_from_clipper(offset_polygon)
+        close_polygon(pc.scale_from_clipper(offset_polygon))
         for offset_polygon in pc.CleanPolygons(
             pco.Execute(scaled_offset), precision / 100
         )
@@ -140,17 +148,9 @@ def close_polygon(polygon: Polygon):
     return polygon
 
 
-def make_polyfaces(outers: List[Polygon], inners: List[Polygon]) -> List[PolyFace]:
-    clipper = pc.Pyclipper()
-    outers = [pc.scale_to_clipper(p) for p in outers]
-    inners = [pc.scale_to_clipper(p) for p in inners]
-
-    clipper.AddPaths(outers, pc.PT_SUBJECT, True)
-    clipper.AddPaths(inners, pc.PT_CLIP, True)
-    poly_node: pc.PyPolyNode = clipper.Execute2(pc.CT_DIFFERENCE)
-
+def poly_tree_to_poly_faces(poly_tree: pc.PyPolyNode, depth: float) -> List[PolyFace]:
     polyfaces: List[PolyFace] = []
-    for face in poly_node.Childs:
+    for face in poly_tree.Childs:
         if face.depth > 1:
             logger.warning("Deep face encountered in make_polyface")
         outer = tuplify_polygon(close_polygon(pc.scale_from_clipper(face.Contour)))
@@ -158,8 +158,14 @@ def make_polyfaces(outers: List[Polygon], inners: List[Polygon]) -> List[PolyFac
             tuplify_polygon(close_polygon(pc.scale_from_clipper(child.Contour)))
             for child in face.Childs
         ]
-        polyfaces.append(PolyFace(outer, inners))
+        polyfaces.append(PolyFace(outer, inners, depth))
     return polyfaces
+
+
+def make_polyfaces(
+    outers: List[Polygon], inners: List[Polygon], depth: float
+) -> List[PolyFace]:
+    return difference_poly_tree(outers, inners, depth)
 
 
 def offset_polyface(
@@ -169,10 +175,12 @@ def offset_polyface(
     inners = flatten_list(
         [offset_polygon(inner, inner_offset) for inner in polyface.inners]
     )
-    return make_polyfaces(outers, inners)
+    return make_polyfaces(outers, inners, polyface.depth)
 
 
-def polygon_boolean_op(subjects: List[Polygon], clips: List[Polygon], clip_type: int):
+def prepare_polygon_boolean_op(
+    subjects: List[Polygon], clips: List[Polygon]
+) -> pc.Pyclipper:
     clipper = pc.Pyclipper()
     # noinspection PyArgumentList
     scaled_subjects = [pc.scale_to_clipper(subject) for subject in subjects]
@@ -180,6 +188,40 @@ def polygon_boolean_op(subjects: List[Polygon], clips: List[Polygon], clip_type:
     scaled_clips = [pc.scale_to_clipper(clip) for clip in clips]
 
     clipper.AddPaths(scaled_subjects, pc.PT_SUBJECT)
-    clipper.AddPaths(scaled_clips, pc.PT_CLIP)
+
+    if scaled_clips:
+        clipper.AddPaths(scaled_clips, pc.PT_CLIP)
+
+    return clipper
+
+
+def boolean_op_polygon_list(
+    subjects: List[Polygon], clips: List[Polygon], clip_type: int
+) -> List[Polygon]:
+    clipper = prepare_polygon_boolean_op(subjects, clips)
     results = [pc.scale_from_clipper(result) for result in clipper.Execute(clip_type)]
     return results
+
+
+def boolean_op_poly_tree(
+    subjects: List[Polygon], clips: List[Polygon], clip_type: int
+) -> pc.PyPolyNode:
+    clipper = prepare_polygon_boolean_op(subjects, clips)
+    results = clipper.Execute2(clip_type)
+    return results
+
+
+def union_poly_tree(
+    subjects: List[Polygon], clips: List[Polygon], depth: float
+) -> List[PolyFace]:
+    return poly_tree_to_poly_faces(
+        boolean_op_poly_tree(subjects, clips, pc.CT_UNION), depth
+    )
+
+
+def difference_poly_tree(
+    subjects: List[Polygon], clips: List[Polygon], depth: float
+) -> List[PolyFace]:
+    return poly_tree_to_poly_faces(
+        boolean_op_poly_tree(subjects, clips, pc.CT_DIFFERENCE), depth
+    )
