@@ -130,6 +130,47 @@ def offset_face(
     return offset_faces
 
 
+def tuplify_polygon(polygon: Polygon):
+    return [tuple(point) for point in polygon]
+
+
+def close_polygon(polygon: Polygon):
+    if polygon[0] != polygon[-1]:
+        polygon.append(polygon[0])
+    return polygon
+
+
+def make_polyface(outers: List[Polygon], inners: List[Polygon]) -> List[PolyFace]:
+    clipper = pc.Pyclipper()
+    outers = [pc.scale_to_clipper(p) for p in outers]
+    inners = [pc.scale_to_clipper(p) for p in inners]
+
+    clipper.AddPaths(outers, pc.PT_SUBJECT, True)
+    clipper.AddPaths(inners, pc.PT_CLIP, True)
+    poly_node: pc.PyPolyNode = clipper.Execute2(pc.CT_DIFFERENCE)
+
+    polyfaces: List[PolyFace] = []
+    for face in poly_node.Childs:
+        if face.depth > 1:
+            logger.warning("Deep face encountered in make_polyface")
+        outer = tuplify_polygon(close_polygon(pc.scale_from_clipper(face.Contour)))
+        inners = [
+            tuplify_polygon(close_polygon(pc.scale_from_clipper(child.Contour)))
+            for child in face.Childs
+        ]
+        polyfaces.append(PolyFace(outer, inners))
+    return polyfaces
+
+
+def offset_face_clipper(
+    face: cq.Face, outer_offset: float, inner_offset: float
+) -> List[PolyFace]:
+    outers = offset_polygon(wire_to_polygon(face.outerWire()), outer_offset)
+    inners = []
+    for inner in face.innerWires():
+        inners += offset_polygon(wire_to_polygon(inner), inner_offset)
+
+
 def polygon_boolean_op(subjects: List[Polygon], clips: List[Polygon], clip_type: int):
     clipper = pc.Pyclipper()
     # noinspection PyArgumentList
