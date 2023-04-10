@@ -1,7 +1,7 @@
 import itertools
 import math
 from functools import cache
-from typing import Iterable, List, Tuple, Union
+from typing import Iterable, List, T, Tuple, Union
 
 import numpy as np
 import pyclipper
@@ -210,7 +210,7 @@ def cut_clockwise(positive_offset: bool, spindle_clockwise: bool, climb: bool):
     return bool((positive_offset + spindle_clockwise + climb) % 2)
 
 
-def flatten_list(lst: List[Iterable]) -> List:
+def flatten_list(lst: Iterable[Iterable[T]]) -> List[T]:
     return [element for nested_lst in lst for element in nested_lst]
 
 

@@ -7,7 +7,7 @@ from OCP.StdFail import StdFail_NotDone
 
 from cq_cam.utils.circle_bug_workaround import circle_bug_workaround
 from cq_cam.utils.interpolation import vectors_to_2d_tuples, wire_to_vectors
-from cq_cam.utils.utils import pairwise
+from cq_cam.utils.utils import flatten_list, pairwise
 
 logger = logging.getLogger(__name__)
 OffsetToolRadiusMultiplier: TypeAlias = float
@@ -140,7 +140,7 @@ def close_polygon(polygon: Polygon):
     return polygon
 
 
-def make_polyface(outers: List[Polygon], inners: List[Polygon]) -> List[PolyFace]:
+def make_polyfaces(outers: List[Polygon], inners: List[Polygon]) -> List[PolyFace]:
     clipper = pc.Pyclipper()
     outers = [pc.scale_to_clipper(p) for p in outers]
     inners = [pc.scale_to_clipper(p) for p in inners]
@@ -162,13 +162,14 @@ def make_polyface(outers: List[Polygon], inners: List[Polygon]) -> List[PolyFace
     return polyfaces
 
 
-def offset_face_clipper(
-    face: cq.Face, outer_offset: float, inner_offset: float
+def offset_polyface(
+    polyface: PolyFace, outer_offset: float, inner_offset: float
 ) -> List[PolyFace]:
-    outers = offset_polygon(wire_to_polygon(face.outerWire()), outer_offset)
-    inners = []
-    for inner in face.innerWires():
-        inners += offset_polygon(wire_to_polygon(inner), inner_offset)
+    outers = offset_polygon(polyface.outer, outer_offset)
+    inners = flatten_list(
+        [offset_polygon(inner, inner_offset) for inner in polyface.inners]
+    )
+    return make_polyfaces(outers, inners)
 
 
 def polygon_boolean_op(subjects: List[Polygon], clips: List[Polygon], clip_type: int):

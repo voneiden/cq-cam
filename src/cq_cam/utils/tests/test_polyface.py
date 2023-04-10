@@ -2,7 +2,7 @@ from typing import List
 
 import cadquery as cq
 
-from cq_cam.utils.geometry_op import make_polyface, wire_to_polygon
+from cq_cam.utils.geometry_op import make_polyfaces, wire_to_polygon
 from cq_cam.utils.tests.conftest import shift_polygon
 
 
@@ -29,8 +29,10 @@ def test_make_polyface():
         outers.append(wire_to_polygon(face.outerWire()))
         inners += [wire_to_polygon(inner) for inner in face.innerWires()]
 
-    polyfaces = make_polyface(outers, inners)
+    polyfaces = make_polyfaces(outers, inners)
     assert len(polyfaces) == 2
+
+    # The order changes a bit during processing with clipper
     assert polyfaces[0].outer == shift_polygon(outers[0], 3)
     assert polyfaces[0].inners[0] == shift_polygon(inners[0], 1)
     assert polyfaces[1].outer == shift_polygon(outers[1], 3)
