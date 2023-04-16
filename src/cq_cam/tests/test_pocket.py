@@ -1,6 +1,6 @@
 import cadquery as cq
 
-from cq_cam.operations.pocket import offset_face
+from cq_cam.utils.geometry_op import offset_face
 from cq_cam.utils.tests.conftest import round_array
 from cq_cam.utils.utils import break_compound_to_faces
 
