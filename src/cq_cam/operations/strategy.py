@@ -142,7 +142,7 @@ class ZigZagStrategy(Strategy):
             linked_polygons.append(linked_polygon)
             for p1, p2 in pairwise(polygon):
                 for scanpoint in remaining_scanpoints[:]:
-                    d = dist_to_segment_squared(scanpoint, p1, p2)
+                    d, _ = dist_to_segment_squared(scanpoint, p1, p2)
                     # Todo pick a good number. Tests show values between 1.83e-19 and 1.38e-21
                     if d < 0.0000001:
                         remaining_scanpoints.remove(scanpoint)

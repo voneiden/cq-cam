@@ -15,7 +15,7 @@ from cq_cam.command import (
     Plunge,
     Rapid,
 )
-from cq_cam.utils.geometry_op import Polygon
+from cq_cam.utils.geometry_op import PolyFace, Polygon, distance_to_polygon
 from cq_cam.utils.utils import (
     edge_end_param,
     edge_end_point,
@@ -233,30 +233,38 @@ def route_wires(job: "Job", wires: List[Union[cq.Wire, cq.Edge]], stepover=None)
     return commands
 
 
-def route_polygons(job: "Job", polygons: List[Polygon], stepover=None):
+def shift_polygon(polygon: Polygon, i: int):
+    polygon = polygon[:-1]
+    polygon = polygon[i:] + polygon[: i + 1]
+    return polygon
+
+
+def route_polyface_outers(job: "Job", polyfaces: List[PolyFace], stepover=None):
     commands = []
     previous_wire = None
     previous_wire_start = None
     previous_wire_end = None
     ep = None
-    for poly in polygons:
-        start = cq.Vector(*poly[0], 0)
+    for polyface in polyfaces:
+        poly = polyface.outer
+        start = cq.Vector(*poly[0], polyface.depth)
 
         # Determine how to access the wire
         # Direct plunge option
         if previous_wire_end:
-            # distance, target, param = distance_to_wire(previous_wire_end, poly)
-            distance, target, param = None, None, None
+            distance, closest_point, poly_position = distance_to_polygon(
+                previous_wire_end, poly
+            )
         else:
-            distance, target, param = None, None, None
+            distance, closest_point, poly_position = None, None, None
 
         if stepover and distance and distance <= stepover:
             # Determine the index of the edge, shift edges and use param?
             # edges = shift_edges(edges, target)
-            # start = edge_start_point(edges[0])
-            # if param:
-            #    start = edges[0].positionAt(param, "parameter")
-            # commands.append(Cut(AbsoluteCV.from_vector(start)))
+            index = poly_position[0]
+            poly = shift_polygon(poly, index)
+            start = closest_point
+            commands.append(Cut.abs(*start, polyface.depth))
             pass
         else:
             commands += rapid_to(start, job.rapid_height, job.op_safe_height)
@@ -264,12 +272,12 @@ def route_polygons(job: "Job", polygons: List[Polygon], stepover=None):
         for x, y in poly[1:]:
             commands.append(Cut.abs(x, y, 0))
 
-        if param:
-            # new_commands, end = route_edge(edges[0], end_p=param)
-            # commands += new_commands
-            pass
+        if closest_point:
+            commands.append(Cut.abs(*closest_point, polyface.depth))
+            previous_wire_end = closest_point
+        else:
+            previous_wire_end = poly[-1]
+        # previous_wire = poly
+        # previous_wire_start = start
 
-        previous_wire = poly
-        previous_wire_start = start
-        previous_wire_end = None  # tODO
     return commands

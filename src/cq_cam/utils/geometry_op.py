@@ -1,4 +1,6 @@
 import logging
+from itertools import pairwise
+from math import sqrt
 from typing import List, Literal, Optional, Tuple, TypeAlias, Union
 
 import cadquery as cq
@@ -7,7 +9,7 @@ from OCP.StdFail import StdFail_NotDone
 
 from cq_cam.utils.circle_bug_workaround import circle_bug_workaround
 from cq_cam.utils.interpolation import vectors_to_2d_tuples, wire_to_vectors
-from cq_cam.utils.utils import flatten_list, pairwise
+from cq_cam.utils.utils import dist_to_segment_squared, flatten_list
 
 logger = logging.getLogger(__name__)
 OffsetToolRadiusMultiplier: TypeAlias = float
@@ -16,10 +18,14 @@ OffsetInput: TypeAlias = Union[
     OffsetToolRadiusMultiplier, Tuple[OffsetToolRadiusMultiplier, OffsetDistance]
 ]
 
-Polygon: TypeAlias = List[Tuple[float, float]]
+Point: TypeAlias = Tuple[float, float]
+Polygon: TypeAlias = List[Point]
+PolyPosition: TypeAlias = Tuple[int, float]
 
 
 class PolyFace:
+    __slots__ = ("outer", "inners", "depth")
+
     def __init__(self, outer: Polygon, inners: List[Polygon], depth: float):
         self.outer: Polygon = outer
         self.inners: List[Polygon] = inners
@@ -81,7 +87,7 @@ def offset_wire(
     return validated_wires
 
 
-def offset_polygon(polygon: Polygon, offset: float) -> List[Polygon]:
+def offset_polygon(polygon: Polygon, offset: float) -> list[Polygon]:
     # noinspection PyArgumentList
     scaled_polygon = pc.scale_to_clipper(polygon)
 
@@ -172,10 +178,13 @@ def offset_polyface(
     polyface: PolyFace, outer_offset: float, inner_offset: float
 ) -> List[PolyFace]:
     outers = offset_polygon(polyface.outer, outer_offset)
-    inners = flatten_list(
-        [offset_polygon(inner, inner_offset) for inner in polyface.inners]
-    )
-    return make_polyfaces(outers, inners, polyface.depth)
+    if polyface.inners:
+        inners = flatten_list(
+            [offset_polygon(inner, inner_offset) for inner in polyface.inners]
+        )
+        return make_polyfaces(outers, inners, polyface.depth)
+    else:
+        return [PolyFace(outer, inners=[], depth=polyface.depth) for outer in outers]
 
 
 def prepare_polygon_boolean_op(
@@ -225,3 +234,29 @@ def difference_poly_tree(
     return poly_tree_to_poly_faces(
         boolean_op_poly_tree(subjects, clips, pc.CT_DIFFERENCE), depth
     )
+
+
+def segment_length_squared(s1: Point, s2: Point):
+    return (s2[0] - s1[0]) ** 2 + (s2[1] - s1[1]) ** 2
+
+
+def distance_to_polygon(
+    point: Point, polygon: Polygon
+) -> Tuple[float, Point, PolyPosition]:
+    distance, closest_point, poly_position = None, None, None
+    for i, (segment_start, segment_end) in enumerate(pairwise(polygon)):
+        s_distance, s_closest_point = dist_to_segment_squared(
+            point, segment_start, segment_end
+        )
+        if distance is None or s_distance < distance:
+            distance = s_distance
+            closest_point = s_closest_point
+            segment_length = segment_length_squared(segment_start, segment_end)
+            point_length = segment_length_squared(segment_start, closest_point)
+
+            # the lengths are squared, so to get the correct ratio
+            # sqrt needs to be applied
+            poly_param = sqrt(point_length / segment_length)
+            poly_position = (i, poly_param)
+
+    return distance, closest_point, poly_position

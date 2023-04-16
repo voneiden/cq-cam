@@ -316,7 +316,7 @@ class WireClipper:
         return self.execute(pyclipper.CT_DIFFERENCE)
 
 
-def dist2(v, w):
+def dist2(v: Tuple[float, float], w: Tuple[float, float]) -> float:
     return (v[0] - w[0]) ** 2 + (v[1] - w[1]) ** 2
 
 
@@ -325,13 +325,18 @@ def cached_dist2(p1: Tuple[float, float], p2: Tuple[float, float]):
     return dist2(p1, p2)
 
 
-def dist_to_segment_squared(p, v, w):
+def dist_to_segment_squared(
+    point: Tuple[float, float],
+    segment_start: Tuple[float, float],
+    segment_end: Tuple[float, float],
+) -> Tuple[float, Tuple[float, float]]:
+    p, v, w = point, segment_start, segment_end
     """https://stackoverflow.com/a/1501725"""
     l2 = dist2(v, w)
     t = ((p[0] - v[0]) * (w[0] - v[0]) + (p[1] - v[1]) * (w[1] - v[1])) / l2
-    t = max(0, min(1, t))
+    t = max(0.0, min(1.0, t))
     closest_point = (v[0] + t * (w[0] - v[0]), v[1] + t * (w[1] - v[1]))
-    return dist2(p, closest_point)
+    return dist2(p, closest_point), closest_point
 
 
 def pairwise(iterable):

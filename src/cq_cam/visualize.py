@@ -50,8 +50,8 @@ def visualize_job(job_plane: cq.Plane, commands, start_height=10):
     position = cq.Vector(0, 0, start_height)
     command_group = AIS_MultipleConnectedInteractive()
 
-    for command in commands:
-        shape, position = command.to_ais_shape(position)
+    for i, command in enumerate(commands):
+        shape, position = command.to_ais_shape(position, alt_color=i % 2)
         if shape:
             command_group.Connect(shape)
 

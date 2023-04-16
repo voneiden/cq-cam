@@ -60,6 +60,7 @@ class Command(ABC):
     modal = None
     max_depth: Optional[float]
     ais_color = "red"
+    ais_alt_color = "darkred"
     end: CommandVector
     tab: bool  # TODO not the right place to carry tab information imo?
 
@@ -109,7 +110,9 @@ class Command(ABC):
         pass
 
     @abstractmethod
-    def to_ais_shape(self, start: cq.Vector, as_edges=False) -> (AIS_Shape, cq.Vector):
+    def to_ais_shape(
+        self, start: cq.Vector, as_edges=False, alt_color=False
+    ) -> (AIS_Shape, cq.Vector):
         pass
 
 
@@ -119,7 +122,9 @@ class ReferencePosition(Command):
     ) -> (str, cq.Vector):
         raise RuntimeError("Reference position may not generate gcode")
 
-    def to_ais_shape(self, start: cq.Vector, as_edges=False) -> (AIS_Shape, cq.Vector):
+    def to_ais_shape(
+        self, start: cq.Vector, as_edges=False, alt_color=False
+    ) -> (AIS_Shape, cq.Vector):
         raise RuntimeError("Reference position may not generate shape")
 
 
@@ -130,7 +135,7 @@ class Linear(Command, ABC):
         xyz, end = self.xyz_gcode(start)
         return f"{self.print_modal(previous_command)}{xyz}", end
 
-    def to_ais_shape(self, start, as_edges=False):
+    def to_ais_shape(self, start, as_edges=False, alt_color=False):
         end = self.end.to_vector(start)
         if start == end:
             return None, end
@@ -143,7 +148,11 @@ class Linear(Command, ABC):
         )
         if self.arrow:
             shape.Attributes().SetLineArrowDraw(True)
-        shape.SetColor(cached_occ_color(self.ais_color))
+
+        shape.SetColor(
+            cached_occ_color(self.ais_alt_color if alt_color else self.ais_color)
+        )
+
         return shape, end
 
     def flip(self, new_end: cq.Vector) -> (Command, cq.Vector):
@@ -240,7 +249,7 @@ class Circular(Command, ABC):
         ijk = self.ijk_gcode(start)
         return f"{self.print_modal(previous_command)}{xyz}{ijk}", end
 
-    def to_ais_shape(self, start, as_edges=False):
+    def to_ais_shape(self, start, as_edges=False, alt_color=False):
         end = self.end.to_vector(start)
         mid = self.mid.to_vector(start)
 
@@ -264,7 +273,9 @@ class Circular(Command, ABC):
         if as_edges:
             return edge, end
         shape = AIS_Shape(edge.wrapped)
-        shape.SetColor(cached_occ_color(self.ais_color))
+        shape.SetColor(
+            cached_occ_color(self.ais_alt_color if alt_color else self.ais_color)
+        )
         return shape, end
 
 

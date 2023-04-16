@@ -3,69 +3,26 @@ from collections import defaultdict
 from typing import TYPE_CHECKING, List, Literal, Optional
 
 import cadquery as cq
-from OCP.StdFail import StdFail_NotDone
-from OCP.TopAbs import TopAbs_FACE
-from OCP.TopExp import TopExp_Explorer
 
 from cq_cam.operations.pocket_cq import pocket_cq
-from cq_cam.routers import route_polygons, route_wires
+from cq_cam.routers import route_polyface_outers
 from cq_cam.utils.geometry_op import (
     OffsetInput,
     PolyFace,
     Polygon,
     calculate_offset,
     difference_poly_tree,
-    offset_face,
     offset_polyface,
     offset_polygon,
-    offset_wire,
     union_poly_tree,
 )
 from cq_cam.utils.tree import Tree
-from cq_cam.utils.utils import break_compound_to_faces, flatten_list
+from cq_cam.utils.utils import flatten_list
 
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from cq_cam.fluent import Job
-
-
-def fill_pocket_contour_shrink_clipper(pocket: PolyFace, step: float) -> List[Polygon]:
-    inner_polygons = pocket.inners
-    tree = Tree(pocket.outer)
-    i = 0
-
-    # TODO sanify the variable names here
-    try:
-        while True:
-            if i > 50:
-                break
-            i += 1
-            node = tree.next_unlocked
-            next_outer_candidates = offset_polygon(node.obj, -step)
-            next_outers = []
-
-            if inner_polygons:
-                for next_outer in next_outer_candidates:
-                    outer_face = cq.Face.makeFromWires(next_outer)
-                    outer_compound = outer_face.cut(*inner_polygons)
-                    compound_faces = break_compound_to_faces(outer_compound)
-                    if compound_faces:
-                        next_outers += [face.outerWire() for face in compound_faces]
-            else:
-                next_outers = next_outer_candidates
-
-            if next_outers:
-                node.branch(next_outers)
-            else:
-                node.lock()
-
-            i += 1
-
-    except StopIteration:
-        pass
-
-    return tree.sequences
 
 
 def pocket(
@@ -193,15 +150,15 @@ def build_pocket_ops(
     return pocket_ops
 
 
-def fill_pocket_contour_shrink(pocket: PolyFace, step: float) -> List[Polygon]:
-    tree = Tree(pocket.outer)
+def fill_pocket_contour_shrink(pocket: PolyFace, step: float) -> list[PolyFace]:
+    tree = Tree(PolyFace(pocket.outer, [], depth=pocket.depth))
     i = 0
 
     # TODO sanify the variable names here
     try:
         while True:
             node = tree.next_unlocked
-            next_outer_candidates = offset_polygon(node.obj, -step)
+            next_outer_candidates = offset_polygon(node.obj.outer, -step)
             if pocket.inners:
                 next_outers = [
                     face.outer
@@ -213,7 +170,9 @@ def fill_pocket_contour_shrink(pocket: PolyFace, step: float) -> List[Polygon]:
                 next_outers = next_outer_candidates
 
             if next_outers:
-                node.branch(next_outers)
+                node.branch(
+                    [PolyFace(outer, [], pocket.depth) for outer in next_outers]
+                )
             else:
                 node.lock()
 
@@ -227,19 +186,17 @@ def fill_pocket_contour_shrink(pocket: PolyFace, step: float) -> List[Polygon]:
 
 def pocket_clipper(
     job,
-    op_areas: List[PolyFace],
-    avoid_areas: List[PolyFace],
+    op_areas: list[PolyFace],
+    avoid_areas: list[PolyFace],
     outer_offset: float,
     inner_offset: float,
     avoid_outer_offset: float,
     avoid_inner_offset: float,
     stepover: float,
 ):
-    # Convert to polyfaces
-
     # Offset faces
-    offset_op_areas = []
-    offset_avoid_areas = []
+    offset_op_areas: list[PolyFace] = []
+    offset_avoid_areas: list[PolyFace] = []
 
     for face in op_areas:
         offset_op_areas += offset_polyface(face, outer_offset, inner_offset)
@@ -252,13 +209,13 @@ def pocket_clipper(
     pocket_ops = build_pocket_ops(job, offset_op_areas, offset_avoid_areas)
 
     # Apply pocket fill
-    sequences: List[List[Polygon]] = []
+    sequences: List[List[PolyFace]] = []
     for pocket_op in pocket_ops:
         sequences += fill_pocket_contour_shrink(pocket_op, stepover)
 
     # Route wires
     commands = []
-    for sequence_wires in sequences:
-        commands += route_polygons(job, sequence_wires, stepover=stepover)
+    for sequence_polyfaces in sequences:
+        commands += route_polyface_outers(job, sequence_polyfaces, stepover=stepover)
 
     return commands
