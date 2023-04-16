@@ -34,7 +34,7 @@ class PolyFace:
     @classmethod
     def from_cq_face(cls, cq_face: cq.Face):
         bbox = cq_face.BoundingBox()
-        if bbox.zmin != bbox.zmax:
+        if round(bbox.zmin, 3) != round(bbox.zmax, 3):
             raise ValueError("PolyFace supports only flat faces")
 
         return cls(
@@ -108,6 +108,7 @@ def offset_polygon(polygon: Polygon, offset: float) -> list[Polygon]:
         for offset_polygon in pc.CleanPolygons(
             pco.Execute(scaled_offset), precision / 100
         )
+        if offset_polygon
     ]
     return offset_polygons
 

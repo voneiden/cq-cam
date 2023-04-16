@@ -159,7 +159,7 @@ def fill_pocket_contour_shrink(pocket: PolyFace, step: float) -> list[PolyFace]:
         while True:
             node = tree.next_unlocked
             next_outer_candidates = offset_polygon(node.obj.outer, -step)
-            if pocket.inners:
+            if next_outer_candidates and pocket.inners:
                 next_outers = [
                     face.outer
                     for face in difference_poly_tree(
