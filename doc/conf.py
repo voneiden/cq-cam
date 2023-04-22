@@ -13,8 +13,9 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
-import sys, os
+import os
 import os.path
+import sys
 
 # print "working path is %s" % os.getcwd()
 # sys.path.append("../cadquery")
@@ -47,7 +48,7 @@ extensions = [
     "sphinx.ext.autosummary",
     "cadquery.cq_directive",
     "sphinx.ext.mathjax",
-    "enum_tools.autoenum"
+    "enum_tools.autoenum",
 ]
 
 always_document_param_types = True
@@ -64,8 +65,8 @@ source_suffix = ".rst"
 master_doc = "index"
 
 # General information about the project.
-project = u"CQ-CAM"
-copyright = u"Matti Eiden, All Rights Reserved"
+project = "CQ-CAM"
+copyright = "Matti Eiden, All Rights Reserved"
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the

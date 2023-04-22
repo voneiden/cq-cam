@@ -10,9 +10,11 @@ CQ-CAM aims to become a free, parametric CAM solution for
 ===
 Highly experimental at this stage. Expect bugs and always inspect the generated gcode.
 
+2023-04-22: A major refactoring has been merged, likely breaking features that were present in v0.1. 
+Proceed with extra caution if using the untsable branch!
+
 Requirements and installation
 ---
-* 
 * [cadquery=master=py3.10](https://github.com/CadQuery/cadquery)
 * Optional visualization: [cq-editor=master=py3.10](https://github.com/CadQuery/CQ-editor)
 * Optional 3D toolpaths: [opencamlib=2019.07](https://anaconda.org/conda-forge/opencamlib) (note, not available in PyPI)

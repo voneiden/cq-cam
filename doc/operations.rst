@@ -6,36 +6,44 @@ This page describes how to use the various operations provided by the library.
 
 Profile
 =========
-:class:`cq_cam.Profile` generates 2.5D profile toolpaths.
-It can be used for both outer and inner profiles.
+Profile operations follow wires.
 
 Outer profile
 -------------
 
 .. cadquery::
 
-    from cq_cam import Job, Profile, METRIC, visualize_task
+    from cq_cam import JobV2
     result = cadquery.Workplane("front").box(20.0, 20.0, 5)
 
-    job_plane = result.faces('>Z').workplane()
-    job = Job(job_plane, 300, 100, METRIC, 5)
-    op = Profile(job=job, o=result.wires('<Z'))
-    toolpath = visualize_task(job, op, as_edges=True)
-    result.objects += toolpath
+    job_wp = result.faces('>Z').workplane()
+    cam = (
+        JobV2(top=job_wp.plane, feed=300, tool_diameter=1)
+        .profile(result.wires('<Z'), outer_offset=1)
+    )
+    result.objects += cam.to_shapes(as_edges=True)
 
 Inner profile
 -------------
 .. cadquery::
 
-    from cq_cam import Job, Profile, METRIC, visualize_task
+    from cq_cam import JobV2
 
-    result = cadquery.Workplane("front").box(20.0, 20.0, 1).faces('>Z').workplane().rect(10, 10).cutThruAll()
+    result = (
+        cadquery.Workplane("front")
+        .box(20.0, 20.0, 1)
+        .faces('>Z')
+        .workplane()
+        .rect(10, 10)
+        .cutThruAll()
+    )
 
-    job_plane = result.faces('>Z').workplane()
-    job = Job(job_plane, 300, 100, METRIC, 5)
-    op = Profile(job=job, o=result.faces('<Z'), face_offset_outer=None, face_offset_inner=-1)
-    toolpath = visualize_task(job, op, as_edges=True)
-    result.objects += toolpath
+    job_wp = result.faces('>Z').workplane()
+    cam = (
+        JobV2(top=job_wp.plane, feed=300, tool_diameter=1)
+        .profile(result.faces('<Z'), inner_offset=-1)
+    )
+    result.objects += cam.to_shapes(as_edges=True)
 
 Tabs
 ----
@@ -55,14 +63,19 @@ spacing or manually defined positions.
 
 .. cadquery::
 
-    from cq_cam import Job, Profile, METRIC, visualize_task, EdgeTabs
+    from cq_cam import JobV2, EdgeTabs
     result = cadquery.Workplane("front").box(20.0, 20.0, 5)
 
-    job_plane = result.faces('>Z').workplane()
-    job = Job(job_plane, 300, 100, METRIC, 5)
-    op = Profile(job=job, o=result.wires('<Z'), tabs=EdgeTabs(spacing=9, width=2, height=2))
-    toolpath = visualize_task(job, op, as_edges=True)
-    result.objects += toolpath
+    job_wp = result.faces('>Z').workplane()
+    cam = (
+        JobV2(top=job_wp.plane, feed=300, tool_diameter=1)
+        .profile(
+            result.wires('<Z'),
+            outer_offset=1,
+            tabs=EdgeTabs(spacing=9, width=2, height=2)
+        )
+    )
+    result.objects += cam.to_shapes(as_edges=True)
 
 WireTabs
 ********
@@ -72,14 +85,19 @@ Tabs can be placed by count, spacing or manually defined positions.
 
 .. cadquery::
 
-    from cq_cam import Job, Profile, METRIC, visualize_task, WireTabs
+    from cq_cam import JobV2, WireTabs
     result = cadquery.Workplane("front").box(20.0, 20.0, 5)
 
-    job_plane = result.faces('>Z').workplane()
-    job = Job(job_plane, 300, 100, METRIC, 5)
-    op = Profile(job=job, o=result.wires('<Z'), tabs=WireTabs(count=8, width=2, height=2))
-    toolpath = visualize_task(job, op, as_edges=True)
-    result.objects += toolpath
+    job_wp = result.faces('>Z').workplane()
+    cam = (
+        JobV2(top=job_wp.plane, feed=300, tool_diameter=1)
+        .profile(
+            result.wires('<Z'),
+            outer_offset=1,
+            tabs=WireTabs(count=8, width=2, height=2)
+        )
+    )
+    result.objects += cam.to_shapes(as_edges=True)
 
 
 
@@ -96,27 +114,39 @@ Closed pockets and strategies
 
 .. cadquery::
 
-    from cq_cam import Job, Pocket, METRIC, visualize_task, ZigZagStrategy
+    from cq_cam import JobV2, ZigZagStrategy
 
     result = cq.Workplane("front").box(50.0, 50.0, 2).faces('>Z').workplane().rect(40, 40).cutBlind(-1)
 
-    job_plane = result.faces('>Z').workplane()
-    job = Job(job_plane, 300, 100, METRIC, 5)
-    op = Pocket(job=job, clearance_height=5, top_height=0, o=result.faces('<Z[1]'), strategy=ZigZagStrategy)
-    toolpath = visualize_task(job, op, as_edges=True)
-    result.objects += toolpath
+    job_wp = result.faces('>Z').workplane()
+    cam = (
+        JobV2(top=job_wp.plane, feed=300, tool_diameter=1)
+        .pocket(
+            clearance_height=5,
+            top_height=0,
+            o=result.faces('<Z[1]'),
+            strategy=ZigZagStrategy
+        )
+    )
+    result.objects += cam.to_shapes(as_edges=True)
 
 .. cadquery::
 
-    from cq_cam import Job, Pocket, METRIC, visualize_task, ContourStrategy
+    from cq_cam import JobV2, ContourStrategy
 
     result = cq.Workplane("front").box(50.0, 50.0, 2).faces('>Z').workplane().rect(40, 40).cutBlind(-1)
 
-    job_plane = result.faces('>Z').workplane()
-    job = Job(job_plane, 300, 100, METRIC, 5)
-    op = Pocket(job=job, clearance_height=5, top_height=0, o=result.faces('<Z[1]'), strategy=ContourStrategy)
-    toolpath = visualize_task(job, op, as_edges=True)
-    result.objects += toolpath
+    job_wp = result.faces('>Z').workplane()
+    cam = (
+        JobV2(top=job_wp.plane, feed=300, tool_diameter=1)
+        .pocket(
+            clearance_height=5,
+            top_height=0,
+            o=result.faces('<Z[1]'),
+            strategy=ContourStrategy
+        )
+    )
+    result.objects += cam.to_shapes(as_edges=True)
 
 Open pockets
 ------------
@@ -126,28 +156,43 @@ entering the faces listed.
 
 .. cadquery::
 
-    from cq_cam import Job, Pocket, METRIC, visualize_task
+    from cq_cam import JobV2
 
     result = cq.Workplane("front").box(20.0, 20.0, 2).faces('>Z').workplane().rect(15, 15).cutBlind(-1).moveTo(0, -10).rect(5, 5).cutBlind(-1)
-    job_plane = result.faces('>Z').workplane()
-    job = Job(job_plane, 300, 100, METRIC, 5)
-    op = Pocket(job=job, tool_diameter=1, clearance_height=5, top_height=0, o=result.faces('<Z[1]'), outer_boundary_offset=1, avoid=result.faces('>Z'))
-    toolpath = visualize_task(job, op, as_edges=True)
-    result.objects += toolpath
+
+    job_wp = result.faces('>Z').workplane()
+    cam = (
+        JobV2(top=job_wp.plane, feed=300, tool_diameter=1)
+        .pocket(
+            clearance_height=5,
+            top_height=0,
+            o=result.faces('<Z[1]'),
+            outer_boundary_offset=1,
+            avoid=result.faces('>Z')
+        )
+    )
+    result.objects += cam.to_shapes(as_edges=True)
 
 
 Drill
 ========
 .. cadquery::
 
-    from cq_cam import Job, Drill, METRIC, visualize_task
+    from cq_cam import JobV2
     result = cq.Workplane("front").box(20.0, 20.0, 2).faces('>Z').workplane().pushPoints([
         (3, 3), (-5, -8), (0, 0), (5, 2), (7, -3), (-8, 2)]).circle(1).cutThruAll()
-    job_plane = result.faces('>Z').workplane()
-    job = Job(job_plane, 300, 100, METRIC, 5)
-    op = Drill(job=job, clearance_height=5, top_height=0, depth=2, o=result.faces('>Z').objects[0].innerWires())
-    toolpath = visualize_task(job, op, as_edges=True)
-    result.objects += toolpath
+
+    job_wp = result.faces('>Z').workplane()
+    cam = (
+        JobV2(top=job_wp.plane, feed=300, tool_diameter=1)
+        .drill(
+            clearance_height=5,
+            top_height=0,
+            depth=2,
+            o=result.faces('>Z').objects[0].innerWires()
+        )
+    )
+    result.objects += cam.to_shapes(as_edges=True)
 
 3D Surface
 ==========
@@ -157,7 +202,7 @@ The package is available in conda but not in pip.
 .. cadquery::
 
     import ocl
-    from cq_cam import Job, Surface3D, METRIC, visualize_task
+    from cq_cam import JobV2
     result = (
         cq.Workplane('XY').rect(30, 30).extrude(20)
         .faces('>Z').workplane().rect(20, 20).cutBlind(-5)
@@ -168,11 +213,20 @@ The package is available in conda but not in pip.
     )
     result.objects = result.objects[0].innerWires()
     result = result.fillet(1)
-    job = Job(workplane=result.faces('>Z').workplane(), feed=300, plunge_feed=100, unit=METRIC, rapid_height=10)
-    op = Surface3D(job=job, clearance_height=2, top_height=0, o=result.faces(), tool=ocl.CylCutter(3.175, 10),
-                   interpolation_step=0.1, outer_boundary_offset=0)
-    toolpath = visualize_task(job, op, as_edges=True)
-    result.objects += toolpath
+
+    job_wp = result.faces('>Z').workplane()
+    cam = (
+        JobV2(top=job_wp.plane, feed=300)
+        .surface3d(
+            clearance_height=2,
+            top_height=0,
+            o=result.faces(),
+            tool=ocl.CylCutter(3.175, 10),
+            interpolation_step=0.1,
+            outer_boundary_offset=0
+        )
+    )
+    result.objects += cam.to_shapes(as_edges=True)
 
 
 
@@ -187,11 +241,18 @@ A common feature is the need to perform an operation in multiple stepdown depths
 
 .. cadquery::
 
-    from cq_cam import Job, Profile, METRIC, visualize_task, EdgeTabs
+    from cq_cam import JobV2, EdgeTabs
+
     result = cadquery.Workplane("front").box(20.0, 20.0, 5)
 
-    job_plane = result.faces('>Z').workplane()
-    job = Job(job_plane, 300, 100, METRIC, 5)
-    op = Profile(job=job, o=result.wires('<Z'), stepdown=-1, tabs=EdgeTabs(spacing=9, width=2, height=2))
-    toolpath = visualize_task(job, op, as_edges=True)
-    result.objects += toolpath
+    job_wp = result.faces('>Z').workplane()
+    cam = (
+        JobV2(top=job_wp.plane, feed=300, tool_diameter=1)
+        .profile(
+            result.wires('<Z'),
+            outer_offset=1,
+            stepdown=2,
+            tabs=EdgeTabs(spacing=9, width=2, height=4)
+        )
+    )
+    result.objects += cam.to_shapes(as_edges=True)

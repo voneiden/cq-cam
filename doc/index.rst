@@ -3,7 +3,8 @@
 CQ-CAM Documentation
 ===================================
 
-CQ-CAM is a CAM extension for generating and visualizing CNC milling toolpaths for CadQuery.
+CQ-CAM is an experimental CAM extension for generating and
+visualizing CNC milling toolpaths for CadQuery.
 
 Table Of Contents
 -------------------
