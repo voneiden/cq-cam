@@ -2,7 +2,7 @@ from typing import List
 
 import cadquery as cq
 
-from cq_cam.utils.geometry_op import make_polyfaces, wire_to_polygon
+from cq_cam.utils.geometry_op import make_polyfaces, wire_to_path
 from cq_cam.utils.tests.conftest import shift_polygon
 
 
@@ -26,8 +26,8 @@ def test_make_polyface():
     inners = []
     faces: List[cq.Face] = wp.objects
     for face in faces:
-        outers.append(wire_to_polygon(face.outerWire()))
-        inners += [wire_to_polygon(inner) for inner in face.innerWires()]
+        outers.append(wire_to_path(face.outerWire()))
+        inners += [wire_to_path(inner) for inner in face.innerWires()]
 
     polyfaces = make_polyfaces(outers, inners, 0)
     assert len(polyfaces) == 2

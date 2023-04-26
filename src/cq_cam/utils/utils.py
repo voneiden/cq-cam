@@ -63,29 +63,8 @@ def edge_start_end(edge: cq.Edge) -> Tuple[cq.Vector, cq.Vector]:
     return edge.startPoint(), edge.endPoint()
 
 
-def vertex_to_vector(vertex: TopoDS_Shape) -> cq.Vector:
-    geom_point = BRep_Tool.Pnt_s(TopoDS.Vertex_s(vertex))
-    return cq.Vector(geom_point.X(), geom_point.Y(), geom_point.Z())
-
-
-def orient_vector(vector: cq.Vector, plane: cq.Plane):
-    return cq.Vector(
-        plane.xDir.dot(vector), plane.yDir.dot(vector), plane.zDir.dot(vector)
-    )
-
-
 def drop_z(vector: cq.Vector) -> Tuple[float, float]:
     return vector.x, vector.y
-
-
-def flatten_wire_to_closed_2d(wire: cq.Wire):
-    polygon = [drop_z(v) for v in flatten_wire(wire)]
-    polygon.append(polygon[0])
-    return polygon
-
-
-def vectors_to_xy(plane: cq.Plane, *vectors: cq.Vector):
-    return tuple((plane.xDir.dot(vector), plane.yDir.dot(vector)) for vector in vectors)
 
 
 def position_space(edge: cq.Edge, tolerance=0.1):
@@ -148,31 +127,6 @@ def is_arc_clockwise2(arc: cq.Edge):
     return normal.z < 0
 
 
-def is_parallel_plane(plane1: cq.Plane, plane2: cq.Plane):
-    # Based on Plane._eq_iter
-    def _eq_iter():
-        cls = type(plane1)
-        yield isinstance(plane1, cq.Plane)
-        yield isinstance(plane2, cq.Plane)
-        # origins are the same
-        # yield abs(plane1.origin - plane2.origin) < cls._eq_tolerance_origin
-        # z-axis vectors are parallel (assumption: both are unit vectors, ignore direction)
-        yield abs(plane1.zDir.dot(plane2.zDir)) < cls._eq_tolerance_dot + 1
-        # x-axis vectors are parallel (assumption: both are unit vectors, ignore direction)
-        yield abs(plane1.xDir.dot(plane2.xDir)) < cls._eq_tolerance_dot + 1
-
-    return all(_eq_iter())
-
-
-def plane_offset_distance(plane1: cq.Plane, plane2: cq.Plane):
-    if not is_parallel_plane(plane1, plane2):
-        return None
-
-    height1 = plane1.origin.dot(plane1.zDir)
-    height2 = plane2.origin.dot(plane1.zDir)
-    return height2 - height1
-
-
 def wire_to_ordered_edges(wire: cq.Wire) -> List[cq.Edge]:
     """
     It's a trap.
@@ -195,6 +149,8 @@ def wire_to_ordered_edges(wire: cq.Wire) -> List[cq.Edge]:
 
 def cut_clockwise(positive_offset: bool, spindle_clockwise: bool, climb: bool):
     """
+    TODO This code is not used currently, but is left here
+    TODO as a reference.
     If all 3 are true, then cut must be done clockwise.
     Changing one to false, the cut must be done counter-clockwise.
     Changing two to false, the cut must be done clockwise.
@@ -339,22 +295,6 @@ def dist_to_segment_squared(
     return dist2(p, closest_point), closest_point
 
 
-def pairwise(iterable):
-    """s -> (s0,s1), (s1,s2), (s2, s3), ...
-    builtin in py3.10"""
-    a, b = itertools.tee(iterable)
-    next(b, None)
-    return zip(a, itertools.chain(b, [iterable[0]]))
-
-
-def pairwise_open(iterable):
-    """s -> (s0,s1), (s1,s2), (s2, s3), ...
-    builtin in py3.10"""
-    a, b = itertools.tee(iterable)
-    next(b, None)
-    return zip(a, b)
-
-
 def project_face(face: cq.Face, projection_dir=(0, 0, 1)) -> cq.Face:
     """
     Based on CQ SVG export function, thanks to adam-urbanczyk.
@@ -447,18 +387,6 @@ def compound_to_edges(compound: cq.Compound):
         edges.append(cq.Edge(edge))
         explorer.Next()
     return edges
-
-
-def filter_edges_below_plane(edges: List[cq.Edge], plane: cq.Plane):
-    """
-    Given a list of edges, return edges whose center is below plane.
-    This is meant to be used as a quick filter after cutting against the plane.
-
-    :param edges:
-    :param plane:
-    :return:
-    """
-    return [edge for edge in edges if plane.zDir.dot(edge.Center() - plane.origin) < 0]
 
 
 def optimize_float(v: float):

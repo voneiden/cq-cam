@@ -15,14 +15,13 @@ from cq_cam.command import (
     Plunge,
     Rapid,
 )
-from cq_cam.utils.geometry_op import PolyFace, Polygon, distance_to_polygon
+from cq_cam.utils.geometry_op import Path, PathFace, distance_to_path
 from cq_cam.utils.utils import (
     edge_end_param,
     edge_end_point,
     edge_start_param,
     edge_start_point,
     is_arc_clockwise2,
-    pairwise,
     wire_to_ordered_edges,
 )
 
@@ -233,13 +232,13 @@ def route_wires(job: "Job", wires: List[Union[cq.Wire, cq.Edge]], stepover=None)
     return commands
 
 
-def shift_polygon(polygon: Polygon, i: int):
+def shift_polygon(polygon: Path, i: int):
     polygon = polygon[:-1]
     polygon = polygon[i:] + polygon[: i + 1]
     return polygon
 
 
-def route_polyface_outers(job: "Job", polyfaces: List[PolyFace], stepover=None):
+def route_polyface_outers(job: "Job", polyfaces: List[PathFace], stepover=None):
     commands = []
     previous_wire = None
     previous_wire_start = None
@@ -252,7 +251,7 @@ def route_polyface_outers(job: "Job", polyfaces: List[PolyFace], stepover=None):
         # Determine how to access the wire
         # Direct plunge option
         if previous_wire_end:
-            distance, closest_point, poly_position = distance_to_polygon(
+            distance, closest_point, poly_position = distance_to_path(
                 previous_wire_end, poly
             )
         else:
