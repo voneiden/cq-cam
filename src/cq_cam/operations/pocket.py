@@ -8,12 +8,12 @@ from cq_cam.operations.pocket_cq import pocket_cq
 from cq_cam.routers import route_polyface_outers
 from cq_cam.utils.geometry_op import (
     OffsetInput,
-    PolyFace,
-    Polygon,
+    Path,
+    PathFace,
     calculate_offset,
     difference_poly_tree,
+    offset_path,
     offset_polyface,
-    offset_polygon,
     union_poly_tree,
 )
 from cq_cam.utils.tree import Tree
@@ -58,8 +58,8 @@ def pocket(
     if engine == "clipper":
         return pocket_clipper(
             job,
-            [PolyFace.from_cq_face(face) for face in op_areas],
-            [PolyFace.from_cq_face(face) for face in avoid_areas],
+            [PathFace.from_cq_face(face) for face in op_areas],
+            [PathFace.from_cq_face(face) for face in avoid_areas],
             outer_offset,
             inner_offset,
             avoid_outer_offset,
@@ -81,7 +81,7 @@ def pocket(
         raise ValueError("Unknown engine")
 
 
-def generate_depth_map(poly_faces: List[PolyFace]):
+def generate_depth_map(poly_faces: List[PathFace]):
     depth_map = defaultdict(list)
 
     for face in poly_faces:
@@ -96,7 +96,7 @@ def generate_depth_map(poly_faces: List[PolyFace]):
     return depth_map, depths
 
 
-def combine_poly_faces(poly_faces: List[PolyFace], depth) -> List[PolyFace]:
+def combine_poly_faces(poly_faces: List[PathFace], depth) -> List[PathFace]:
     outers = [poly_face.outer for poly_face in poly_faces]
     inners = flatten_list([poly_face.inners for poly_face in poly_faces])
 
@@ -104,14 +104,14 @@ def combine_poly_faces(poly_faces: List[PolyFace], depth) -> List[PolyFace]:
     return difference_poly_tree(new_outers, inners, depth)
 
 
-def combine_outers(poly_faces: List[PolyFace], depth) -> List[Polygon]:
+def combine_outers(poly_faces: List[PathFace], depth) -> List[Path]:
     outers = [poly_face.outer for poly_face in poly_faces]
     return [poly_face.outer for poly_face in union_poly_tree(outers, [], depth)]
 
 
 def build_pocket_ops(
-    job: "Job", op_areas: List[PolyFace], avoid_areas: List[PolyFace]
-) -> List[PolyFace]:
+    job: "Job", op_areas: List[PathFace], avoid_areas: List[PathFace]
+) -> List[PathFace]:
     # Determine depth of each face
     depth_map, depths = generate_depth_map(op_areas)
     avoid_depth_map, avoid_depths = generate_depth_map(avoid_areas)
@@ -150,15 +150,15 @@ def build_pocket_ops(
     return pocket_ops
 
 
-def fill_pocket_contour_shrink(pocket: PolyFace, step: float) -> list[PolyFace]:
-    tree = Tree(PolyFace(pocket.outer, [], depth=pocket.depth))
+def fill_pocket_contour_shrink(pocket: PathFace, step: float) -> list[PathFace]:
+    tree = Tree(PathFace(pocket.outer, [], depth=pocket.depth))
     i = 0
 
     # TODO sanify the variable names here
     try:
         while True:
             node = tree.next_unlocked
-            next_outer_candidates = offset_polygon(node.obj.outer, -step)
+            next_outer_candidates = offset_path(node.obj.outer, -step)
             if next_outer_candidates and pocket.inners:
                 next_outers = [
                     face.outer
@@ -171,7 +171,7 @@ def fill_pocket_contour_shrink(pocket: PolyFace, step: float) -> list[PolyFace]:
 
             if next_outers:
                 node.branch(
-                    [PolyFace(outer, [], pocket.depth) for outer in next_outers]
+                    [PathFace(outer, [], pocket.depth) for outer in next_outers]
                 )
             else:
                 node.lock()
@@ -186,8 +186,8 @@ def fill_pocket_contour_shrink(pocket: PolyFace, step: float) -> list[PolyFace]:
 
 def pocket_clipper(
     job,
-    op_areas: list[PolyFace],
-    avoid_areas: list[PolyFace],
+    op_areas: list[PathFace],
+    avoid_areas: list[PathFace],
     outer_offset: float,
     inner_offset: float,
     avoid_outer_offset: float,
@@ -195,8 +195,8 @@ def pocket_clipper(
     stepover: float,
 ):
     # Offset faces
-    offset_op_areas: list[PolyFace] = []
-    offset_avoid_areas: list[PolyFace] = []
+    offset_op_areas: list[PathFace] = []
+    offset_avoid_areas: list[PathFace] = []
 
     for face in op_areas:
         offset_op_areas += offset_polyface(face, outer_offset, inner_offset)
@@ -209,7 +209,7 @@ def pocket_clipper(
     pocket_ops = build_pocket_ops(job, offset_op_areas, offset_avoid_areas)
 
     # Apply pocket fill
-    sequences: List[List[PolyFace]] = []
+    sequences: List[List[PathFace]] = []
     for pocket_op in pocket_ops:
         sequences += fill_pocket_contour_shrink(pocket_op, stepover)
 

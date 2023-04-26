@@ -1,16 +1,12 @@
 import logging
+from itertools import pairwise
 from typing import Dict, List, Tuple
 
 import cadquery as cq
 import numpy as np
 
 from cq_cam.utils.linked_polygon import LinkedPolygon
-from cq_cam.utils.utils import (
-    WireClipper,
-    cached_dist2,
-    dist_to_segment_squared,
-    pairwise,
-)
+from cq_cam.utils.utils import WireClipper, cached_dist2, dist_to_segment_squared
 
 Scanpoint = Tuple[float, float]
 Scanline = List[Scanpoint]
