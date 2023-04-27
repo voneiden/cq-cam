@@ -6,7 +6,15 @@ from typing import List, Optional, Union
 from cadquery import cq
 
 from cq_cam.command import Command
-from cq_cam.common import Unit
+from cq_cam.common import (
+    ArcDistanceMode,
+    CoolantState,
+    DistanceMode,
+    PlannerControlMode,
+    Unit,
+    WorkOffset,
+    WorkPlane,
+)
 from cq_cam.operations.pocket import pocket
 from cq_cam.operations.profile import profile
 from cq_cam.operations.tabs import Tabs
@@ -45,19 +53,29 @@ class Job:
         self,
         top: cq.Plane,
         feed: float,
+        speed: Optional[float] = None,
         tool_diameter: Optional[float] = None,
+        tool_number: Optional[int] = None,
         name="Job",
         plunge_feed: float = None,
         rapid_height: float = None,
         op_safe_height: float = None,
         gcode_precision: int = 3,
         unit: Unit = Unit.METRIC,
+        plane: WorkPlane = WorkPlane.XY,
+        coordinate: WorkOffset = WorkOffset.OFFSET_1,
+        distance: DistanceMode = DistanceMode.ABSOLUTE,
+        arc_distance: ArcDistanceMode = ArcDistanceMode.ABSOLUTE,
+        controller_motion: PlannerControlMode = PlannerControlMode.BLEND,
+        coolant: Optional[CoolantState] = None,
     ):
         self.top = top
         self.top_plane_face = cq.Face.makePlane(None, None, top.origin, top.zDir)
         self.feed = feed
+        self.speed = speed
         self.tool_diameter = tool_diameter
-        self.tool_radius = tool_diameter / 2
+        self.tool_number = tool_number
+        self.tool_radius = tool_diameter / 2 if tool_diameter else None
         self.name = name
         self.plunge_feed = feed if plunge_feed is None else plunge_feed
         self.rapid_height = (
@@ -70,6 +88,12 @@ class Job:
         )
         self.gcode_precision = gcode_precision
         self.unit = unit
+        self.plane = plane
+        self.coordinate = coordinate
+        self.distance = distance
+        self.arc_distance = arc_distance
+        self.controller_motion = controller_motion
+        self.coolant = coolant
 
         self.max_stepdown_count = 100
 
@@ -87,7 +111,7 @@ class Job:
         tabs: Optional[Tabs] = None,
     ) -> Job:
         if self.tool_diameter is None:
-            raise ValueError("Profile requires tool_diameter to be est")
+            raise ValueError("Profile requires tool_diameter to be set")
 
         if outer_offset is None and inner_offset is None:
             raise ValueError('Set at least one of "outer_offset" or "inner_offset"')
