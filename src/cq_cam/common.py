@@ -67,7 +67,7 @@ The G-codes have been organised differently from the proposed modal groups.
 - DistanceMode: G90 (Absolute), G91 (Incremental)
 - ArcDistanceMode: G90.1 (Absolute), G91.1 (Incremental)
 - FeedRateControlMode: G93 (Inverse), G94 (Time), G95 (Revolution)
-- SpindleControlMode: G96 (Surface Speed), G97 (RPMpy)
+- SpindleControlMode: G96 (Surface Speed), G97 (RPM)
 
 ## Tool Configuration
 - LengthCompensation: G40 (OFF), G41 (Left), G42 (Right)
@@ -245,7 +245,7 @@ class CutterState(Enum):
         return self._value_
 
 
-class AutomaticChangerMode:
+class AutomaticChangerMode(Enum):
     TOOL_CHANGE = "M6"
     PALLET_CHANGE = "M60"
 
