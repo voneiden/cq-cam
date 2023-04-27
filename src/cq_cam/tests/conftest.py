@@ -31,4 +31,4 @@ def bottom_face(box):
 
 @pytest.fixture
 def job(top_plane):
-    return Job(top_plane, 200, 1.5)
+    return Job(top_plane, 200, 1000, 1.5)
