@@ -1,5 +1,3 @@
-from enum import Enum, auto
-
 """
 G-code (also RS-274) is the most widely-used computer numerical control (CNC) programming language. 
 It is used mainly in computer-aided manufacturing to control automated machine tools, as well as from a 3D-printing slicer app.
@@ -48,6 +46,13 @@ In addition to the G and M address there are other letter addresses that are use
 - D - Radius Offset: G41, G42
 """
 
+from enum import Enum
+
+
+class GCodeEnum(Enum):
+    def to_gcode(self) -> str:
+        return self._value_
+
 """
 The G-codes have been organised differently from the proposed modal groups.
 
@@ -75,7 +80,7 @@ The G-codes have been organised differently from the proposed modal groups.
 """
 
 
-class Path(Enum):
+class Path(GCodeEnum):
     RAPID = "G0"
     LINEAR = "G1"
     ARC_CW = "G2"
@@ -85,60 +90,54 @@ class Path(Enum):
     QUADRATIC_SPLINE = "G5.1"
     NURBS = "G5.2"
 
-    def to_gcode(self) -> str:
-        return self._value_
 
 
-class WorkPlane(Enum):
+
+class WorkPlane(GCodeEnum):
     XY = "G17"
     XZ = "G18"
     YZ = "G19"
 
-    def to_gcode(self) -> str:
-        return self._value_
 
 
-class Unit(Enum):
+
+class Unit(GCodeEnum):
     IMPERIAL = "G20"
     METRIC = "G21"
 
-    def to_gcode(self) -> str:
-        return self._value_
 
 
-class HomePosition(Enum):
+
+class HomePosition(GCodeEnum):
     HOME_1 = "G28"
     HOME_2 = "G30"
 
-    def to_gcode(self) -> str:
-        return self._value_
 
 
-class ProbeMode(Enum):
+
+class ProbeMode(GCodeEnum):
     ON_CONTACT_ERROR = "38.2"
     ON_CONTACT = "G38.3"
     LOSE_CONTACT_ERROR = "G38.4"
     LOSE_CONTACT = "G38.5"
 
 
-class RadiusCompensation(Enum):
+class RadiusCompensation(GCodeEnum):
     OFF = "G40"
     LEFT = "G41"
     RIGHT = "G42"
 
-    def to_gcode(self) -> str:
-        return self._value_
 
 
-class LengthCompensation(Enum):
+
+class LengthCompensation(GCodeEnum):
     ON = "G43"
     OFF = "G49"
 
-    def to_gcode(self) -> str:
-        return self._value_
 
 
-class WorkOffset(Enum):
+
+class WorkOffset(GCodeEnum):
     ABSOLUTE = "G53"
     OFFSET_1 = "G54"
     OFFSET_2 = "G55"
@@ -147,19 +146,17 @@ class WorkOffset(Enum):
     OFFSET_6 = "G59"
     OFFSET_5 = "G58"
 
-    def to_gcode(self) -> str:
-        return self._value_
 
 
-class PlannerControlMode(Enum):
+
+class PlannerControlMode(GCodeEnum):
     EXACT = "G61"
     BLEND = "G64"
 
-    def to_gcode(self) -> str:
-        return self._value_
 
 
-class CannedCycle(Enum):
+
+class CannedCycle(GCodeEnum):
     CANCEL = "G80"
     DRILL_SIMPLE = "G81"
     DRILL_DWELL = "G82"
@@ -170,50 +167,44 @@ class CannedCycle(Enum):
     BORE_DWELL_STOP_MANUAL = "G88"
     BORE_DWELL = "G89"
 
-    def to_gcode(self) -> str:
-        return self._value_
 
 
-class DistanceMode(Enum):
+
+class DistanceMode(GCodeEnum):
     ABSOLUTE = "G90"
     INCREMENTAL = "G91"
 
-    def to_gcode(self) -> str:
-        return self._value_
 
 
-class ArcDistanceMode(Enum):
+
+class ArcDistanceMode(GCodeEnum):
     ABSOLUTE = "G90.1"
     INCREMENTAL = "G91.1"
 
-    def to_gcode(self) -> str:
-        return self._value_
 
 
-class FeedRateControlMode(Enum):
+
+class FeedRateControlMode(GCodeEnum):
     INVERSE_TIME = "G93"
     UNITS_PER_MINUTE = "G94"
     UNITS_PER_REVOLUTION = "G95"
 
-    def to_gcode(self) -> str:
-        return self._value_
 
 
-class SpindleControlMode(Enum):
+
+class SpindleControlMode(GCodeEnum):
     MAX_SPINDLE_SPEED = "G50"
     SURFACE_SPEED = "G96"
     RPM = "G97"
 
-    def to_gcode(self) -> str:
-        return self._value_
 
 
-class CannedCycleReturnMode(Enum):
+
+class CannedCycleReturnMode(GCodeEnum):
     INITIAL = "G98"
     LAST = "G99"
 
-    def to_gcode(self) -> str:
-        return self._value_
+
 
 
 """
@@ -226,7 +217,7 @@ Common M-Codes
 """
 
 
-class ProgramControlMode(Enum):
+class ProgramControlMode(GCodeEnum):
     PAUSE = "M0"
     PAUSE_OPTIONAL = "M1"
     END = "M2"
@@ -236,35 +227,31 @@ class ProgramControlMode(Enum):
         return self._value_
 
 
-class CutterState(Enum):
+class CutterState(GCodeEnum):
     ON_CW = "M3"
     ON_CCW = "M4"
     OFF = "M5"
 
-    def to_gcode(self) -> str:
-        return self._value_
 
 
-class AutomaticChangerMode(Enum):
+
+class AutomaticChangerMode(GCodeEnum):
     TOOL_CHANGE = "M6"
     PALLET_CHANGE = "M60"
 
-    def to_gcode(self) -> str:
-        return self._value_
 
 
-class CoolantState(Enum):
+
+class CoolantState(GCodeEnum):
     MIST = "M7"
     FLOOD = "M8"
     OFF = "M9"
 
-    def to_gcode(self) -> str:
-        return self._value_
 
 
-class VacuumState(Enum):
+
+class VacuumState(GCodeEnum):
     ON = "M10"
     OFF = "M11"
 
-    def to_gcode(self) -> str:
-        return self._value_
+
