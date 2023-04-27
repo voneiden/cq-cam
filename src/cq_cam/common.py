@@ -52,7 +52,7 @@ In addition to the G and M address there are other letter addresses that are use
 The G-codes have been organised differently from the proposed modal groups.
 
 ## Motion Control
-- PathControl: G00 (Rapid), G01 (Linear), G02 (Arc CW), G03 (Arc CCW), G04 (Pause/Dwell), G05 (Cubic Spline)
+- Paths: G00 (Rapid), G01 (Linear), G02 (Arc CW), G03 (Arc CCW), G04 (Pause/Dwell), G05 (Cubic Spline)
 - Home Position: G28 (Home 1), G30 (Home 2)
 - CannedCycle: G80 (Cancel), G81 (Simple), G82 (Simple Dwell), G83 (Peck), G84 (Tap), G98 (Retract to initial Z), G99 (Retruct to last Z)
 - CannedCycleReturnMode: G98, G99
@@ -63,17 +63,19 @@ The G-codes have been organised differently from the proposed modal groups.
 - Length Compensation: G43 (ON), G49 (OFF)
 - Radius Compensation: G40 (OFF), G41 (Left), G42 (Right)
 - WorkOffset: G53, G54, G55, G56, G57, G58, G59
-- MotionControlMode: G61 (Exact Stop Check), G64 (Cancel)
-- DistanceMode: G90 (Absolute), G91 (Relative)
+- MotionControlMode: G61 (Exact Stop Check), G64 (Blend)
+- DistanceMode: G90 (Absolute), G91 (Incremental)
+- ArcDistanceMode: G90.1 (Absolute), G91.1 (Incremental)
 - FeedRateControlMode: G93 (Inverse), G94 (Time), G95 (Revolution)
 - SpindleControlMode: G96 (Surface Speed), G97 (RPMpy)
 
 ## Tool Configuration
-- 
+- LengthCompensation: G40 (OFF), G41 (Left), G42 (Right)
+- RadiusCompensation: G43 (ON), G49 (OFF)
 """
 
 
-class PathControl(Enum):
+class Path(Enum):
     RAPID = "G0"
     LINEAR = "G1"
     ARC_CW = "G2"
@@ -84,7 +86,7 @@ class PathControl(Enum):
     NURBS = "G5.2"
 
     def to_gcode(self) -> str:
-        return self
+        return self._value_
 
 
 class WorkPlane(Enum):
@@ -93,7 +95,7 @@ class WorkPlane(Enum):
     YZ = "G19"
 
     def to_gcode(self) -> str:
-        return self
+        return self._value_
 
 
 class Unit(Enum):
@@ -101,7 +103,7 @@ class Unit(Enum):
     METRIC = "G21"
 
     def to_gcode(self) -> str:
-        return self
+        return self._value_
 
 
 class HomePosition(Enum):
@@ -109,7 +111,7 @@ class HomePosition(Enum):
     HOME_2 = "G30"
 
     def to_gcode(self) -> str:
-        return self
+        return self._value_
 
 
 class ProbeMode(Enum):
@@ -125,7 +127,7 @@ class RadiusCompensation(Enum):
     RIGHT = "G42"
 
     def to_gcode(self) -> str:
-        return self
+        return self._value_
 
 
 class LengthCompensation(Enum):
@@ -133,7 +135,7 @@ class LengthCompensation(Enum):
     OFF = "G49"
 
     def to_gcode(self) -> str:
-        return self
+        return self._value_
 
 
 class WorkOffset(Enum):
@@ -146,7 +148,7 @@ class WorkOffset(Enum):
     OFFSET_5 = "G58"
 
     def to_gcode(self) -> str:
-        return self
+        return self._value_
 
 
 class PlannerControlMode(Enum):
@@ -154,7 +156,7 @@ class PlannerControlMode(Enum):
     BLEND = "G64"
 
     def to_gcode(self) -> str:
-        return self
+        return self._value_
 
 
 class CannedCycle(Enum):
@@ -169,7 +171,7 @@ class CannedCycle(Enum):
     BORE_DWELL = "G89"
 
     def to_gcode(self) -> str:
-        return self
+        return self._value_
 
 
 class DistanceMode(Enum):
@@ -177,7 +179,7 @@ class DistanceMode(Enum):
     INCREMENTAL = "G91"
 
     def to_gcode(self) -> str:
-        return self
+        return self._value_
 
 
 class ArcDistanceMode(Enum):
@@ -185,7 +187,7 @@ class ArcDistanceMode(Enum):
     INCREMENTAL = "G91.1"
 
     def to_gcode(self) -> str:
-        return self
+        return self._value_
 
 
 class FeedRateControlMode(Enum):
@@ -194,7 +196,7 @@ class FeedRateControlMode(Enum):
     UNITS_PER_REVOLUTION = "G95"
 
     def to_gcode(self) -> str:
-        return self
+        return self._value_
 
 
 class SpindleControlMode(Enum):
@@ -203,7 +205,7 @@ class SpindleControlMode(Enum):
     RPM = "G97"
 
     def to_gcode(self) -> str:
-        return self
+        return self._value_
 
 
 class CannedCycleReturnMode(Enum):
@@ -211,7 +213,7 @@ class CannedCycleReturnMode(Enum):
     LAST = "G99"
 
     def to_gcode(self) -> str:
-        return self
+        return self._value_
 
 
 """
@@ -231,7 +233,7 @@ class ProgramControlMode(Enum):
     END_RESET = "M30"
 
     def to_gcode(self):
-        return self
+        return self._value_
 
 
 class CutterState(Enum):
@@ -240,7 +242,7 @@ class CutterState(Enum):
     OFF = "M5"
 
     def to_gcode(self) -> str:
-        return self
+        return self._value_
 
 
 class AutomaticChangerMode:
@@ -248,7 +250,7 @@ class AutomaticChangerMode:
     PALLET_CHANGE = "M60"
 
     def to_gcode(self) -> str:
-        return self
+        return self._value_
 
 
 class CoolantState(Enum):
@@ -257,7 +259,7 @@ class CoolantState(Enum):
     OFF = "M9"
 
     def to_gcode(self) -> str:
-        return self
+        return self._value_
 
 
 class VacuumState(Enum):
@@ -265,28 +267,4 @@ class VacuumState(Enum):
     OFF = "M11"
 
     def to_gcode(self) -> str:
-        return self
-
-
-class MachineControl:
-    def terminate_program(reset=True):
-        if reset:
-            return ProgramControlMode.END_RESET
-        else:
-            return ProgramControlMode.END
-
-    def tool_change(self):
-        CoolantState.OFF.to_gcode()
-        CutterState.OFF.to_gcode()
-        AutomaticChangerMode.to_gcode()
-        LengthCompensation.ON.to_gcode()
-        CutterState.ON_CW.to_gcode()
-        CoolantState.FLOOD.to_gcode()
-
-    def restore_default_state(self):
-        RadiusCompensation.OFF.to_gcode()
-        LengthCompensation.OFF.to_gcode()
-        WorkOffset.OFFSET_1.to_gcode()
-        WorkPlane.XY.to_gcode()
-        DistanceMode.ABSOLUTE.to_gcode()
-        Unit.METRIC.to_gcode()
+        return self._value_
