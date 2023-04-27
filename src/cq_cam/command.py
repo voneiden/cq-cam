@@ -154,13 +154,13 @@ class Command(ABC):
         return gcode_str
 
     def tool_change_gcode(
-        self, tool_number: int, coolant: Optional[CoolantState] = None
+        self, tool_number: int, spindle: Optional[int] = None, coolant: Optional[CoolantState] = None
     ) -> str:
         gcode_str = self.stop_sequence(coolant)
         gcode_str += f"\n{HomePosition.HOME_2.to_gcode()}"
         gcode_str += f"\n{ProgramControlMode.PAUSE_OPTIONAL.to_gcode()}"
         gcode_str += f"\nT{tool_number} {LengthCompensation.ON.to_gcode()} H{tool_number} {AutomaticChangerMode.TOOL_CHANGE.to_gcode()}"
-        gcode_str += f"\n{self.start_sequence_gcode()}"
+        gcode_str += f"\n{self.start_sequence_gcode(spindle, coolant)}"
 
         return gcode_str
 
