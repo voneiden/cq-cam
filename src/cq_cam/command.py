@@ -154,7 +154,10 @@ class Command(ABC):
         return gcode_str
 
     def tool_change_gcode(
-        self, tool_number: int, spindle: Optional[int] = None, coolant: Optional[CoolantState] = None
+        self,
+        tool_number: int,
+        spindle: Optional[int] = None,
+        coolant: Optional[CoolantState] = None,
     ) -> str:
         gcode_str = self.stop_sequence(coolant)
         gcode_str += f"\n{HomePosition.HOME_2.to_gcode()}"
