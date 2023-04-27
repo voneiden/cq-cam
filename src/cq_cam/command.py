@@ -8,6 +8,25 @@ import cadquery as cq
 from OCP.AIS import AIS_Line, AIS_Shape
 from OCP.Geom import Geom_CartesianPoint
 
+from cq_cam.common import (
+    ArcDistanceMode,
+    AutomaticChangerMode,
+    CannedCycle,
+    CoolantState,
+    CutterState,
+    DistanceMode,
+    FeedRateControlMode,
+    HomePosition,
+    LengthCompensation,
+    Path,
+    PlannerControlMode,
+    ProgramControlMode,
+    RadiusCompensation,
+    SpindleControlMode,
+    Unit,
+    WorkOffset,
+    WorkPlane,
+)
 from cq_cam.utils.utils import optimize_float
 from cq_cam.visualize import cached_occ_color
 
@@ -161,12 +180,12 @@ class Linear(Command, ABC):
 
 
 class Rapid(Linear):
-    modal = "G0"
+    modal = Path.RAPID.to_gcode()
     ais_color = "green"
 
 
 class Cut(Linear):
-    modal = "G1"
+    modal = Path.LINEAR.to_gcode()
 
 
 class Plunge(Cut):
@@ -280,8 +299,8 @@ class Circular(Command, ABC):
 
 
 class CircularCW(Circular):
-    modal = "G2"
+    modal = Path.ARC_CW.to_gcode()
 
 
 class CircularCCW(Circular):
-    modal = "G3"
+    modal = Path.ARC_CCW.to_gcode()
