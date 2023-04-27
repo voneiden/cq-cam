@@ -53,7 +53,7 @@ class Job:
         self,
         top: cq.Plane,
         feed: float,
-        speed: float,
+        speed: Optional[float] = None,
         tool_diameter: Optional[float] = None,
         tool_number: Optional[int] = None,
         name="Job",
