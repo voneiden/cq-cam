@@ -8,3 +8,4 @@ papers
 tmp
 *.iml
 .coverage
+*.code-workspace
