@@ -111,7 +111,7 @@ class Job:
         tabs: Optional[Tabs] = None,
     ) -> Job:
         if self.tool_diameter is None:
-            raise ValueError("Profile requires tool_diameter to be est")
+            raise ValueError("Profile requires tool_diameter to be set")
 
         if outer_offset is None and inner_offset is None:
             raise ValueError('Set at least one of "outer_offset" or "inner_offset"')
