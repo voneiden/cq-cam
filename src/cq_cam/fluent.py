@@ -75,7 +75,7 @@ class Job:
         self.speed = speed
         self.tool_diameter = tool_diameter
         self.tool_number = tool_number
-        self.tool_radius = tool_diameter / 2
+        self.tool_radius = tool_diameter / 2 if tool_diameter else None
         self.name = name
         self.plunge_feed = feed if plunge_feed is None else plunge_feed
         self.rapid_height = (
