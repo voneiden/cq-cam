@@ -121,6 +121,49 @@ class Command(ABC):
 
         return "".join(coords), end
 
+    def safety_block_gcode() -> str:
+        gcode_str = f"{DistanceMode.ABSOLUTE.to_gcode()} {WorkOffset.OFFSET_1.to_gcode()} {PlannerControlMode.BLEND.to_gcode()} {SpindleControlMode.MAX_SPINDLE_SPEED.to_gcode()} {WorkPlane.XY.to_gcode()} {FeedRateControlMode.UNITS_PER_MINUTE.to_gcode()}"
+        gcode_str += f"\n{LengthCompensation.OFF.to_gcode()} {RadiusCompensation.OFF.to_gcode()} {CannedCycle.CANCEL.to_gcode()}"
+        gcode_str += f"\n{Unit.METRIC.to_gcode()}"
+        gcode_str += f"{HomePosition.HOME_2.to_gcode()}"
+
+        return gcode_str
+
+    def start_sequence_gcode(
+        self, spindle: Optional[int] = None, coolant: Optional[CoolantState] = None
+    ) -> str:
+        gcode_str = ""
+        if spindle != None:
+            gcode_str += f"S{spindle}"
+
+        if gcode_str == "":
+            gcode_str = f"{CutterState.ON_CW.to_gcode()}"
+        else:
+            gcode_str += f" {CutterState.ON_CW.to_gcode()}"
+
+        if coolant != None:
+            gcode_str += f" {coolant.to_gcode()}"
+
+        return gcode_str
+
+    def stop_sequence_gcode(self, coolant: Optional[CoolantState] = None) -> str:
+        gcode_str = CutterState.OFF.to_gcode()
+        if coolant != None:
+            gcode_str += f" {CoolantState.OFF.to_gcode()}"
+
+        return gcode_str
+
+    def tool_change_gcode(
+        self, tool_number: int, coolant: Optional[CoolantState] = None
+    ) -> str:
+        gcode_str = self.stop_sequence(coolant)
+        gcode_str += f"\n{HomePosition.HOME_2.to_gcode()}"
+        gcode_str += f"\n{ProgramControlMode.PAUSE_OPTIONAL.to_gcode()}"
+        gcode_str += f"\nT{tool_number} {LengthCompensation.ON.to_gcode()} H{tool_number} {AutomaticChangerMode.TOOL_CHANGE.to_gcode()}"
+        gcode_str += f"\n{self.start_sequence_gcode()}"
+
+        return gcode_str
+
     @abstractmethod
     def to_gcode(
         self, previous_command: Union[Command, None], start: cq.Vector
