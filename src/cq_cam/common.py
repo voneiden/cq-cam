@@ -53,6 +53,7 @@ class GCodeEnum(Enum):
     def to_gcode(self) -> str:
         return self._value_
 
+
 """
 The G-codes have been organised differently from the proposed modal groups.
 
@@ -91,14 +92,10 @@ class Path(GCodeEnum):
     NURBS = "G5.2"
 
 
-
-
 class WorkPlane(GCodeEnum):
     XY = "G17"
     XZ = "G18"
     YZ = "G19"
-
-
 
 
 class Unit(GCodeEnum):
@@ -106,13 +103,9 @@ class Unit(GCodeEnum):
     METRIC = "G21"
 
 
-
-
 class HomePosition(GCodeEnum):
     HOME_1 = "G28"
     HOME_2 = "G30"
-
-
 
 
 class ProbeMode(GCodeEnum):
@@ -128,13 +121,9 @@ class RadiusCompensation(GCodeEnum):
     RIGHT = "G42"
 
 
-
-
 class LengthCompensation(GCodeEnum):
     ON = "G43"
     OFF = "G49"
-
-
 
 
 class WorkOffset(GCodeEnum):
@@ -147,13 +136,9 @@ class WorkOffset(GCodeEnum):
     OFFSET_5 = "G58"
 
 
-
-
 class PlannerControlMode(GCodeEnum):
     EXACT = "G61"
     BLEND = "G64"
-
-
 
 
 class CannedCycle(GCodeEnum):
@@ -168,20 +153,14 @@ class CannedCycle(GCodeEnum):
     BORE_DWELL = "G89"
 
 
-
-
 class DistanceMode(GCodeEnum):
     ABSOLUTE = "G90"
     INCREMENTAL = "G91"
 
 
-
-
 class ArcDistanceMode(GCodeEnum):
     ABSOLUTE = "G90.1"
     INCREMENTAL = "G91.1"
-
-
 
 
 class FeedRateControlMode(GCodeEnum):
@@ -190,21 +169,15 @@ class FeedRateControlMode(GCodeEnum):
     UNITS_PER_REVOLUTION = "G95"
 
 
-
-
 class SpindleControlMode(GCodeEnum):
     MAX_SPINDLE_SPEED = "G50"
     SURFACE_SPEED = "G96"
     RPM = "G97"
 
 
-
-
 class CannedCycleReturnMode(GCodeEnum):
     INITIAL = "G98"
     LAST = "G99"
-
-
 
 
 """
@@ -233,13 +206,9 @@ class CutterState(GCodeEnum):
     OFF = "M5"
 
 
-
-
 class AutomaticChangerMode(GCodeEnum):
     TOOL_CHANGE = "M6"
     PALLET_CHANGE = "M60"
-
-
 
 
 class CoolantState(GCodeEnum):
@@ -248,10 +217,6 @@ class CoolantState(GCodeEnum):
     OFF = "M9"
 
 
-
-
 class VacuumState(GCodeEnum):
     ON = "M10"
     OFF = "M11"
-
-
