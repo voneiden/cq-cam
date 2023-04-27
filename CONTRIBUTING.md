@@ -7,7 +7,7 @@
 conda activate cq-cam-dev
 - Install `cq-cam`:
 `pip install -e .`
-- Before making any changes verify that the current tests pass. Run pytest from the root of your cadquery clone, there should be no failures and the output will look similar to this:
+- Before making any changes verify that the current tests pass. Run pytest from the root of your cq-cam clone, there should be no failures and the output will look similar to this:
 - Start with the tests! How should CadQuery behave after your changes? Make sure to add some tests to the test suite to ensure proper behavior
 - Make sure your tests have assertions checking all the expected results
 - Add a nice docstring to the test indicating what the test is doing; if there is too much to explain, consider splitting the test in two!
