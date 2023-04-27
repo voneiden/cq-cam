@@ -8,6 +8,7 @@ from cadquery import cq
 from cq_cam.command import Command
 from cq_cam.common import (
     ArcDistanceMode,
+    CoolantState,
     DistanceMode,
     PlannerControlMode,
     Unit,
@@ -66,6 +67,7 @@ class Job:
         distance: DistanceMode = DistanceMode.ABSOLUTE,
         arc_distance: ArcDistanceMode = ArcDistanceMode.ABSOLUTE,
         controller_motion: PlannerControlMode = PlannerControlMode.BLEND,
+        coolant: Optional[CoolantState] = None,
     ):
         self.top = top
         self.top_plane_face = cq.Face.makePlane(None, None, top.origin, top.zDir)
@@ -91,6 +93,7 @@ class Job:
         self.distance = distance
         self.arc_distance = arc_distance
         self.controller_motion = controller_motion
+        self.coolant = coolant
 
         self.max_stepdown_count = 100
 
