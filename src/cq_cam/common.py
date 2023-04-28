@@ -220,8 +220,8 @@ class CoolantState(GCodeEnum):
 class VacuumState(GCodeEnum):
     ON = "M10"
     OFF = "M11"
-    
-    
+
+
 class Test:
     def __init__(self, *args, **kwargs):
         if "foo" in kwargs:
