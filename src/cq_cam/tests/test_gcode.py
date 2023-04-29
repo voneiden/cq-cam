@@ -2,7 +2,17 @@ import unittest
 
 import cadquery as cq
 
-from cq_cam.command import AbsoluteCV, CircularCCW, CircularCW, Cut, StopSequence, StartSequence, SafetyBlock, ToolChange, CoolantState
+from cq_cam.command import (
+    AbsoluteCV,
+    CircularCCW,
+    CircularCW,
+    CoolantState,
+    Cut,
+    SafetyBlock,
+    StartSequence,
+    StopSequence,
+    ToolChange,
+)
 
 
 class TestUtils(unittest.TestCase):
@@ -56,7 +66,7 @@ class TestUtils(unittest.TestCase):
         cmd = StartSequence(coolant=CoolantState.FLOOD)
         gcode = cmd.to_gcode()
         self.assertEqual("M3 M8", gcode)
-    
+
     def test_start_sequence_coolant_mist(self):
         cmd = StartSequence(coolant=CoolantState.MIST)
         gcode = cmd.to_gcode()
@@ -68,7 +78,7 @@ class TestUtils(unittest.TestCase):
         self.assertEqual("M3 S1000 M8", gcode)
 
     def test_safety_block(self):
-        cmd  = SafetyBlock()
+        cmd = SafetyBlock()
         gcode = cmd.to_gcode()
         self.assertEqual("G90 G54 G64 G50 G17 G94\nG49 G40 G80\nG21\nG30", gcode)
 
@@ -78,7 +88,7 @@ class TestUtils(unittest.TestCase):
         self.assertEqual("M5\nG30\nM1\nT2 G43 H2 M6\nM3", gcode)
 
     def test_tool_change_spindle(self):
-        cmd = ToolChange(2, spindle = 1000)
+        cmd = ToolChange(2, spindle=1000)
         gcode = cmd.to_gcode()
         self.assertEqual("M5\nG30\nM1\nT2 G43 H2 M6\nM3 S1000", gcode)
 

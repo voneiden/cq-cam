@@ -1,3 +1,42 @@
+"""
+command.py builts upon the gcode letter addresses introduced in common.py to form full gcode command abstractions.
+It is organised in a similiar fashion, into motion and non motion commands.
+
+The code is strctured around the abstract classes CommandVector and Command:
+- CommandVector
+    - AbsouluteCV
+    - RelativeCV
+- Command
+    - MotionCommand (abstract)
+        - ReferencePosition
+        - Linear (abstract)
+            - Rapid
+            - Cut
+            - Plunge
+            - Retract
+        - Circular (abstract)
+            - CircularCW
+            - CircularCCW
+    - ConfigCommand (abstract)
+        - StartSequence
+        - StopSequence
+        - SafetyBlock
+        - ToolChange
+
+MotionCommands keep track of the previous command and position to optimise the generated gcode into a smaller size.
+
+In the following example the G0 command in the second line along with X1 and Z1 are unnecessarily issued:
+```
+G0 X1 Y1 Z1
+G0 X1 Y2 Z1
+```
+
+A more optimised version would look like this:
+```
+G0 X1 Y1 Z1
+Y2
+```
+"""
 from __future__ import annotations
 
 import warnings
@@ -139,19 +178,19 @@ class MotionCommand(Command, ABC):
 
 
 class ConfigCommand(Command, ABC):
-    tool_number: Optional[int] = None,
+    tool_number: Optional[int] = (None,)
     spindle: Optional[int] = None
     coolant: Optional[CoolantState] = None
 
-    def __init__(self, tool_number: int, spindle: Optional[int], coolant: Optional[CoolantState]) -> None:
+    def __init__(
+        self, tool_number: int, spindle: Optional[int], coolant: Optional[CoolantState]
+    ) -> None:
         self.tool_number = tool_number
         self.spindle = spindle
         self.coolant = coolant
 
     @abstractmethod
-    def to_gcode(
-        self
-    ) -> str:
+    def to_gcode(self) -> str:
         pass
 
 
@@ -327,7 +366,9 @@ class CircularCCW(Circular):
 
 
 class StartSequence(ConfigCommand):
-    def __init__(self, spindle: Optional[int] = None, coolant: Optional[CoolantState] = None) -> None:
+    def __init__(
+        self, spindle: Optional[int] = None, coolant: Optional[CoolantState] = None
+    ) -> None:
         super().__init__(None, spindle, coolant)
 
     def to_gcode(self) -> str:
@@ -368,7 +409,12 @@ class SafetyBlock(ConfigCommand):
 
 
 class ToolChange(ConfigCommand):
-    def __init__(self, tool_number: int, spindle: Optional[int] = None, coolant: Optional[CoolantState] =  None):
+    def __init__(
+        self,
+        tool_number: int,
+        spindle: Optional[int] = None,
+        coolant: Optional[CoolantState] = None,
+    ):
         super().__init__(tool_number, spindle, coolant)
 
     def to_gcode(self) -> str:
