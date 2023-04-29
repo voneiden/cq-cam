@@ -357,6 +357,7 @@ class StopSequence(ConfigCommand):
 class SafetyBlock(ConfigCommand):
     def __init__(self) -> None:
         super().__init__(None, None, None)
+
     def to_gcode(self) -> str:
         gcode_str = f"{DistanceMode.ABSOLUTE.to_gcode()} {WorkOffset.OFFSET_1.to_gcode()} {PlannerControlMode.BLEND.to_gcode()} {SpindleControlMode.MAX_SPINDLE_SPEED.to_gcode()} {WorkPlane.XY.to_gcode()} {FeedRateControlMode.UNITS_PER_MINUTE.to_gcode()}"
         gcode_str += f"\n{LengthCompensation.OFF.to_gcode()} {RadiusCompensation.OFF.to_gcode()} {CannedCycle.CANCEL.to_gcode()}"
@@ -367,11 +368,14 @@ class SafetyBlock(ConfigCommand):
 
 
 class ToolChange(ConfigCommand):
+    def __init__(self, tool_number: int, spindle: Optional[int] = None, coolant: Optional[CoolantState] =  None):
+        super().__init__(tool_number, spindle, coolant)
+
     def to_gcode(self) -> str:
-        gcode_str = StopSequence(self.tool_number, self.spindle, self.coolant).to_gcode()
+        gcode_str = StopSequence(self.coolant).to_gcode()
         gcode_str += f"\n{HomePosition.HOME_2.to_gcode()}"
         gcode_str += f"\n{ProgramControlMode.PAUSE_OPTIONAL.to_gcode()}"
         gcode_str += f"\nT{self.tool_number} {LengthCompensation.ON.to_gcode()} H{self.tool_number} {AutomaticChangerMode.TOOL_CHANGE.to_gcode()}"
-        gcode_str += f"\n{StartSequence(self.tool_number, self.spindle, self.coolant).to_gcode()}"
+        gcode_str += f"\n{StartSequence(self.spindle, self.coolant).to_gcode()}"
 
         return gcode_str
