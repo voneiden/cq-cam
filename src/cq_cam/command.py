@@ -103,7 +103,7 @@ class Command(ABC):
             return self.modal
         return ""
 
-    def xyz_gcode(self, start: cq.Vector, precision=3) -> (str, cq.Vector):
+    def xyz_gcode(self, start: cq.Vector, precision=3) -> Tuple[str, cq.Vector]:
         coords = []
         end = self.end.to_vector(start)
         # TODO precision
@@ -170,26 +170,26 @@ class Command(ABC):
     @abstractmethod
     def to_gcode(
         self, previous_command: Union[Command, None], start: cq.Vector
-    ) -> (str, cq.Vector):
+    ) -> Tuple[str, cq.Vector]:
         """Output all the necessary G-Code required to perform the command"""
         pass
 
     @abstractmethod
     def to_ais_shape(
         self, start: cq.Vector, as_edges=False, alt_color=False
-    ) -> (AIS_Shape, cq.Vector):
+    ) -> Tuple[AIS_Shape, cq.Vector]:
         pass
 
 
 class ReferencePosition(Command):
     def to_gcode(
         self, previous_command: Union[Command, None], start: cq.Vector
-    ) -> (str, cq.Vector):
+    ) -> Tuple[str, cq.Vector]:
         raise RuntimeError("Reference position may not generate gcode")
 
     def to_ais_shape(
         self, start: cq.Vector, as_edges=False, alt_color=False
-    ) -> (AIS_Shape, cq.Vector):
+    ) -> Tuple[AIS_Shape, cq.Vector]:
         raise RuntimeError("Reference position may not generate shape")
 
 
@@ -220,7 +220,7 @@ class Linear(Command, ABC):
 
         return shape, end
 
-    def flip(self, new_end: cq.Vector) -> (Command, cq.Vector):
+    def flip(self, new_end: cq.Vector) -> Tuple[Command, cq.Vector]:
         start = new_end - self.relative_end
         return self.__class__(-self.relative_end), start
 
