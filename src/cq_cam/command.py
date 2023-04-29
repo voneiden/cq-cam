@@ -8,7 +8,6 @@ The code is strctured around the abstract classes CommandVector and Command:
     - RelativeCV
 - Command
     - MotionCommand (abstract)
-        - ReferencePosition
         - Linear (abstract)
             - Rapid
             - Cut
@@ -192,18 +191,6 @@ class ConfigCommand(Command, ABC):
     @abstractmethod
     def to_gcode(self) -> str:
         pass
-
-
-class ReferencePosition(MotionCommand):
-    def to_gcode(
-        self, previous_command: Union[MotionCommand, None], start: cq.Vector
-    ) -> tuple[str, cq.Vector]:
-        raise RuntimeError("Reference position may not generate gcode")
-
-    def to_ais_shape(
-        self, start: cq.Vector, as_edges=False, alt_color=False
-    ) -> tuple[AIS_Shape, cq.Vector]:
-        raise RuntimeError("Reference position may not generate shape")
 
 
 class Linear(MotionCommand, ABC):
