@@ -318,3 +318,58 @@ class CircularCW(Circular):
 
 class CircularCCW(Circular):
     modal = Path.ARC_CCW.to_gcode()
+
+
+class StartSequence(ConfigCommand):
+    def to_gcode(
+        self, tool_number: int, spindle: Optional[int], coolant: Optional[CoolantState]
+    ) -> str:
+        gcode_str = ""
+        if spindle != None:
+            gcode_str += f"S{spindle}"
+
+        if gcode_str == "":
+            gcode_str = f"{CutterState.ON_CW.to_gcode()}"
+        else:
+            gcode_str += f" {CutterState.ON_CW.to_gcode()}"
+
+        if coolant != None:
+            gcode_str += f" {coolant.to_gcode()}"
+
+        return gcode_str
+
+
+class StopSequence(ConfigCommand):
+    def to_gcode(
+        self, tool_number: int, spindle: Optional[int], coolant: Optional[CoolantState]
+    ) -> str:
+        gcode_str = CutterState.OFF.to_gcode()
+        if coolant != None:
+            gcode_str += f" {CoolantState.OFF.to_gcode()}"
+
+        return gcode_str
+
+
+class SafetyBlock(ConfigCommand):
+    def to_gcode(
+        self, tool_number: int, spindle: Optional[int], coolant: Optional[CoolantState]
+    ) -> str:
+        gcode_str = f"{DistanceMode.ABSOLUTE.to_gcode()} {WorkOffset.OFFSET_1.to_gcode()} {PlannerControlMode.BLEND.to_gcode()} {SpindleControlMode.MAX_SPINDLE_SPEED.to_gcode()} {WorkPlane.XY.to_gcode()} {FeedRateControlMode.UNITS_PER_MINUTE.to_gcode()}"
+        gcode_str += f"\n{LengthCompensation.OFF.to_gcode()} {RadiusCompensation.OFF.to_gcode()} {CannedCycle.CANCEL.to_gcode()}"
+        gcode_str += f"\n{Unit.METRIC.to_gcode()}"
+        gcode_str += f"{HomePosition.HOME_2.to_gcode()}"
+
+        return gcode_str
+
+
+class ToolChange(ConfigCommand):
+    def to_gcode(
+        self, tool_number: int, spindle: Optional[int], coolant: Optional[CoolantState]
+    ) -> str:
+        gcode_str = StopSequence(tool_number, spindle, coolant).to_gcode()
+        gcode_str += f"\n{HomePosition.HOME_2.to_gcode()}"
+        gcode_str += f"\n{ProgramControlMode.PAUSE_OPTIONAL.to_gcode()}"
+        gcode_str += f"\nT{tool_number} {LengthCompensation.ON.to_gcode()} H{tool_number} {AutomaticChangerMode.TOOL_CHANGE.to_gcode()}"
+        gcode_str += f"\n{StartSequence(tool_number, spindle, coolant).to_gcode()}"
+
+        return gcode_str
