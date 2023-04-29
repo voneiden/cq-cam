@@ -77,6 +77,9 @@ class AbsoluteCV(CommandVector):
 
 class Command(ABC):
     modal = None
+
+
+class MotionCommand(Command, ABC):
     max_depth: Optional[float]
     ais_color = "red"
     ais_alt_color = "darkred"
@@ -98,7 +101,7 @@ class Command(ABC):
         warnings.warn("Relative CV is deprecated", DeprecationWarning)
         return cls(end=RelativeCV(x=x, y=y, z=z), **kwargs)
 
-    def print_modal(self, previous: Optional[Command]):
+    def print_modal(self, previous: Optional[MotionCommand]):
         if self.modal and (previous is None or previous.modal != self.modal):
             return self.modal
         return ""
@@ -121,55 +124,9 @@ class Command(ABC):
 
         return "".join(coords), end
 
-    def safety_block_gcode() -> str:
-        gcode_str = f"{DistanceMode.ABSOLUTE.to_gcode()} {WorkOffset.OFFSET_1.to_gcode()} {PlannerControlMode.BLEND.to_gcode()} {SpindleControlMode.MAX_SPINDLE_SPEED.to_gcode()} {WorkPlane.XY.to_gcode()} {FeedRateControlMode.UNITS_PER_MINUTE.to_gcode()}"
-        gcode_str += f"\n{LengthCompensation.OFF.to_gcode()} {RadiusCompensation.OFF.to_gcode()} {CannedCycle.CANCEL.to_gcode()}"
-        gcode_str += f"\n{Unit.METRIC.to_gcode()}"
-        gcode_str += f"{HomePosition.HOME_2.to_gcode()}"
-
-        return gcode_str
-
-    def start_sequence_gcode(
-        self, spindle: Optional[int] = None, coolant: Optional[CoolantState] = None
-    ) -> str:
-        gcode_str = ""
-        if spindle != None:
-            gcode_str += f"S{spindle}"
-
-        if gcode_str == "":
-            gcode_str = f"{CutterState.ON_CW.to_gcode()}"
-        else:
-            gcode_str += f" {CutterState.ON_CW.to_gcode()}"
-
-        if coolant != None:
-            gcode_str += f" {coolant.to_gcode()}"
-
-        return gcode_str
-
-    def stop_sequence_gcode(self, coolant: Optional[CoolantState] = None) -> str:
-        gcode_str = CutterState.OFF.to_gcode()
-        if coolant != None:
-            gcode_str += f" {CoolantState.OFF.to_gcode()}"
-
-        return gcode_str
-
-    def tool_change_gcode(
-        self,
-        tool_number: int,
-        spindle: Optional[int] = None,
-        coolant: Optional[CoolantState] = None,
-    ) -> str:
-        gcode_str = self.stop_sequence(coolant)
-        gcode_str += f"\n{HomePosition.HOME_2.to_gcode()}"
-        gcode_str += f"\n{ProgramControlMode.PAUSE_OPTIONAL.to_gcode()}"
-        gcode_str += f"\nT{tool_number} {LengthCompensation.ON.to_gcode()} H{tool_number} {AutomaticChangerMode.TOOL_CHANGE.to_gcode()}"
-        gcode_str += f"\n{self.start_sequence_gcode(spindle, coolant)}"
-
-        return gcode_str
-
     @abstractmethod
     def to_gcode(
-        self, previous_command: Union[Command, None], start: cq.Vector
+        self, previous_command: Union[MotionCommand, None], start: cq.Vector
     ) -> Tuple[str, cq.Vector]:
         """Output all the necessary G-Code required to perform the command"""
         pass
@@ -181,9 +138,20 @@ class Command(ABC):
         pass
 
 
-class ReferencePosition(Command):
+class ConfigCommand(Command, ABC):
+    @abstractmethod
     def to_gcode(
-        self, previous_command: Union[Command, None], start: cq.Vector
+        self,
+        tool_number: int,
+        spindle: Optional[int] = None,
+        coolant: Optional[CoolantState] = None,
+    ) -> str:
+        pass
+
+
+class ReferencePosition(MotionCommand):
+    def to_gcode(
+        self, previous_command: Union[MotionCommand, None], start: cq.Vector
     ) -> Tuple[str, cq.Vector]:
         raise RuntimeError("Reference position may not generate gcode")
 
@@ -193,9 +161,9 @@ class ReferencePosition(Command):
         raise RuntimeError("Reference position may not generate shape")
 
 
-class Linear(Command, ABC):
+class Linear(MotionCommand, ABC):
     def to_gcode(
-        self, previous_command: Optional[Command], start: cq.Vector
+        self, previous_command: Optional[MotionCommand], start: cq.Vector
     ) -> Tuple[str, cq.Vector]:
         xyz, end = self.xyz_gcode(start)
         return f"{self.print_modal(previous_command)}{xyz}", end
@@ -220,7 +188,7 @@ class Linear(Command, ABC):
 
         return shape, end
 
-    def flip(self, new_end: cq.Vector) -> Tuple[Command, cq.Vector]:
+    def flip(self, new_end: cq.Vector) -> Tuple[MotionCommand, cq.Vector]:
         start = new_end - self.relative_end
         return self.__class__(-self.relative_end), start
 
@@ -277,7 +245,7 @@ class Retract(Rapid):
 # CIRCULAR MOTION
 
 
-class Circular(Command, ABC):
+class Circular(MotionCommand, ABC):
     end: CommandVector
     center: CommandVector
     mid: CommandVector
@@ -308,7 +276,7 @@ class Circular(Command, ABC):
         return "".join(ijk)
 
     def to_gcode(
-        self, previous_command: Optional[Command], start: cq.Vector
+        self, previous_command: Optional[MotionCommand], start: cq.Vector
     ) -> Tuple[str, cq.Vector]:
         xyz, end = self.xyz_gcode(start)
         ijk = self.ijk_gcode(start)

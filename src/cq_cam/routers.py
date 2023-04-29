@@ -10,8 +10,8 @@ from cq_cam.command import (
     AbsoluteCV,
     CircularCCW,
     CircularCW,
-    Command,
     Cut,
+    MotionCommand,
     Plunge,
     Rapid,
 )
@@ -109,7 +109,7 @@ def shift_edges(
 
 def route_edge(
     edge: cq.Edge, start_p=None, end_p=None, arrow=False
-) -> Tuple[List[Command], cq.Vector]:
+) -> Tuple[List[MotionCommand], cq.Vector]:
     commands = []
     geom_type = edge.geomType()
     ep = edge_end_point(edge) if end_p is None else edge.positionAt(end_p, "parameter")
