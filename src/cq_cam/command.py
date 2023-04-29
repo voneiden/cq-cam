@@ -355,11 +355,13 @@ class StopSequence(ConfigCommand):
 
 
 class SafetyBlock(ConfigCommand):
+    def __init__(self) -> None:
+        super().__init__(None, None, None)
     def to_gcode(self) -> str:
         gcode_str = f"{DistanceMode.ABSOLUTE.to_gcode()} {WorkOffset.OFFSET_1.to_gcode()} {PlannerControlMode.BLEND.to_gcode()} {SpindleControlMode.MAX_SPINDLE_SPEED.to_gcode()} {WorkPlane.XY.to_gcode()} {FeedRateControlMode.UNITS_PER_MINUTE.to_gcode()}"
         gcode_str += f"\n{LengthCompensation.OFF.to_gcode()} {RadiusCompensation.OFF.to_gcode()} {CannedCycle.CANCEL.to_gcode()}"
         gcode_str += f"\n{Unit.METRIC.to_gcode()}"
-        gcode_str += f"{HomePosition.HOME_2.to_gcode()}"
+        gcode_str += f"\n{HomePosition.HOME_2.to_gcode()}"
 
         return gcode_str
 

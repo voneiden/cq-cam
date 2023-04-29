@@ -67,7 +67,7 @@ class TestUtils(unittest.TestCase):
         gcode = cmd.to_gcode()
         self.assertEqual("M3 S1000 M8", gcode)
 
-    def safety_block(self):
+    def test_safety_block(self):
         cmd  = SafetyBlock()
         gcode = cmd.to_gcode()
         self.assertEqual("G90 G54 G64 G50 G17 G94\nG49 G40 G80\nG21\nG30", gcode)
