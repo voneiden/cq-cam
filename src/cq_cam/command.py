@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import warnings
 from abc import ABC, abstractmethod
-from typing import Optional, Tuple, Union
+from typing import Optional, Union
 
 import cadquery as cq
 from OCP.AIS import AIS_Line, AIS_Shape
@@ -106,7 +106,7 @@ class MotionCommand(Command, ABC):
             return self.modal
         return ""
 
-    def xyz_gcode(self, start: cq.Vector, precision=3) -> Tuple[str, cq.Vector]:
+    def xyz_gcode(self, start: cq.Vector, precision=3) -> tuple[str, cq.Vector]:
         coords = []
         end = self.end.to_vector(start)
         # TODO precision
@@ -127,24 +127,30 @@ class MotionCommand(Command, ABC):
     @abstractmethod
     def to_gcode(
         self, previous_command: Union[MotionCommand, None], start: cq.Vector
-    ) -> Tuple[str, cq.Vector]:
+    ) -> tuple[str, cq.Vector]:
         """Output all the necessary G-Code required to perform the command"""
         pass
 
     @abstractmethod
     def to_ais_shape(
         self, start: cq.Vector, as_edges=False, alt_color=False
-    ) -> Tuple[AIS_Shape, cq.Vector]:
+    ) -> tuple[AIS_Shape, cq.Vector]:
         pass
 
 
 class ConfigCommand(Command, ABC):
+    tool_number: Optional[int] = None,
+    spindle: Optional[int] = None
+    coolant: Optional[CoolantState] = None
+
+    def __init__(self, tool_number: int, spindle: Optional[int], coolant: Optional[CoolantState]) -> None:
+        self.tool_number = tool_number
+        self.spindle = spindle
+        self.coolant = coolant
+
     @abstractmethod
     def to_gcode(
-        self,
-        tool_number: int,
-        spindle: Optional[int] = None,
-        coolant: Optional[CoolantState] = None,
+        self
     ) -> str:
         pass
 
@@ -152,19 +158,19 @@ class ConfigCommand(Command, ABC):
 class ReferencePosition(MotionCommand):
     def to_gcode(
         self, previous_command: Union[MotionCommand, None], start: cq.Vector
-    ) -> Tuple[str, cq.Vector]:
+    ) -> tuple[str, cq.Vector]:
         raise RuntimeError("Reference position may not generate gcode")
 
     def to_ais_shape(
         self, start: cq.Vector, as_edges=False, alt_color=False
-    ) -> Tuple[AIS_Shape, cq.Vector]:
+    ) -> tuple[AIS_Shape, cq.Vector]:
         raise RuntimeError("Reference position may not generate shape")
 
 
 class Linear(MotionCommand, ABC):
     def to_gcode(
         self, previous_command: Optional[MotionCommand], start: cq.Vector
-    ) -> Tuple[str, cq.Vector]:
+    ) -> tuple[str, cq.Vector]:
         xyz, end = self.xyz_gcode(start)
         return f"{self.print_modal(previous_command)}{xyz}", end
 
@@ -188,7 +194,7 @@ class Linear(MotionCommand, ABC):
 
         return shape, end
 
-    def flip(self, new_end: cq.Vector) -> Tuple[MotionCommand, cq.Vector]:
+    def flip(self, new_end: cq.Vector) -> tuple[MotionCommand, cq.Vector]:
         start = new_end - self.relative_end
         return self.__class__(-self.relative_end), start
 
@@ -277,7 +283,7 @@ class Circular(MotionCommand, ABC):
 
     def to_gcode(
         self, previous_command: Optional[MotionCommand], start: cq.Vector
-    ) -> Tuple[str, cq.Vector]:
+    ) -> tuple[str, cq.Vector]:
         xyz, end = self.xyz_gcode(start)
         ijk = self.ijk_gcode(start)
         return f"{self.print_modal(previous_command)}{xyz}{ijk}", end
@@ -321,39 +327,35 @@ class CircularCCW(Circular):
 
 
 class StartSequence(ConfigCommand):
-    def to_gcode(
-        self, tool_number: int, spindle: Optional[int], coolant: Optional[CoolantState]
-    ) -> str:
-        gcode_str = ""
-        if spindle != None:
-            gcode_str += f"S{spindle}"
+    def __init__(self, spindle: Optional[int] = None, coolant: Optional[CoolantState] = None) -> None:
+        super().__init__(None, spindle, coolant)
 
-        if gcode_str == "":
-            gcode_str = f"{CutterState.ON_CW.to_gcode()}"
-        else:
-            gcode_str += f" {CutterState.ON_CW.to_gcode()}"
+    def to_gcode(self) -> str:
+        gcode_str = CutterState.ON_CW.to_gcode()
 
-        if coolant != None:
-            gcode_str += f" {coolant.to_gcode()}"
+        if self.spindle != None:
+            gcode_str += f" S{self.spindle}"
+
+        if self.coolant != None:
+            gcode_str += f" {self.coolant.to_gcode()}"
 
         return gcode_str
 
 
 class StopSequence(ConfigCommand):
-    def to_gcode(
-        self, tool_number: int, spindle: Optional[int], coolant: Optional[CoolantState]
-    ) -> str:
+    def __init__(self, coolant: Optional[CoolantState] = None):
+        super().__init__(None, None, coolant)
+
+    def to_gcode(self) -> str:
         gcode_str = CutterState.OFF.to_gcode()
-        if coolant != None:
+        if self.coolant != None:
             gcode_str += f" {CoolantState.OFF.to_gcode()}"
 
         return gcode_str
 
 
 class SafetyBlock(ConfigCommand):
-    def to_gcode(
-        self, tool_number: int, spindle: Optional[int], coolant: Optional[CoolantState]
-    ) -> str:
+    def to_gcode(self) -> str:
         gcode_str = f"{DistanceMode.ABSOLUTE.to_gcode()} {WorkOffset.OFFSET_1.to_gcode()} {PlannerControlMode.BLEND.to_gcode()} {SpindleControlMode.MAX_SPINDLE_SPEED.to_gcode()} {WorkPlane.XY.to_gcode()} {FeedRateControlMode.UNITS_PER_MINUTE.to_gcode()}"
         gcode_str += f"\n{LengthCompensation.OFF.to_gcode()} {RadiusCompensation.OFF.to_gcode()} {CannedCycle.CANCEL.to_gcode()}"
         gcode_str += f"\n{Unit.METRIC.to_gcode()}"
@@ -363,13 +365,11 @@ class SafetyBlock(ConfigCommand):
 
 
 class ToolChange(ConfigCommand):
-    def to_gcode(
-        self, tool_number: int, spindle: Optional[int], coolant: Optional[CoolantState]
-    ) -> str:
-        gcode_str = StopSequence(tool_number, spindle, coolant).to_gcode()
+    def to_gcode(self) -> str:
+        gcode_str = StopSequence(self.tool_number, self.spindle, self.coolant).to_gcode()
         gcode_str += f"\n{HomePosition.HOME_2.to_gcode()}"
         gcode_str += f"\n{ProgramControlMode.PAUSE_OPTIONAL.to_gcode()}"
-        gcode_str += f"\nT{tool_number} {LengthCompensation.ON.to_gcode()} H{tool_number} {AutomaticChangerMode.TOOL_CHANGE.to_gcode()}"
-        gcode_str += f"\n{StartSequence(tool_number, spindle, coolant).to_gcode()}"
+        gcode_str += f"\nT{self.tool_number} {LengthCompensation.ON.to_gcode()} H{self.tool_number} {AutomaticChangerMode.TOOL_CHANGE.to_gcode()}"
+        gcode_str += f"\n{StartSequence(self.tool_number, self.spindle, self.coolant).to_gcode()}"
 
         return gcode_str
