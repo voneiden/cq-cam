@@ -144,7 +144,7 @@ class Job:
         return self._add_operation("Profile", commands)
 
     def wire_profile(
-        self, wires: cq.Wire | [cq.Wire], offset=1, stepdown=None, tabs=None
+        self, wires: cq.Wire | list[cq.Wire], offset=1, stepdown=None, tabs=None
     ):
         if isinstance(wires, cq.Wire):
             wires = [wires]
