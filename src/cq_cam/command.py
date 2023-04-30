@@ -35,6 +35,8 @@ A more optimised version would look like this:
 G0 X1 Y1 Z1
 Y2
 ```
+
+MotionCommands are consumed by routers.py
 """
 from __future__ import annotations
 

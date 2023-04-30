@@ -1,5 +1,5 @@
 from math import isclose
-from typing import TYPE_CHECKING, List, Tuple, Union
+from typing import TYPE_CHECKING, Union
 
 import cadquery as cq
 import numpy as np
@@ -93,8 +93,8 @@ def distance_to_wire(v: cq.Vector, wire2: cq.Wire):
 
 
 def shift_edges(
-    edges: List[cq.Edge], target: Union[cq.Edge, cq.Vertex]
-) -> List[cq.Edge]:
+    edges: list[cq.Edge], target: Union[cq.Edge, cq.Vertex]
+) -> list[cq.Edge]:
     if isinstance(target, cq.Edge):
         i = edges.index(target)
         return edges[i:] + edges[:i]
@@ -109,7 +109,7 @@ def shift_edges(
 
 def route_edge(
     edge: cq.Edge, start_p=None, end_p=None, arrow=False
-) -> Tuple[List[MotionCommand], cq.Vector]:
+) -> tuple[list[MotionCommand], cq.Vector]:
     commands = []
     geom_type = edge.geomType()
     ep = edge_end_point(edge) if end_p is None else edge.positionAt(end_p, "parameter")
@@ -173,7 +173,7 @@ def route_edge(
     return commands, ep
 
 
-def route_wires(job: "Job", wires: List[Union[cq.Wire, cq.Edge]], stepover=None):
+def route_wires(job: "Job", wires: list[Union[cq.Wire, cq.Edge]], stepover=None):
     commands = []
     previous_wire = None
     previous_wire_start = None
@@ -238,7 +238,7 @@ def shift_polygon(polygon: Path, i: int):
     return polygon
 
 
-def route_polyface_outers(job: "Job", polyfaces: List[PathFace], stepover=None):
+def route_polyface_outers(job: "Job", polyfaces: list[PathFace], stepover=None):
     commands = []
     previous_wire = None
     previous_wire_start = None

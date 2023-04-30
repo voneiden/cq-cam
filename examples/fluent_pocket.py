@@ -41,9 +41,10 @@ def demo2():
         avoid_areas=result.faces(">Z"),
     )
 
-    show_object(result, "obj")
-    show_object(result.faces(">Z"), "avoid", {"color": "red"})
-    cam.show(show_object)
+    cam.to_gcode()
+    # show_object(result, "obj")
+    # show_object(result.faces(">Z"), "avoid", {"color": "red"})
+    # cam.show(show_object)
 
 
 if "show_object" in locals() or __name__ == "__main__":

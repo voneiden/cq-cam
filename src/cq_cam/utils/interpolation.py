@@ -1,5 +1,3 @@
-from typing import List, Tuple
-
 import cadquery as cq
 import numpy as np
 from OCP import Geom
@@ -37,7 +35,7 @@ def get_underlying_geom_type(edge: cq.Edge):
 
 def interpolate_edge_to_vectors(
     edge: cq.Edge, precision: float = 0.1
-) -> List[cq.Vector]:
+) -> list[cq.Vector]:
     # Interpolation must have at least two edges
     n = max(int(edge.Length() / precision), 2)
 
@@ -54,7 +52,7 @@ def interpolate_edge_to_vectors(
     return interpolations
 
 
-def interpolate_edge(edge: cq.Edge, precision: float = 0.1) -> List[cq.Edge]:
+def interpolate_edge(edge: cq.Edge, precision: float = 0.1) -> list[cq.Edge]:
     interpolations = interpolate_edge_to_vectors(edge, precision)
 
     result = []
@@ -65,7 +63,7 @@ def interpolate_edge(edge: cq.Edge, precision: float = 0.1) -> List[cq.Edge]:
 
 
 def interpolate_edges_with_unstable_curves(
-    edges: List[cq.Edge], precision: float = 0.1
+    edges: list[cq.Edge], precision: float = 0.1
 ):
     """
     It appears some curves do not offset nicely with OCCT. BSPLINE is an example.
@@ -90,11 +88,11 @@ def interpolate_edges_with_unstable_curves(
     return result, interpolated
 
 
-def vectors_to_2d_tuples(vectors: List[cq.Vector]) -> List[Tuple[float, float]]:
+def vectors_to_2d_tuples(vectors: list[cq.Vector]) -> list[tuple[float, float]]:
     return [(vector.x, vector.y) for vector in vectors]
 
 
-def edge_to_vectors(edge: cq.Edge, precision: float = 0.01) -> List[cq.Vector]:
+def edge_to_vectors(edge: cq.Edge, precision: float = 0.01) -> list[cq.Vector]:
     geom_type = edge.geomType()
     if geom_type == "OFFSET":
         geom_type = get_underlying_geom_type(edge)
@@ -107,7 +105,7 @@ def edge_to_vectors(edge: cq.Edge, precision: float = 0.01) -> List[cq.Vector]:
 
 def wire_to_vectors(
     wire: cq.Wire, precision: float = 0.01, close=True
-) -> List[cq.Vector]:
+) -> list[cq.Vector]:
     edges = wire_to_ordered_edges(wire)
 
     if not edges:

@@ -1,7 +1,7 @@
 import itertools
 import math
 from functools import cache
-from typing import Iterable, List, T, Tuple, Union
+from typing import Iterable, T, Union
 
 import numpy as np
 import pyclipper
@@ -55,7 +55,7 @@ def edge_oriented_param(edge: cq.Edge, p1, p2):
     return p1, p2, False
 
 
-def edge_start_end(edge: cq.Edge) -> Tuple[cq.Vector, cq.Vector]:
+def edge_start_end(edge: cq.Edge) -> tuple[cq.Vector, cq.Vector]:
     # https://github.com/CadQuery/cadquery/issues/831
     orientation = edge.wrapped.Orientation()
     if orientation == TopAbs_REVERSED:
@@ -63,7 +63,7 @@ def edge_start_end(edge: cq.Edge) -> Tuple[cq.Vector, cq.Vector]:
     return edge.startPoint(), edge.endPoint()
 
 
-def drop_z(vector: cq.Vector) -> Tuple[float, float]:
+def drop_z(vector: cq.Vector) -> tuple[float, float]:
     return vector.x, vector.y
 
 
@@ -72,7 +72,7 @@ def position_space(edge: cq.Edge, tolerance=0.1):
     return np.linspace(0, 1, math.ceil(edge.Length() / tolerance))
 
 
-def flatten_edges(edges: List[cq.Edge]):
+def flatten_edges(edges: list[cq.Edge]):
     vxs = []
     for i, edge in enumerate(edges):
         # LINE ARC CIRCLE SPLINE
@@ -93,7 +93,7 @@ def flatten_edges(edges: List[cq.Edge]):
     return vxs
 
 
-def flatten_wire(wire: cq.Wire) -> List[cq.Vector]:
+def flatten_wire(wire: cq.Wire) -> list[cq.Vector]:
     return flatten_edges(wire_to_ordered_edges(wire))
 
 
@@ -127,7 +127,7 @@ def is_arc_clockwise2(arc: cq.Edge):
     return normal.z < 0
 
 
-def wire_to_ordered_edges(wire: cq.Wire) -> List[cq.Edge]:
+def wire_to_ordered_edges(wire: cq.Wire) -> list[cq.Edge]:
     """
     It's a trap.
 
@@ -166,7 +166,7 @@ def cut_clockwise(positive_offset: bool, spindle_clockwise: bool, climb: bool):
     return bool((positive_offset + spindle_clockwise + climb) % 2)
 
 
-def flatten_list(lst: Iterable[Iterable[T]]) -> List[T]:
+def flatten_list(lst: Iterable[Iterable[T]]) -> list[T]:
     return [element for nested_lst in lst for element in nested_lst]
 
 
@@ -193,17 +193,17 @@ class WireClipper:
         return polygon
 
     def add_clip_polygon(
-        self, polygon: Iterable[Tuple[float, float]], is_closed=False, cache=False
+        self, polygon: Iterable[tuple[float, float]], is_closed=False, cache=False
     ):
         return self._add_polygon(polygon, pyclipper.PT_CLIP, is_closed, cache)
 
     def add_subject_polygon(
-        self, polygon: Iterable[Tuple[float, float]], is_closed=False
+        self, polygon: Iterable[tuple[float, float]], is_closed=False
     ):
         return self._add_polygon(polygon, pyclipper.PT_SUBJECT, is_closed)
 
     def _add_polygon(
-        self, polygon: Iterable[Tuple[float, float]], pt, is_closed=False, cache=False
+        self, polygon: Iterable[tuple[float, float]], pt, is_closed=False, cache=False
     ):
         self._add_path(pyclipper.scale_to_clipper(polygon), pt, is_closed, cache)
 
@@ -249,7 +249,7 @@ class WireClipper:
 
     def execute(
         self, clip_type=pyclipper.CT_INTERSECTION
-    ) -> Tuple[Tuple[Tuple[float, float], Tuple[float, float]]]:
+    ) -> tuple[tuple[tuple[float, float], tuple[float, float]]]:
         # TODO detect if there's nothing to do?
         polytree = self._clipper.Execute2(clip_type)
         # TODO option to return nested structure?
@@ -272,20 +272,20 @@ class WireClipper:
         return self.execute(pyclipper.CT_DIFFERENCE)
 
 
-def dist2(v: Tuple[float, float], w: Tuple[float, float]) -> float:
+def dist2(v: tuple[float, float], w: tuple[float, float]) -> float:
     return (v[0] - w[0]) ** 2 + (v[1] - w[1]) ** 2
 
 
 @cache
-def cached_dist2(p1: Tuple[float, float], p2: Tuple[float, float]):
+def cached_dist2(p1: tuple[float, float], p2: tuple[float, float]):
     return dist2(p1, p2)
 
 
 def dist_to_segment_squared(
-    point: Tuple[float, float],
-    segment_start: Tuple[float, float],
-    segment_end: Tuple[float, float],
-) -> Tuple[float, Tuple[float, float]]:
+    point: tuple[float, float],
+    segment_start: tuple[float, float],
+    segment_end: tuple[float, float],
+) -> tuple[float, tuple[float, float]]:
     p, v, w = point, segment_start, segment_end
     """https://stackoverflow.com/a/1501725"""
     l2 = dist2(v, w)
@@ -348,8 +348,8 @@ def project_face(face: cq.Face, projection_dir=(0, 0, 1)) -> cq.Face:
 
 
 def extract_wires(
-    shape: Union[cq.Workplane, cq.Shape, List[cq.Shape]]
-) -> Tuple[List[cq.Wire], List[cq.Wire]]:
+    shape: Union[cq.Workplane, cq.Shape, list[cq.Shape]]
+) -> tuple[list[cq.Wire], list[cq.Wire]]:
     if isinstance(shape, cq.Workplane):
         return extract_wires(shape.objects)
 
@@ -397,7 +397,7 @@ def optimize_float(v: float):
 
 def break_compound_to(
     compound: cq.Compound, shape_type: TopAbs_ShapeEnum
-) -> List[TopoDS_Shape]:
+) -> list[TopoDS_Shape]:
     shapes = []
     explorer = TopExp_Explorer(compound.wrapped, shape_type)
     while explorer.More():

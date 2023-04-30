@@ -1,20 +1,20 @@
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
+from typing import Optional
 
 from cq_cam.utils.utils import cached_dist2
 
 
 @dataclass
 class LinkedPolygon:
-    polygon: List[Tuple[float, float]]
-    linked_points: List[Tuple[float, float]] = field(default_factory=list)
-    _linked_points: List[Tuple[float, float]] = field(default_factory=list)
+    polygon: list[tuple[float, float]]
+    linked_points: list[tuple[float, float]] = field(default_factory=list)
+    _linked_points: list[tuple[float, float]] = field(default_factory=list)
 
     def link_point(
         self,
-        point: Tuple[float, float],
-        segment_start: Tuple[float, float],
-        segment_end: Tuple[float, float],
+        point: tuple[float, float],
+        segment_start: tuple[float, float],
+        segment_end: tuple[float, float],
     ):
         assert point not in self.linked_points
 
@@ -34,7 +34,7 @@ class LinkedPolygon:
 
         self.linked_points.append(point)
 
-    def reset(self, start_point: Optional[Tuple[float, float]] = None):
+    def reset(self, start_point: Optional[tuple[float, float]] = None):
         """
         Reset the internal state for `nearest_linked`
 
@@ -46,10 +46,10 @@ class LinkedPolygon:
         if start_point:
             self._linked_points.remove(start_point)
 
-    def drop(self, point: Optional[Tuple[float, float]]):
+    def drop(self, point: Optional[tuple[float, float]]):
         self._linked_points.remove(point)
 
-    def nearest_linked(self, point: Tuple[float, float]):
+    def nearest_linked(self, point: tuple[float, float]):
         """
         Given a (unused) linked point, find the nearest other (unused) linked point
         and return the path sequence to it.

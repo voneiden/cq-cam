@@ -5,7 +5,7 @@ from typing import List, Optional, Union
 
 from cadquery import cq
 
-from cq_cam.command import MotionCommand
+from cq_cam.command import Command, MotionCommand
 from cq_cam.common import (
     ArcDistanceMode,
     CoolantState,
@@ -24,7 +24,7 @@ from cq_cam.visualize import visualize_job, visualize_job_as_edges
 
 
 class Operation:
-    def __init__(self, job, name: str, commands: List[MotionCommand]):
+    def __init__(self, job, name: str, commands: List[Command]):
         self.job = job
         self.name = name
         self.commands = commands
@@ -36,6 +36,8 @@ class Operation:
         gcodes = [f"({self.job.name} - {self.name})"]
         previous_command = None
         for command in self.commands:
+            print(Command)
+            print(issubclass(MotionCommand, type(command)))
             gcode, position = command.to_gcode(previous_command, position)
             previous_command = command
 
@@ -249,7 +251,7 @@ class Job:
             for operation in self.operations
         ]
 
-    def _add_operation(self, name: str, commands: List[MotionCommand]):
+    def _add_operation(self, name: str, commands: List[Command]):
         job = copy(self)
         job.operations = [*self.operations, Operation(job, name, commands)]
         return job

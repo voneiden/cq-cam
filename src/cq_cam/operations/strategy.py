@@ -1,6 +1,6 @@
 import logging
 from itertools import pairwise
-from typing import Dict, List, Tuple
+from typing import List
 
 import cadquery as cq
 import numpy as np
@@ -8,8 +8,8 @@ import numpy as np
 from cq_cam.utils.linked_polygon import LinkedPolygon
 from cq_cam.utils.utils import WireClipper, cached_dist2, dist_to_segment_squared
 
-Scanpoint = Tuple[float, float]
-Scanline = List[Scanpoint]
+Scanpoint = tuple[float, float]
+Scanline = list[Scanpoint]
 
 logger = logging.getLogger(__name__)
 
@@ -21,8 +21,8 @@ class Strategy:
 
     @staticmethod
     def _pick_nearest(
-        point: Tuple[float, float], options: List[Tuple[float, float]]
-    ) -> Tuple[float, float]:
+        point: tuple[float, float], options: list[tuple[float, float]]
+    ) -> tuple[float, float]:
         nearest = (cached_dist2(point, options[0]), options[0])
         for option in options[1:]:
             dist2 = cached_dist2(point, option)
@@ -32,7 +32,7 @@ class Strategy:
 
     @classmethod
     def _sort_clipper_output(
-        cls, output_paths: Tuple[Tuple[Tuple[float, float], Tuple[float, float]]]
+        cls, output_paths: tuple[tuple[tuple[float, float], tuple[float, float]]]
     ):
         paths = [output_paths[0]]
         point = output_paths[0][-1]
@@ -115,7 +115,7 @@ class ZigZagStrategy(Strategy):
         return cut_sequences
 
     @staticmethod
-    def _scanline_end_map(scanlines: List[Scanline]):
+    def _scanline_end_map(scanlines: list[Scanline]):
         scanline_end_map = {}
         scanpoints = []
         for scanline in scanlines:
@@ -128,7 +128,7 @@ class ZigZagStrategy(Strategy):
 
     @staticmethod
     def _link_scanpoints_to_boundaries(
-        scanpoints: List[Scanpoint], boundaries: List[List[Tuple[float, float]]]
+        scanpoints: list[Scanpoint], boundaries: list[list[tuple[float, float]]]
     ):
         remaining_scanpoints = scanpoints[:]
         scanpoint_to_linked_polygon = {}
@@ -150,11 +150,11 @@ class ZigZagStrategy(Strategy):
 
     @staticmethod
     def _route_zig_zag(
-        linked_polygons: List[LinkedPolygon],
-        scanlines: Tuple[Tuple[Tuple[float, float], Tuple[float, float]]],
-        scanpoint_to_linked_polygon: Dict[Tuple[float, float], LinkedPolygon],
-        scanpoint_to_scanline: Dict[Tuple[float, float], List[Tuple[float, float]]],
-    ) -> List[List[Tuple[float, float]]]:
+        linked_polygons: list[LinkedPolygon],
+        scanlines: tuple[tuple[tuple[float, float], tuple[float, float]]],
+        scanpoint_to_linked_polygon: dict[tuple[float, float], LinkedPolygon],
+        scanpoint_to_scanline: dict[tuple[float, float], list[tuple[float, float]]],
+    ) -> list[list[tuple[float, float]]]:
         # Prepare to route the zigzag
         for linked_polygon in linked_polygons:
             linked_polygon.reset()
@@ -202,7 +202,7 @@ class ContourStrategy(Strategy):
 
     @classmethod
     def process(
-        cls, task, outer_boundaries: List[cq.Wire], inner_boundaries: List[cq.Wire]
+        cls, task, outer_boundaries: list[cq.Wire], inner_boundaries: list[cq.Wire]
     ):
         # We generate shrinking contours from all the outer boundaries
         offset_step = -abs(task._tool_diameter * task.stepover)
