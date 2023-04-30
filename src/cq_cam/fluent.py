@@ -5,7 +5,7 @@ from typing import List, Optional, Union
 
 from cadquery import cq
 
-from cq_cam.command import Command, MotionCommand
+from cq_cam.command import Command, SafetyBlock, StartSequence, StopSequence
 from cq_cam.common import (
     ArcDistanceMode,
     CoolantState,
@@ -36,8 +36,6 @@ class Operation:
         gcodes = [f"({self.job.name} - {self.name})"]
         previous_command = None
         for command in self.commands:
-            print(Command)
-            print(issubclass(MotionCommand, type(command)))
             command.previous_command = previous_command
             command.start = position
             gcode, position = command.to_gcode()
@@ -218,14 +216,13 @@ class Job:
 
     def to_gcode(self):
         task_break = "\n\n\n"
-
-        to_home = f"G1Z0\nG0Z{self.rapid_height}\nX0Y0"
         return (
             f"({self.name} - Feedrate: {self.feed} - Unit: {self.unit})\n"
-            f"G90\n"
-            f"{self.unit.to_gcode()}\n"
+            f"{SafetyBlock().to_gcode()}\n"
+            f"{StartSequence(spindle=self.speed, coolant=self.coolant).to_gcode()}\n"
             f"{task_break.join(task.to_gcode() for task in self.operations)}"
-            f"{to_home}"
+            f"\n{SafetyBlock().to_gcode()}\n"
+            f"{StopSequence(coolant=self.coolant).to_gcode()}"
         )
 
     def save_gcode(self, file_name):
