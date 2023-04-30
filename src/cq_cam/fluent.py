@@ -220,8 +220,8 @@ class Job:
             f"({self.name} - Feedrate: {self.feed} - Unit: {self.unit})\n"
             f"{SafetyBlock().to_gcode()}\n"
             f"{StartSequence(spindle=self.speed, coolant=self.coolant).to_gcode()}\n"
-            f"{task_break.join(task.to_gcode() for task in self.operations)}"
-            f"\n{SafetyBlock().to_gcode()}\n"
+            f"{task_break.join(task.to_gcode() for task in self.operations)}\n"
+            f"{SafetyBlock().to_gcode()}\n"
             f"{StopSequence(coolant=self.coolant).to_gcode()}"
         )
 
