@@ -43,7 +43,9 @@ class Operation(ABC):
         def command_gcode_generator(start):
             previous_command = None
             for command in self.commands:
-                gcode, start = command.to_gcode(previous_command, start, self.job)
+                command.previous_command = previous_command
+                command.start = start
+                gcode, start = command.to_gcode(self.job)
                 yield gcode
                 previous_command = command
 

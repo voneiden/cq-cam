@@ -38,7 +38,9 @@ class Operation:
         for command in self.commands:
             print(Command)
             print(issubclass(MotionCommand, type(command)))
-            gcode, position = command.to_gcode(previous_command, position)
+            command.previous_command = previous_command
+            command.start = position
+            gcode, position = command.to_gcode()
             previous_command = command
 
             # Skip blank lines. These can happen for example if we try to issue

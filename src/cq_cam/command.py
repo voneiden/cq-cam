@@ -123,6 +123,8 @@ class MotionCommand(Command, ABC):
     max_depth: Optional[float]
     ais_color = "red"
     ais_alt_color = "darkred"
+    previous_command: Union[MotionCommand, None]
+    start: cq.Vector
     end: CommandVector
     tab: bool  # TODO not the right place to carry tab information imo?
 
@@ -165,15 +167,13 @@ class MotionCommand(Command, ABC):
         return "".join(coords), end
 
     @abstractmethod
-    def to_gcode(
-        self, previous_command: Union[MotionCommand, None], start: cq.Vector
-    ) -> tuple[str, cq.Vector]:
+    def to_gcode(self) -> tuple[str, cq.Vector]:
         """Output all the necessary G-Code required to perform the command"""
         pass
 
     @abstractmethod
     def to_ais_shape(
-        self, start: cq.Vector, as_edges=False, alt_color=False
+        self, as_edges=False, alt_color=False
     ) -> tuple[AIS_Shape, cq.Vector]:
         pass
 
@@ -196,22 +196,20 @@ class ConfigCommand(Command, ABC):
 
 
 class Linear(MotionCommand, ABC):
-    def to_gcode(
-        self, previous_command: Optional[MotionCommand], start: cq.Vector
-    ) -> tuple[str, cq.Vector]:
-        xyz, end = self.xyz_gcode(start)
-        return f"{self.print_modal(previous_command)}{xyz}", end
+    def to_gcode(self) -> tuple[str, cq.Vector]:
+        xyz, end = self.xyz_gcode(self.start)
+        return f"{self.print_modal(self.previous_command)}{xyz}", end
 
-    def to_ais_shape(self, start, as_edges=False, alt_color=False):
-        end = self.end.to_vector(start)
-        if start == end:
+    def to_ais_shape(self, as_edges=False, alt_color=False):
+        end = self.end.to_vector(self.start)
+        if self.start == end:
             return None, end
 
         if as_edges:
-            return cq.Edge.makeLine(start, end), end
+            return cq.Edge.makeLine(self.start, end), end
 
         shape = AIS_Line(
-            Geom_CartesianPoint(start.toPnt()), Geom_CartesianPoint(end.toPnt())
+            Geom_CartesianPoint(self.start.toPnt()), Geom_CartesianPoint(end.toPnt())
         )
         if self.arrow:
             shape.Attributes().SetLineArrowDraw(True)
@@ -309,16 +307,14 @@ class Circular(MotionCommand, ABC):
 
         return "".join(ijk)
 
-    def to_gcode(
-        self, previous_command: Optional[MotionCommand], start: cq.Vector
-    ) -> tuple[str, cq.Vector]:
-        xyz, end = self.xyz_gcode(start)
-        ijk = self.ijk_gcode(start)
-        return f"{self.print_modal(previous_command)}{xyz}{ijk}", end
+    def to_gcode(self) -> tuple[str, cq.Vector]:
+        xyz, end = self.xyz_gcode(self.start)
+        ijk = self.ijk_gcode(self.start)
+        return f"{self.print_modal(self.previous_command)}{xyz}{ijk}", end
 
-    def to_ais_shape(self, start, as_edges=False, alt_color=False):
-        end = self.end.to_vector(start)
-        mid = self.mid.to_vector(start)
+    def to_ais_shape(self, as_edges=False, alt_color=False):
+        end = self.end.to_vector(self.start)
+        mid = self.mid.to_vector(self.start)
 
         # Note: precision of __eq__ on vectors can cause false positive circles with very small arcs
         # TODO: Neutralise small arcs, these can cause similar problem with grbl as far as I remember
@@ -330,10 +326,10 @@ class Circular(MotionCommand, ABC):
         #    edge = cq.Edge.makeCircle(radius, center, cq.Vector(0,0,1))
         # else:
         try:
-            edge = cq.Edge.makeThreePointArc(start, mid, end)
+            edge = cq.Edge.makeThreePointArc(self.start, mid, end)
         except:
             try:
-                edge = cq.Edge.makeLine(start, end)
+                edge = cq.Edge.makeLine(self.start, end)
             except:
                 # Too small to render ?
                 return None, end
