@@ -385,12 +385,29 @@ class SafetyBlock(ConfigCommand):
         super().__init__(None, None, None)
 
     def to_gcode(self) -> str:
-        gcode_str = f"{DistanceMode.ABSOLUTE.to_gcode()} {WorkOffset.OFFSET_1.to_gcode()} {PlannerControlMode.BLEND.to_gcode()} {SpindleControlMode.MAX_SPINDLE_SPEED.to_gcode()} {WorkPlane.XY.to_gcode()} {FeedRateControlMode.UNITS_PER_MINUTE.to_gcode()}"
-        gcode_str += f"\n{LengthCompensation.OFF.to_gcode()} {RadiusCompensation.OFF.to_gcode()} {CannedCycle.CANCEL.to_gcode()}"
-        gcode_str += f"\n{Unit.METRIC.to_gcode()}"
-        gcode_str += f"\n{HomePosition.HOME_2.to_gcode()}"
-
-        return gcode_str
+        return "\n".join(
+            (
+                " ".join(
+                    (
+                        DistanceMode.ABSOLUTE.to_gcode(),
+                        WorkOffset.OFFSET_1.to_gcode(),
+                        PlannerControlMode.BLEND.to_gcode(),
+                        SpindleControlMode.MAX_SPINDLE_SPEED.to_gcode(),
+                        WorkPlane.XY.to_gcode(),
+                        FeedRateControlMode.UNITS_PER_MINUTE.to_gcode(),
+                    )
+                ),
+                " ".join(
+                    (
+                        LengthCompensation.OFF.to_gcode(),
+                        RadiusCompensation.OFF.to_gcode(),
+                        CannedCycle.CANCEL.to_gcode(),
+                    )
+                ),
+                Unit.METRIC.to_gcode(),
+                HomePosition.HOME_2.to_gcode(),
+            )
+        )
 
 
 class ToolChange(ConfigCommand):
@@ -403,10 +420,19 @@ class ToolChange(ConfigCommand):
         super().__init__(tool_number, spindle, coolant)
 
     def to_gcode(self) -> str:
-        gcode_str = StopSequence(self.coolant).to_gcode()
-        gcode_str += f"\n{HomePosition.HOME_2.to_gcode()}"
-        gcode_str += f"\n{ProgramControlMode.PAUSE_OPTIONAL.to_gcode()}"
-        gcode_str += f"\nT{self.tool_number} {LengthCompensation.ON.to_gcode()} H{self.tool_number} {AutomaticChangerMode.TOOL_CHANGE.to_gcode()}"
-        gcode_str += f"\n{StartSequence(self.spindle, self.coolant).to_gcode()}"
-
-        return gcode_str
+        return "\n".join(
+            (
+                StopSequence(self.coolant).to_gcode(),
+                HomePosition.HOME_2.to_gcode(),
+                ProgramControlMode.PAUSE_OPTIONAL.to_gcode(),
+                " ".join(
+                    (
+                        f"T{self.tool_number}",
+                        LengthCompensation.ON.to_gcode(),
+                        f"H{self.tool_number}",
+                        AutomaticChangerMode.TOOL_CHANGE.to_gcode(),
+                    )
+                ),
+                StartSequence(self.spindle, self.coolant).to_gcode(),
+            )
+        )
