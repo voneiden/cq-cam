@@ -269,7 +269,7 @@ def route_polyface_outers(job: "Job", polyfaces: list[PathFace], stepover=None):
             commands += rapid_to(start, job.rapid_height, job.op_safe_height)
 
         for x, y in poly[1:]:
-            commands.append(Cut.abs(x, y, 0))
+            commands.append(Cut.abs(x, y, polyface.depth))
 
         if closest_point:
             commands.append(Cut.abs(*closest_point, polyface.depth))
