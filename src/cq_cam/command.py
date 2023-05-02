@@ -179,17 +179,6 @@ class MotionCommand(Command, ABC):
 
 
 class ConfigCommand(Command, ABC):
-    tool_number: Optional[int] = (None,)
-    spindle: Optional[int] = None
-    coolant: Optional[CoolantState] = None
-
-    def __init__(
-        self, tool_number: int, spindle: Optional[int], coolant: Optional[CoolantState]
-    ) -> None:
-        self.tool_number = tool_number
-        self.spindle = spindle
-        self.coolant = coolant
-
     @abstractmethod
     def to_gcode(self) -> str:
         pass
@@ -351,10 +340,15 @@ class CircularCCW(Circular):
 
 
 class StartSequence(ConfigCommand):
+    spindle: Optional[int] = None
+    coolant: Optional[CoolantState] = None
+
     def __init__(
         self, spindle: Optional[int] = None, coolant: Optional[CoolantState] = None
     ) -> None:
-        super().__init__(None, spindle, coolant)
+        self.spindle = spindle
+        self.coolant = coolant
+        super().__init__()
 
     def to_gcode(self) -> str:
         gcode_str = CutterState.ON_CW.to_gcode()
@@ -369,8 +363,11 @@ class StartSequence(ConfigCommand):
 
 
 class StopSequence(ConfigCommand):
+    coolant: Optional[CoolantState] = None
+
     def __init__(self, coolant: Optional[CoolantState] = None):
-        super().__init__(None, None, coolant)
+        self.coolant = coolant
+        super().__init__()
 
     def to_gcode(self) -> str:
         gcode_str = CutterState.OFF.to_gcode()
@@ -381,9 +378,6 @@ class StopSequence(ConfigCommand):
 
 
 class SafetyBlock(ConfigCommand):
-    def __init__(self) -> None:
-        super().__init__(None, None, None)
-
     def to_gcode(self) -> str:
         return "\n".join(
             (
@@ -411,13 +405,21 @@ class SafetyBlock(ConfigCommand):
 
 
 class ToolChange(ConfigCommand):
+    tool_number: Optional[int] = None
+    spindle: Optional[int] = None
+    coolant: Optional[CoolantState] = None
+
     def __init__(
         self,
         tool_number: int,
         spindle: Optional[int] = None,
         coolant: Optional[CoolantState] = None,
     ):
-        super().__init__(tool_number, spindle, coolant)
+        self.tool_number = tool_number
+        self.spindle = spindle
+        self.coolant = coolant
+
+        super().__init__()
 
     def to_gcode(self) -> str:
         return "\n".join(
