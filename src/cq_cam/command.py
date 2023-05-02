@@ -140,7 +140,7 @@ class MotionCommand(Command, ABC):
         return cls(end=RelativeCV(x=x, y=y, z=z), **kwargs)
 
     def print_modal(self, previous: Optional[MotionCommand]):
-        if self.modal and (previous is None or previous.modal is not self.modal):
+        if self.modal and (previous is None or previous.modal != self.modal):
             return self.modal
         return ""
 
@@ -151,13 +151,13 @@ class MotionCommand(Command, ABC):
 
         # TODO use isclose
 
-        if start.x is not end.x:
+        if start.x != end.x:
             coords.append(f"X{optimize_float(round(end.x, precision))}")
 
-        if start.y is not end.y:
+        if start.y != end.y:
             coords.append(f"Y{optimize_float(round(end.y, precision))}")
 
-        if start.z is not end.z:
+        if start.z != end.z:
             coords.append(f"Z{optimize_float(round(end.z, precision))}")
 
         return "".join(coords), end
@@ -361,10 +361,10 @@ class StartSequence(ConfigCommand):
     def to_gcode(self) -> str:
         gcode_str = CutterState.ON_CW.to_gcode()
 
-        if self.spindle is not None:
+        if self.spindle != None:
             gcode_str += f" S{self.spindle}"
 
-        if self.coolant is not None:
+        if self.coolant != None:
             gcode_str += f" {self.coolant.to_gcode()}"
 
         return gcode_str
@@ -376,7 +376,7 @@ class StopSequence(ConfigCommand):
 
     def to_gcode(self) -> str:
         gcode_str = CutterState.OFF.to_gcode()
-        if self.coolant is not None:
+        if self.coolant != None:
             gcode_str += f" {CoolantState.OFF.to_gcode()}"
 
         return gcode_str
