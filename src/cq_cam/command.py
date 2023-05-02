@@ -359,10 +359,10 @@ class StartSequence(ConfigCommand):
     def to_gcode(self) -> str:
         gcode_str = CutterState.ON_CW.to_gcode()
 
-        if self.spindle != None:
+        if self.spindle is not None:
             gcode_str += f" S{self.spindle}"
 
-        if self.coolant != None:
+        if self.coolant is not None:
             gcode_str += f" {self.coolant.to_gcode()}"
 
         return gcode_str
@@ -374,7 +374,7 @@ class StopSequence(ConfigCommand):
 
     def to_gcode(self) -> str:
         gcode_str = CutterState.OFF.to_gcode()
-        if self.coolant != None:
+        if self.coolant is not None:
             gcode_str += f" {CoolantState.OFF.to_gcode()}"
 
         return gcode_str
