@@ -1,3 +1,6 @@
+from typing import Any
+
+
 class Node:
     def __init__(self, tree, obj, parent=None):
         self.tree = tree
@@ -55,7 +58,7 @@ class Tree:
         return next(node for node in leaves if not node.locked)
 
     @property
-    def sequences(self):
+    def sequences(self) -> list[list[Any]]:
         leaves = self.leaves
         sequence_candidates = [node.traverse_and_unwrap for node in leaves]
         sequences = []

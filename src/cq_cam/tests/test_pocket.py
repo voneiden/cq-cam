@@ -55,3 +55,27 @@ def test_make_from_wire_with_bigger_inner_than_outer():
     assert outer_compound.Area() == 0
     compound_faces = break_compound_to_faces(outer_compound)
     assert len(compound_faces) == 0
+
+
+def test_stepdown(job, box):
+    wp = box.faces(">Z").workplane().rect(2, 2).cutBlind(-1)
+    pocket_face = wp.faces(">Z[1]")
+    job = job.pocket(pocket_face, stepdown=0.5)
+    assert job.operations[0].to_gcode() == (
+        "(Job - Pocket)\n"
+        "G0Z10\n"
+        "X0.25Y0.25\n"
+        "Z1\n"
+        "G1Z-0.5\n"
+        "X-0.25\n"
+        "Y-0.25\n"
+        "X0.25\n"
+        "Y0.25\n"
+        "G0Z10\n"
+        "Z1\n"
+        "G1Z-1\n"
+        "X-0.25\n"
+        "Y-0.25\n"
+        "X0.25\n"
+        "Y0.25"
+    )
