@@ -111,6 +111,21 @@ def combine_outers(poly_faces: List[PathFace], depth) -> List[Path]:
     return [poly_face.outer for poly_face in union_poly_tree(outers, [], depth)]
 
 
+def determine_stepdown_start_depth(
+    pocket_op: PathFace, shallower_pocket_ops: list[PathFace]
+) -> Optional[float]:
+    stepdown_start_depth = [
+        op.depth
+        for op in shallower_pocket_ops
+        if op.polygon.contains(pocket_op.polygon)
+    ]
+    if stepdown_start_depth:
+        stepdown_start_depth.sort()
+        return stepdown_start_depth[0]
+    else:
+        return None
+
+
 def apply_stepdown(
     sequences: list[list[PathFace]], start_depth: Optional[float], stepdown: float
 ) -> list[list[PathFace]]:
@@ -233,25 +248,17 @@ def pocket_clipper(
 
     # Apply pocket fill
     sequences: list[list[PathFace]] = []
-    filled_pocket_ops = []
+    shallower_pocket_ops = []
     for pocket_op in pocket_ops:
         fill_sequences = fill_pocket_contour_shrink(pocket_op, stepover)
         if stepdown:
-            stepdown_start_depth = [
-                op.depth
-                for op in filled_pocket_ops
-                if op.polygon.contains(pocket_op.polygon)
-            ]
-            if stepdown_start_depth:
-                stepdown_start_depth.sort()
-                stepdown_start_depth = stepdown_start_depth[0]
-            else:
-                stepdown_start_depth = None
-
+            stepdown_start_depth = determine_stepdown_start_depth(
+                pocket_op, shallower_pocket_ops
+            )
             sequences += apply_stepdown(fill_sequences, stepdown_start_depth, stepdown)
 
         sequences += fill_sequences
-        filled_pocket_ops.append(pocket_op)
+        shallower_pocket_ops.append(pocket_op)
 
     # Route wires
     commands = []

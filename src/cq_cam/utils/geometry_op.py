@@ -30,8 +30,6 @@ PathSegmentPosition: TypeAlias = tuple[int, float]
 
 
 class PathFace:
-    __slots__ = ("outer", "inners", "depth")
-
     def __init__(self, outer: Path, inners: list[Path], depth: float):
         self.outer: Path = outer
         self.inners: list[Path] = inners

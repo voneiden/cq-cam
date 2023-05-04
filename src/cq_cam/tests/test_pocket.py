@@ -1,6 +1,8 @@
 import cadquery as cq
+import pytest
 
-from cq_cam.utils.geometry_op import offset_face
+from cq_cam.operations.pocket import apply_stepdown, determine_stepdown_start_depth
+from cq_cam.utils.geometry_op import PathFace, offset_face
 from cq_cam.utils.tests.conftest import round_array
 from cq_cam.utils.utils import break_compound_to_faces
 
@@ -79,3 +81,17 @@ def test_stepdown(job, box):
         "X0.25\n"
         "Y0.25"
     )
+
+
+def test_apply_stepdown_invalid_depths():
+    with pytest.raises(RuntimeError):
+        apply_stepdown([[PathFace([], [], -5), PathFace([], [], -6)]], None, 1)
+
+
+def test_determine_stepdown_start_depth():
+    upper_container = PathFace([(0, 0), (1, 0), (1, 1), (0, 1)], [], -3)
+    upper_non_container = PathFace([(0, 0), (-1, 0), (-1, -1), (0, -1)], [], -3)
+    bottom = PathFace([(0, 0), (1, 0), (1, 1), (0, 1)], [], -5)
+    assert determine_stepdown_start_depth(bottom, []) is None
+    assert determine_stepdown_start_depth(bottom, [upper_container]) == -3
+    assert determine_stepdown_start_depth(bottom, [upper_non_container]) is None
