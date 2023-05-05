@@ -45,7 +45,13 @@ def visualize_job_plane(job_plane: cq.Plane, length=1):
     return group
 
 
-def visualize_job(job_plane: cq.Plane, commands, start_height=10):
+def visualize_job(
+    job_plane: cq.Plane, commands, start_height=10
+) -> AIS_MultipleConnectedInteractive:
+    """
+    Visualize commands as AIS_Line objects grouped inside AIS_MultipleConnectedInteractive
+    This method is suitable for cq-editor as it enables the use of colours.
+    """
     inverse_transform = job_plane.rG
     position = cq.Vector(0, 0, start_height)
     command_group = AIS_MultipleConnectedInteractive()
@@ -63,13 +69,13 @@ def visualize_job(job_plane: cq.Plane, commands, start_height=10):
     return group
 
 
-def visualize_job_as_edges(job_plane: cq.Plane, commands, start_height=10):
-    """To be used mainly for documentation purposes
+def visualize_job_as_edges(
+    job_plane: cq.Plane, commands, start_height=10
+) -> list[cq.Edge]:
+    """
+    Slower generation but slightly more performant rendering compared to AIS_Line
 
-    :param job_plane:
-    :param commands:
-    :param start_height:
-    :return:
+    Used for documentation and ocp_vscode.
     """
     inverse_transform = job_plane.rG
     position = cq.Vector(0, 0, start_height)

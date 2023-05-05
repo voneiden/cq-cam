@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from copy import copy
 from typing import List, Optional, Union
 
@@ -21,6 +22,8 @@ from cq_cam.operations.tabs import Tabs
 from cq_cam.utils.geometry_op import OffsetInput
 from cq_cam.utils.utils import extract_wires, flatten_list
 from cq_cam.visualize import visualize_job, visualize_job_as_edges
+
+logger = logging.getLogger(__name__)
 
 
 class Operation:
@@ -229,10 +232,30 @@ class Job:
         with open(file_name, "w") as f:
             f.write(gcode)
 
-    def show(self, show_object):
+    def show(self, show_object=None):
+        if show_object is None:
+            import __main__
+
+            show_object = __main__.__dict__.get("show_object")
+
+        if show_object is None:
+            raise ValueError(
+                "Unable to visualize job, no show_object provided or found"
+            )
+
+        match source_module := show_object.__module__.split(".")[0]:
+            case "cq_editor":
+                visualize_f = visualize_job
+            case "ocp_vscode":
+                visualize_f = visualize_job_as_edges
+            case _:
+                logger.warning(
+                    f"Unsupported show_object source module ({source_module}) - visualizing as edges"
+                )
+                visualize_f = visualize_job_as_edges
         for i, operation in enumerate(self.operations):
             show_object(
-                visualize_job(self.top, operation.commands[1:]),
+                visualize_f(self.top, operation.commands[1:]),
                 f"{self.name} #{i} {operation.name}",
             )
 
