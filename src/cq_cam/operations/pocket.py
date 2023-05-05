@@ -3,6 +3,7 @@ from collections import defaultdict
 from typing import TYPE_CHECKING, List, Literal, Optional
 
 import cadquery as cq
+import numpy as np
 
 from cq_cam.operations.pocket_cq import pocket_cq
 from cq_cam.routers import route_polyface_outers
@@ -65,6 +66,7 @@ def pocket(
             avoid_outer_offset,
             avoid_inner_offset,
             stepover,
+            stepdown,
         )
     elif engine == "cq":
         return pocket_cq(
@@ -109,8 +111,44 @@ def combine_outers(poly_faces: List[PathFace], depth) -> List[Path]:
     return [poly_face.outer for poly_face in union_poly_tree(outers, [], depth)]
 
 
+def determine_stepdown_start_depth(
+    pocket_op: PathFace, shallower_pocket_ops: list[PathFace]
+) -> Optional[float]:
+    stepdown_start_depth = [
+        op.depth
+        for op in shallower_pocket_ops
+        if op.polygon.contains(pocket_op.polygon)
+    ]
+    if stepdown_start_depth:
+        stepdown_start_depth.sort()
+        return stepdown_start_depth[0]
+    else:
+        return None
+
+
+def apply_stepdown(
+    sequences: list[list[PathFace]], start_depth: Optional[float], stepdown: float
+) -> list[list[PathFace]]:
+    start_depth = -stepdown if start_depth is None else start_depth - stepdown
+
+    end_depths = set([path.depth for sequence in sequences for path in sequence])
+    if len(end_depths) != 1:
+        raise RuntimeError("Multiple depths in sequences")
+
+    step_depths = np.arange(start_depth, list(end_depths)[0], -stepdown)
+    stepped_sequences = []
+    for step_depth in step_depths:
+        for sequence in sequences:
+            step_sequence = []
+            for path in sequence:
+                step_sequence.append(path.clone_to_depth(step_depth))
+            stepped_sequences.append(step_sequence)
+
+    return stepped_sequences
+
+
 def build_pocket_ops(
-    job: "Job", op_areas: List[PathFace], avoid_areas: List[PathFace]
+    op_areas: List[PathFace], avoid_areas: List[PathFace]
 ) -> List[PathFace]:
     # Determine depth of each face
     depth_map, depths = generate_depth_map(op_areas)
@@ -141,7 +179,6 @@ def build_pocket_ops(
             depth_ops_with_avoid = difference_poly_tree(
                 depth_ops, depth_inners + avoid_outers, depth
             )
-
             pocket_ops += depth_ops_with_avoid
 
         else:
@@ -150,7 +187,7 @@ def build_pocket_ops(
     return pocket_ops
 
 
-def fill_pocket_contour_shrink(pocket: PathFace, step: float) -> list[PathFace]:
+def fill_pocket_contour_shrink(pocket: PathFace, step: float) -> list[list[PathFace]]:
     tree = Tree(PathFace(pocket.outer, [], depth=pocket.depth))
     i = 0
 
@@ -193,6 +230,7 @@ def pocket_clipper(
     avoid_outer_offset: float,
     avoid_inner_offset: float,
     stepover: float,
+    stepdown: float,
 ):
     # Offset faces
     offset_op_areas: list[PathFace] = []
@@ -206,12 +244,21 @@ def pocket_clipper(
             face, avoid_outer_offset, avoid_inner_offset
         )
 
-    pocket_ops = build_pocket_ops(job, offset_op_areas, offset_avoid_areas)
+    pocket_ops = build_pocket_ops(offset_op_areas, offset_avoid_areas)
 
     # Apply pocket fill
-    sequences: List[List[PathFace]] = []
+    sequences: list[list[PathFace]] = []
+    shallower_pocket_ops = []
     for pocket_op in pocket_ops:
-        sequences += fill_pocket_contour_shrink(pocket_op, stepover)
+        fill_sequences = fill_pocket_contour_shrink(pocket_op, stepover)
+        if stepdown:
+            stepdown_start_depth = determine_stepdown_start_depth(
+                pocket_op, shallower_pocket_ops
+            )
+            sequences += apply_stepdown(fill_sequences, stepdown_start_depth, stepdown)
+
+        sequences += fill_sequences
+        shallower_pocket_ops.append(pocket_op)
 
     # Route wires
     commands = []

@@ -1,10 +1,12 @@
 import logging
+from functools import cached_property
 from itertools import pairwise
 from math import sqrt
 from typing import Literal, Optional, TypeAlias
 
 import cadquery as cq
 import pyclipper as pc
+import shapely
 from OCP.StdFail import StdFail_NotDone
 
 from cq_cam.utils.circle_bug_workaround import circle_bug_workaround
@@ -28,8 +30,6 @@ PathSegmentPosition: TypeAlias = tuple[int, float]
 
 
 class PathFace:
-    __slots__ = ("outer", "inners", "depth")
-
     def __init__(self, outer: Path, inners: list[Path], depth: float):
         self.outer: Path = outer
         self.inners: list[Path] = inners
@@ -46,6 +46,13 @@ class PathFace:
             [wire_to_path(wire) for wire in cq_face.innerWires()],
             bbox.zmax,
         )
+
+    def clone_to_depth(self, depth: float):
+        return PathFace(list(self.outer), [list(inner) for inner in self.inners], depth)
+
+    @cached_property
+    def polygon(self) -> shapely.Polygon:
+        return shapely.Polygon(shell=self.outer, holes=self.inners)
 
 
 def calculate_offset(tool_radius: float, offset: Optional[OffsetInput], default=None):

@@ -1,6 +1,8 @@
 import cadquery as cq
+import pytest
 
-from cq_cam.utils.geometry_op import offset_face
+from cq_cam.operations.pocket import apply_stepdown, determine_stepdown_start_depth
+from cq_cam.utils.geometry_op import PathFace, offset_face
 from cq_cam.utils.tests.conftest import round_array
 from cq_cam.utils.utils import break_compound_to_faces
 
@@ -55,3 +57,41 @@ def test_make_from_wire_with_bigger_inner_than_outer():
     assert outer_compound.Area() == 0
     compound_faces = break_compound_to_faces(outer_compound)
     assert len(compound_faces) == 0
+
+
+def test_stepdown(job, box):
+    wp = box.faces(">Z").workplane().rect(2, 2).cutBlind(-1)
+    pocket_face = wp.faces(">Z[1]")
+    job = job.pocket(pocket_face, stepdown=0.5)
+    assert job.operations[0].to_gcode() == (
+        "(Job - Pocket)\n"
+        "G0Z10\n"
+        "X0.25Y0.25\n"
+        "Z1\n"
+        "G1Z-0.5\n"
+        "X-0.25\n"
+        "Y-0.25\n"
+        "X0.25\n"
+        "Y0.25\n"
+        "G0Z10\n"
+        "Z1\n"
+        "G1Z-1\n"
+        "X-0.25\n"
+        "Y-0.25\n"
+        "X0.25\n"
+        "Y0.25"
+    )
+
+
+def test_apply_stepdown_invalid_depths():
+    with pytest.raises(RuntimeError):
+        apply_stepdown([[PathFace([], [], -5), PathFace([], [], -6)]], None, 1)
+
+
+def test_determine_stepdown_start_depth():
+    upper_container = PathFace([(0, 0), (1, 0), (1, 1), (0, 1)], [], -3)
+    upper_non_container = PathFace([(0, 0), (-1, 0), (-1, -1), (0, -1)], [], -3)
+    bottom = PathFace([(0, 0), (1, 0), (1, 1), (0, 1)], [], -5)
+    assert determine_stepdown_start_depth(bottom, []) is None
+    assert determine_stepdown_start_depth(bottom, [upper_container]) == -3
+    assert determine_stepdown_start_depth(bottom, [upper_non_container]) is None
