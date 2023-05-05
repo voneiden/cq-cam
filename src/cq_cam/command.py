@@ -1,3 +1,39 @@
+"""
+command.py builts upon the gcode letter addresses introduced in common.py to form full gcode command abstractions.
+It is organised in a similiar fashion, into motion and non motion commands.
+The code is strctured around the abstract classes CommandVector and Command:
+- CommandVector
+    - AbsouluteCV
+    - RelativeCV
+- Command
+    - MotionCommand (abstract)
+        - Linear (abstract)
+            - Rapid
+            - Cut
+            - Plunge
+            - Retract
+        - Circular (abstract)
+            - CircularCW
+            - CircularCCW
+    - ConfigCommand (abstract)
+        - StartSequence
+        - StopSequence
+        - SafetyBlock
+        - ToolChange
+MotionCommands keep track of the previous command and position to optimise the generated gcode into a smaller size.
+In the following example the G0 command in the second line along with X1 and Z1 are unnecessarily issued:
+```
+G0 X1 Y1 Z1
+G0 X1 Y2 Z1
+```
+A more optimised version would look like this:
+```
+G0 X1 Y1 Z1
+Y2
+```
+MotionCommands are consumed by routers.py
+"""
+
 from __future__ import annotations
 
 import warnings
