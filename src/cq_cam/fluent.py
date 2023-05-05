@@ -6,7 +6,7 @@ from typing import List, Optional, Union
 
 from cadquery import cq
 
-from cq_cam.command import Command
+from cq_cam.command import MotionCommand
 from cq_cam.common import (
     ArcDistanceMode,
     CoolantState,
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 class Operation:
-    def __init__(self, job, name: str, commands: List[Command]):
+    def __init__(self, job, name: str, commands: List[MotionCommand]):
         self.job = job
         self.name = name
         self.commands = commands
@@ -271,7 +271,7 @@ class Job:
             for operation in self.operations
         ]
 
-    def _add_operation(self, name: str, commands: List[Command]):
+    def _add_operation(self, name: str, commands: List[MotionCommand]):
         job = copy(self)
         job.operations = [*self.operations, Operation(job, name, commands)]
         return job

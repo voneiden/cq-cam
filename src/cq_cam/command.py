@@ -77,6 +77,9 @@ class AbsoluteCV(CommandVector):
 
 class Command(ABC):
     modal = None
+
+
+class MotionCommand(Command, ABC):
     max_depth: Optional[float]
     ais_color = "red"
     ais_alt_color = "darkred"
@@ -98,12 +101,12 @@ class Command(ABC):
         warnings.warn("Relative CV is deprecated", DeprecationWarning)
         return cls(end=RelativeCV(x=x, y=y, z=z), **kwargs)
 
-    def print_modal(self, previous: Optional[Command]):
+    def print_modal(self, previous: Optional[MotionCommand]):
         if self.modal and (previous is None or previous.modal != self.modal):
             return self.modal
         return ""
 
-    def xyz_gcode(self, start: cq.Vector, precision=3) -> (str, cq.Vector):
+    def xyz_gcode(self, start: cq.Vector, precision=3) -> Tuple[str, cq.Vector]:
         coords = []
         end = self.end.to_vector(start)
         # TODO precision
@@ -123,33 +126,44 @@ class Command(ABC):
 
     @abstractmethod
     def to_gcode(
-        self, previous_command: Union[Command, None], start: cq.Vector
-    ) -> (str, cq.Vector):
+        self, previous_command: Union[MotionCommand, None], start: cq.Vector
+    ) -> Tuple[str, cq.Vector]:
         """Output all the necessary G-Code required to perform the command"""
         pass
 
     @abstractmethod
     def to_ais_shape(
         self, start: cq.Vector, as_edges=False, alt_color=False
-    ) -> (AIS_Shape, cq.Vector):
+    ) -> Tuple[AIS_Shape, cq.Vector]:
         pass
 
 
-class ReferencePosition(Command):
+class ConfigCommand(Command, ABC):
+    @abstractmethod
     def to_gcode(
-        self, previous_command: Union[Command, None], start: cq.Vector
-    ) -> (str, cq.Vector):
+        self,
+        tool_number: int,
+        spindle: Optional[int] = None,
+        coolant: Optional[CoolantState] = None,
+    ) -> str:
+        pass
+
+
+class ReferencePosition(MotionCommand):
+    def to_gcode(
+        self, previous_command: Union[MotionCommand, None], start: cq.Vector
+    ) -> Tuple[str, cq.Vector]:
         raise RuntimeError("Reference position may not generate gcode")
 
     def to_ais_shape(
         self, start: cq.Vector, as_edges=False, alt_color=False
-    ) -> (AIS_Shape, cq.Vector):
+    ) -> Tuple[AIS_Shape, cq.Vector]:
         raise RuntimeError("Reference position may not generate shape")
 
 
-class Linear(Command, ABC):
+class Linear(MotionCommand, ABC):
     def to_gcode(
-        self, previous_command: Optional[Command], start: cq.Vector
+        self, previous_command: Optional[MotionCommand], start: cq.Vector
     ) -> Tuple[str, cq.Vector]:
         xyz, end = self.xyz_gcode(start)
         return f"{self.print_modal(previous_command)}{xyz}", end
@@ -174,7 +188,7 @@ class Linear(Command, ABC):
 
         return shape, end
 
-    def flip(self, new_end: cq.Vector) -> (Command, cq.Vector):
+    def flip(self, new_end: cq.Vector) -> Tuple[MotionCommand, cq.Vector]:
         start = new_end - self.relative_end
         return self.__class__(-self.relative_end), start
 
@@ -231,7 +245,7 @@ class Retract(Rapid):
 # CIRCULAR MOTION
 
 
-class Circular(Command, ABC):
+class Circular(MotionCommand, ABC):
     end: CommandVector
     center: CommandVector
     mid: CommandVector
@@ -262,7 +276,7 @@ class Circular(Command, ABC):
         return "".join(ijk)
 
     def to_gcode(
-        self, previous_command: Optional[Command], start: cq.Vector
+        self, previous_command: Optional[MotionCommand], start: cq.Vector
     ) -> Tuple[str, cq.Vector]:
         xyz, end = self.xyz_gcode(start)
         ijk = self.ijk_gcode(start)
