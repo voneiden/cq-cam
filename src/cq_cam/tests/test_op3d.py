@@ -9,8 +9,8 @@ def test_profile_square_outside(job: Job, box):
     code = job.surface3d(o=box.faces(), tool=ocl.CylCutter(1, 15)).to_gcode()
     assert code == (
         "(Job - Feedrate: 200 - Unit: Unit.METRIC)\n"
-        "G90\n"
-        "G21\n"
+        "G90 G54 G64 G50 G17 G94\nG49 G40 G80\nG21\nG30\n"
+        "M3\n"
         "(Job - Surface 3D)\n"
         "G0Z10\n"
         "X-1.5Y1\n"
@@ -45,7 +45,7 @@ def test_profile_square_outside(job: Job, box):
         "X0\n"
         "X-0.5\n"
         "X-1\n"
-        "X-1.5G1Z0\n"
-        "G0Z10\n"
-        "X0Y0"
+        "X-1.5\n"
+        "G90 G54 G64 G50 G17 G94\nG49 G40 G80\nG21\nG30\n"
+        "M5"
     )

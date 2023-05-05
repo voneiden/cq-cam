@@ -23,8 +23,8 @@ def test_profile_square_outside(job: Job, top_face):
     code = job.profile(top_face).to_gcode()
     assert code == (
         "(Job - Feedrate: 200 - Unit: Unit.METRIC)\n"
-        "G90\n"
-        "G21\n"
+        "G90 G54 G64 G50 G17 G94\nG49 G40 G80\nG21\nG30\n"
+        "M3\n"
         "(Job - Profile)\n"
         "G0Z10\n"
         "X-2.5Y-3.25\n"
@@ -37,9 +37,9 @@ def test_profile_square_outside(job: Job, top_face):
         "G1X-2.5\n"
         "G3X-3.25Y2.5I0J-0.75K0\n"
         "G1Y-2.5\n"
-        "G3X-2.5Y-3.25I0.75J0K0G1Z0\n"
-        "G0Z10\n"
-        "X0Y0"
+        "G3X-2.5Y-3.25I0.75J0K0\n"
+        "G90 G54 G64 G50 G17 G94\nG49 G40 G80\nG21\nG30\n"
+        "M5"
     )
 
 
@@ -47,8 +47,8 @@ def test_profile_square_midline(job: Job, top_face):
     code = job.profile(top_face, outer_offset=0).to_gcode()
     assert code == (
         "(Job - Feedrate: 200 - Unit: Unit.METRIC)\n"
-        "G90\n"
-        "G21\n"
+        "G90 G54 G64 G50 G17 G94\nG49 G40 G80\nG21\nG30\n"
+        "M3\n"
         "(Job - Profile)\n"
         "G0Z10\n"
         "X-2.5Y-2.5\n"
@@ -57,9 +57,9 @@ def test_profile_square_midline(job: Job, top_face):
         "X2.5\n"
         "Y2.5\n"
         "X-2.5\n"
-        "Y-2.5G1Z0\n"
-        "G0Z10\n"
-        "X0Y0"
+        "Y-2.5\n"
+        "G90 G54 G64 G50 G17 G94\nG49 G40 G80\nG21\nG30\n"
+        "M5"
     )
 
 
@@ -67,8 +67,8 @@ def test_profile_square_inside(job: Job, top_face):
     code = job.profile(top_face, outer_offset=-1).to_gcode()
     assert code == (
         "(Job - Feedrate: 200 - Unit: Unit.METRIC)\n"
-        "G90\n"
-        "G21\n"
+        "G90 G54 G64 G50 G17 G94\nG49 G40 G80\nG21\nG30\n"
+        "M3\n"
         "(Job - Profile)\n"
         "G0Z10\n"
         "X-1.75Y-1.75\n"
@@ -77,9 +77,9 @@ def test_profile_square_inside(job: Job, top_face):
         "X1.75\n"
         "Y1.75\n"
         "X-1.75\n"
-        "Y-1.75G1Z0\n"
-        "G0Z10\n"
-        "X0Y0"
+        "Y-1.75\n"
+        "G90 G54 G64 G50 G17 G94\nG49 G40 G80\nG21\nG30\n"
+        "M5"
     )
 
 
@@ -87,8 +87,8 @@ def test_profile_stepdown(job: Job, bottom_face):
     code = job.profile(bottom_face, outer_offset=0, stepdown=1).to_gcode()
     assert code == (
         "(Job - Feedrate: 200 - Unit: Unit.METRIC)\n"
-        "G90\n"
-        "G21\n"
+        "G90 G54 G64 G50 G17 G94\nG49 G40 G80\nG21\nG30\n"
+        "M3\n"
         "(Job - Profile)\n"
         "G0Z10\n"
         "X2.5Y-2.5\n"
@@ -104,9 +104,9 @@ def test_profile_stepdown(job: Job, bottom_face):
         "X-2.5\n"
         "Y2.5\n"
         "X2.5\n"
-        "Y-2.5G1Z0\n"
-        "G0Z10\n"
-        "X0Y0"
+        "Y-2.5\n"
+        "G90 G54 G64 G50 G17 G94\nG49 G40 G80\nG21\nG30\n"
+        "M5"
     )
 
 
@@ -116,8 +116,8 @@ def test_profile_tabs(job, bottom_face):
     ).to_gcode()
     assert code == (
         "(Job - Feedrate: 200 - Unit: Unit.METRIC)\n"
-        "G90\n"
-        "G21\n"
+        "G90 G54 G64 G50 G17 G94\nG49 G40 G80\nG21\nG30\n"
+        "M3\n"
         "(Job - Profile)\n"
         "G0Z10\n"
         "X2.5Y-2.5\n"
@@ -158,9 +158,9 @@ def test_profile_tabs(job, bottom_face):
         "Z-1\n"
         "Y-1.333\n"
         "Z-2\n"
-        "Y-2.5G1Z0\n"
-        "G0Z10\n"
-        "X0Y0"
+        "Y-2.5\n"
+        "G90 G54 G64 G50 G17 G94\nG49 G40 G80\nG21\nG30\n"
+        "M5"
     )
 
 
@@ -170,8 +170,8 @@ def test_profile_wire_tabs(job, bottom_face):
     ).to_gcode()
     assert code == (
         "(Job - Feedrate: 200 - Unit: Unit.METRIC)\n"
-        "G90\n"
-        "G21\n"
+        "G90 G54 G64 G50 G17 G94\nG49 G40 G80\nG21\nG30\n"
+        "M3\n"
         "(Job - Profile)\n"
         "G0Z10\n"
         "X2.5Y-2.5\n"
@@ -188,7 +188,7 @@ def test_profile_wire_tabs(job, bottom_face):
         "X2.5\n"
         "Y-2\n"
         "Z-1\n"
-        "Y-2.5G1Z0\n"
-        "G0Z10\n"
-        "X0Y0"
+        "Y-2.5\n"
+        "G90 G54 G64 G50 G17 G94\nG49 G40 G80\nG21\nG30\n"
+        "M5"
     )

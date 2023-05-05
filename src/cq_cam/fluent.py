@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import logging
 from copy import copy
 from typing import List, Optional, Union
 
 from cadquery import cq
 
-from cq_cam.command import MotionCommand
+from cq_cam.command import Command, SafetyBlock, StartSequence, StopSequence
 from cq_cam.common import (
     ArcDistanceMode,
     CoolantState,
@@ -23,11 +22,9 @@ from cq_cam.utils.geometry_op import OffsetInput
 from cq_cam.utils.utils import extract_wires, flatten_list
 from cq_cam.visualize import visualize_job, visualize_job_as_edges
 
-logger = logging.getLogger(__name__)
-
 
 class Operation:
-    def __init__(self, job, name: str, commands: List[MotionCommand]):
+    def __init__(self, job, name: str, commands: List[Command]):
         self.job = job
         self.name = name
         self.commands = commands
@@ -39,7 +36,9 @@ class Operation:
         gcodes = [f"({self.job.name} - {self.name})"]
         previous_command = None
         for command in self.commands:
-            gcode, position = command.to_gcode(previous_command, position)
+            command.previous_command = previous_command
+            command.start = position
+            gcode, position = command.to_gcode()
             previous_command = command
 
             # Skip blank lines. These can happen for example if we try to issue
@@ -78,6 +77,7 @@ class Job:
         self.speed = speed
         self.tool_diameter = tool_diameter
         self.tool_number = tool_number
+        self.tool_radius = tool_diameter / 2 if tool_diameter else None
         self.name = name
         self.plunge_feed = feed if plunge_feed is None else plunge_feed
         self.rapid_height = (
@@ -144,7 +144,7 @@ class Job:
         return self._add_operation("Profile", commands)
 
     def wire_profile(
-        self, wires: cq.Wire | [cq.Wire], offset=1, stepdown=None, tabs=None
+        self, wires: cq.Wire | list[cq.Wire], offset=1, stepdown=None, tabs=None
     ):
         if isinstance(wires, cq.Wire):
             wires = [wires]
@@ -216,14 +216,13 @@ class Job:
 
     def to_gcode(self):
         task_break = "\n\n\n"
-
-        to_home = f"G1Z0\nG0Z{self.rapid_height}\nX0Y0"
         return (
             f"({self.name} - Feedrate: {self.feed} - Unit: {self.unit})\n"
-            f"G90\n"
-            f"{self.unit.to_gcode()}\n"
-            f"{task_break.join(task.to_gcode() for task in self.operations)}"
-            f"{to_home}"
+            f"{SafetyBlock().to_gcode()}\n"
+            f"{StartSequence(spindle=self.speed, coolant=self.coolant).to_gcode()}\n"
+            f"{task_break.join(task.to_gcode() for task in self.operations)}\n"
+            f"{SafetyBlock().to_gcode()}\n"
+            f"{StopSequence(coolant=self.coolant).to_gcode()}"
         )
 
     def save_gcode(self, file_name):
@@ -231,30 +230,10 @@ class Job:
         with open(file_name, "w") as f:
             f.write(gcode)
 
-    def show(self, show_object=None):
-        if show_object is None:
-            import __main__
-
-            show_object = __main__.__dict__.get("show_object")
-
-        if show_object is None:
-            raise ValueError(
-                "Unable to visualize job, no show_object provided or found"
-            )
-
-        match source_module := show_object.__module__.split(".")[0]:
-            case "cq_editor":
-                visualize_f = visualize_job
-            case "ocp_vscode":
-                visualize_f = visualize_job_as_edges
-            case _:
-                logger.warning(
-                    f"Unsupported show_object source module ({source_module}) - visualizing as edges"
-                )
-                visualize_f = visualize_job_as_edges
+    def show(self, show_object):
         for i, operation in enumerate(self.operations):
             show_object(
-                visualize_f(self.top, operation.commands[1:]),
+                visualize_job(self.top, operation.commands[1:]),
                 f"{self.name} #{i} {operation.name}",
             )
 
@@ -271,11 +250,7 @@ class Job:
             for operation in self.operations
         ]
 
-    def _add_operation(self, name: str, commands: List[MotionCommand]):
+    def _add_operation(self, name: str, commands: List[Command]):
         job = copy(self)
         job.operations = [*self.operations, Operation(job, name, commands)]
         return job
-
-    @property
-    def tool_radius(self):
-        return self.tool_diameter / 2 if self.tool_diameter else None
