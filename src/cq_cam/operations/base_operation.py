@@ -20,7 +20,6 @@ class Operation(ABC):
     job: "Job"
     """ The `Job` which this task belongs to.
     """
-
     commands: List[MotionCommand] = field(init=False, default_factory=list)
     """List of commands that this task wants to perform.
     """

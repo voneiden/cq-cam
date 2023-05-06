@@ -6,7 +6,7 @@ from typing import List, Optional, Union
 
 from cadquery import cq
 
-from cq_cam.command import Command, SafetyBlock, StartSequence, StopSequence
+from cq_cam.command import Command, SafetyBlock, StartSequence, StopSequence, ToolChange
 from cq_cam.common import (
     ArcDistanceMode,
     CoolantState,
@@ -19,6 +19,7 @@ from cq_cam.common import (
 from cq_cam.operations.pocket import pocket
 from cq_cam.operations.profile import profile
 from cq_cam.operations.tabs import Tabs
+from cq_cam.tool import Tool
 from cq_cam.utils.geometry_op import OffsetInput
 from cq_cam.utils.utils import extract_wires, flatten_list
 from cq_cam.visualize import visualize_job, visualize_job_as_edges
@@ -103,6 +104,52 @@ class Job:
 
         self.operations: List[Operation] = []
 
+    """
+    There are two checks that must happen between operations:
+    1. Check if the tool_number has changed
+        - Only tool_number needs to be checked here and not tool_diameter as different tools with the same diameter can be used for different operations (e.g. flat, ball, bull nose, etc.)
+    2. Check if the speed setting has changed
+        - The speed setting can change between roughing and finishing operation
+
+    If either of these happens a ToolChange or a StartSequence command needs to be issued first.
+
+    Note that only one one of these can happen between operations
+
+    No special handling is need for the feed setting. It only needs to be updated for any subsequent operations that use it
+    """
+
+    def update_tool(self, tool: Optional[Tool] = None) -> Job:
+        if tool is not None:
+            # Initilize variables
+            tool_diameter = (
+                self.tool_diameter if tool.tool_diameter is None else tool.tool_diameter
+            )
+            tool_number = (
+                self.tool_number if tool.tool_number is None else tool.tool_number
+            )
+            feed = self.feed if tool.feed is None else tool.feed
+            speed = self.speed if tool.speed is None else tool.speed
+
+            # Check if any of the setting is changed changed to add necessary command
+            if tool_number is not None and tool_number != self.tool_number:
+                commands = [ToolChange(tool_number, speed, self.coolant)]
+                self = self._add_operation("Tool Change", commands)
+            elif speed is not None and speed != self.speed:
+                commands = [StartSequence(speed, self.coolant)]
+                self = self._add_operation("Speed Change", commands)
+
+            # for operation in self.operations:
+            #     print(operation.name)
+            # print("=========================")
+
+            # Update Job attributes
+            self.tool_number = tool_number
+            self.tool_diameter = tool_diameter
+            self.feed = feed
+            self.speed = speed
+
+        return self
+
     # ##################
     # Fluent operations
     # ##################
@@ -113,6 +160,7 @@ class Job:
         inner_offset=-1,
         stepdown=None,
         tabs: Optional[Tabs] = None,
+        tool: Optional[Tool] = None,
     ) -> Job:
         if self.tool_diameter is None:
             raise ValueError("Profile requires tool_diameter to be set")
@@ -146,7 +194,12 @@ class Job:
         return self._add_operation("Profile", commands)
 
     def wire_profile(
-        self, wires: cq.Wire | list[cq.Wire], offset=1, stepdown=None, tabs=None
+        self,
+        wires: cq.Wire | list[cq.Wire],
+        offset=1,
+        stepdown=None,
+        tabs=None,
+        tool: Optional[Tool] = None,
     ):
         if isinstance(wires, cq.Wire):
             wires = [wires]
@@ -154,7 +207,11 @@ class Job:
         commands = []
         for wire in wires:
             commands += profile(
-                job=self, wire=wire, offset=offset, stepdown=stepdown, tabs=tabs
+                job=self,
+                wire=wire,
+                offset=offset,
+                stepdown=stepdown,
+                tabs=tabs,
             )
         return self._add_operation("Wire Profile", commands)
 
@@ -168,6 +225,7 @@ class Job:
         avoid_inner_offset: Optional[OffsetInput] = None,
         stepover: Optional[OffsetInput] = None,
         stepdown: Optional[float] = None,
+        tool: Optional[Tool] = None,
     ) -> Job:
         if isinstance(op_areas, cq.Workplane):
             op_areas = op_areas.objects
@@ -192,7 +250,7 @@ class Job:
         )
         return self._add_operation("Pocket", commands)
 
-    def drill(self, op_areas, **kwargs) -> Job:
+    def drill(self, op_areas, tool: Optional[Tool] = None, **kwargs) -> Job:
         from cq_cam.operations.drill import Drill
 
         drill = Drill(self, o=op_areas, **kwargs)
