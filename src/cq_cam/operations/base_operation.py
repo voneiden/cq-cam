@@ -7,7 +7,7 @@ from OCP.BRepFeat import BRepFeat
 from OCP.TopAbs import TopAbs_FACE
 from OCP.TopExp import TopExp_Explorer
 
-from cq_cam.command import Command
+from cq_cam.command import MotionCommand
 from cq_cam.utils.utils import flatten_list
 
 
@@ -21,7 +21,7 @@ class Operation(ABC):
     """ The `Job` which this task belongs to.
     """
 
-    commands: List[Command] = field(init=False, default_factory=list)
+    commands: List[MotionCommand] = field(init=False, default_factory=list)
     """List of commands that this task wants to perform.
     """
 

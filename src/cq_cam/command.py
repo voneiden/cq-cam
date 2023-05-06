@@ -1,13 +1,68 @@
+"""
+command.py builts upon the gcode letter addresses introduced in common.py to form full gcode command abstractions.
+It is organised in a similiar fashion, into motion and non motion commands.
+The code is strctured around the abstract classes CommandVector and Command:
+- CommandVector
+    - AbsouluteCV
+    - RelativeCV
+- Command
+    - MotionCommand (abstract)
+        - Linear (abstract)
+            - Rapid
+            - Cut
+            - Plunge
+            - Retract
+        - Circular (abstract)
+            - CircularCW
+            - CircularCCW
+    - ConfigCommand (abstract)
+        - StartSequence
+        - StopSequence
+        - SafetyBlock
+        - ToolChange
+MotionCommands keep track of the previous command and position to optimise the generated gcode into a smaller size.
+In the following example the G0 command in the second line along with X1 and Z1 are unnecessarily issued:
+```
+G0 X1 Y1 Z1
+G0 X1 Y2 Z1
+```
+A more optimised version would look like this:
+```
+G0 X1 Y1 Z1
+Y2
+```
+MotionCommands are consumed by routers.py
+"""
+
 from __future__ import annotations
 
 import warnings
 from abc import ABC, abstractmethod
-from typing import Optional, Tuple, Union
+from typing import Optional, Union
 
 import cadquery as cq
 from OCP.AIS import AIS_Line, AIS_Shape
 from OCP.Geom import Geom_CartesianPoint
 
+from cq_cam.common import (
+    ArcDistanceMode,
+    AutomaticChangerMode,
+    CannedCycle,
+    CoolantState,
+    CutterState,
+    DistanceMode,
+    FeedRateControlMode,
+    HomePosition,
+    LengthCompensation,
+    Path,
+    PlannerControlMode,
+    ProgramControlMode,
+    RadiusCompensation,
+    SpindleControlMode,
+    Unit,
+    WorkOffset,
+    WorkPlane,
+)
 from cq_cam.utils.utils import optimize_float
 from cq_cam.visualize import cached_occ_color
 
@@ -58,9 +113,14 @@ class AbsoluteCV(CommandVector):
 
 class Command(ABC):
     modal = None
+
+
+class MotionCommand(Command, ABC):
     max_depth: Optional[float]
     ais_color = "red"
     ais_alt_color = "darkred"
+    previous_command: Union[MotionCommand, None]
+    start: cq.Vector
     end: CommandVector
     tab: bool  # TODO not the right place to carry tab information imo?
 
@@ -79,12 +139,12 @@ class Command(ABC):
         warnings.warn("Relative CV is deprecated", DeprecationWarning)
         return cls(end=RelativeCV(x=x, y=y, z=z), **kwargs)
 
-    def print_modal(self, previous: Optional[Command]):
+    def print_modal(self, previous: Optional[MotionCommand]):
         if self.modal and (previous is None or previous.modal != self.modal):
             return self.modal
         return ""
 
-    def xyz_gcode(self, start: cq.Vector, precision=3) -> (str, cq.Vector):
+    def xyz_gcode(self, start: cq.Vector, precision=3) -> tuple[str, cq.Vector]:
         coords = []
         end = self.end.to_vector(start)
         # TODO precision
@@ -103,48 +163,38 @@ class Command(ABC):
         return "".join(coords), end
 
     @abstractmethod
-    def to_gcode(
-        self, previous_command: Union[Command, None], start: cq.Vector
-    ) -> (str, cq.Vector):
+    def to_gcode(self) -> tuple[str, cq.Vector]:
         """Output all the necessary G-Code required to perform the command"""
         pass
 
     @abstractmethod
     def to_ais_shape(
-        self, start: cq.Vector, as_edges=False, alt_color=False
-    ) -> (AIS_Shape, cq.Vector):
+        self, as_edges=False, alt_color=False
+    ) -> tuple[AIS_Shape, cq.Vector]:
         pass
 
 
-class ReferencePosition(Command):
-    def to_gcode(
-        self, previous_command: Union[Command, None], start: cq.Vector
-    ) -> (str, cq.Vector):
-        raise RuntimeError("Reference position may not generate gcode")
-
-    def to_ais_shape(
-        self, start: cq.Vector, as_edges=False, alt_color=False
-    ) -> (AIS_Shape, cq.Vector):
-        raise RuntimeError("Reference position may not generate shape")
+class ConfigCommand(Command, ABC):
+    @abstractmethod
+    def to_gcode(self) -> str:
+        pass
 
 
-class Linear(Command, ABC):
-    def to_gcode(
-        self, previous_command: Optional[Command], start: cq.Vector
-    ) -> Tuple[str, cq.Vector]:
-        xyz, end = self.xyz_gcode(start)
-        return f"{self.print_modal(previous_command)}{xyz}", end
+class Linear(MotionCommand, ABC):
+    def to_gcode(self) -> tuple[str, cq.Vector]:
+        xyz, end = self.xyz_gcode(self.start)
+        return f"{self.print_modal(self.previous_command)}{xyz}", end
 
-    def to_ais_shape(self, start, as_edges=False, alt_color=False):
-        end = self.end.to_vector(start)
-        if start == end:
+    def to_ais_shape(self, as_edges=False, alt_color=False):
+        end = self.end.to_vector(self.start)
+        if self.start == end:
             return None, end
 
         if as_edges:
-            return cq.Edge.makeLine(start, end), end
+            return cq.Edge.makeLine(self.start, end), end
 
         shape = AIS_Line(
-            Geom_CartesianPoint(start.toPnt()), Geom_CartesianPoint(end.toPnt())
+            Geom_CartesianPoint(self.start.toPnt()), Geom_CartesianPoint(end.toPnt())
         )
         if self.arrow:
             shape.Attributes().SetLineArrowDraw(True)
@@ -155,18 +205,18 @@ class Linear(Command, ABC):
 
         return shape, end
 
-    def flip(self, new_end: cq.Vector) -> (Command, cq.Vector):
+    def flip(self, new_end: cq.Vector) -> tuple[MotionCommand, cq.Vector]:
         start = new_end - self.relative_end
         return self.__class__(-self.relative_end), start
 
 
 class Rapid(Linear):
-    modal = "G0"
+    modal = Path.RAPID.to_gcode()
     ais_color = "green"
 
 
 class Cut(Linear):
-    modal = "G1"
+    modal = Path.LINEAR.to_gcode()
 
 
 class Plunge(Cut):
@@ -212,7 +262,7 @@ class Retract(Rapid):
 # CIRCULAR MOTION
 
 
-class Circular(Command, ABC):
+class Circular(MotionCommand, ABC):
     end: CommandVector
     center: CommandVector
     mid: CommandVector
@@ -242,16 +292,14 @@ class Circular(Command, ABC):
 
         return "".join(ijk)
 
-    def to_gcode(
-        self, previous_command: Optional[Command], start: cq.Vector
-    ) -> Tuple[str, cq.Vector]:
-        xyz, end = self.xyz_gcode(start)
-        ijk = self.ijk_gcode(start)
-        return f"{self.print_modal(previous_command)}{xyz}{ijk}", end
+    def to_gcode(self) -> tuple[str, cq.Vector]:
+        xyz, end = self.xyz_gcode(self.start)
+        ijk = self.ijk_gcode(self.start)
+        return f"{self.print_modal(self.previous_command)}{xyz}{ijk}", end
 
-    def to_ais_shape(self, start, as_edges=False, alt_color=False):
-        end = self.end.to_vector(start)
-        mid = self.mid.to_vector(start)
+    def to_ais_shape(self, as_edges=False, alt_color=False):
+        end = self.end.to_vector(self.start)
+        mid = self.mid.to_vector(self.start)
 
         # Note: precision of __eq__ on vectors can cause false positive circles with very small arcs
         # TODO: Neutralise small arcs, these can cause similar problem with grbl as far as I remember
@@ -263,10 +311,10 @@ class Circular(Command, ABC):
         #    edge = cq.Edge.makeCircle(radius, center, cq.Vector(0,0,1))
         # else:
         try:
-            edge = cq.Edge.makeThreePointArc(start, mid, end)
+            edge = cq.Edge.makeThreePointArc(self.start, mid, end)
         except:
             try:
-                edge = cq.Edge.makeLine(start, end)
+                edge = cq.Edge.makeLine(self.start, end)
             except:
                 # Too small to render ?
                 return None, end
@@ -280,8 +328,109 @@ class Circular(Command, ABC):
 
 
 class CircularCW(Circular):
-    modal = "G2"
+    modal = Path.ARC_CW.to_gcode()
 
 
 class CircularCCW(Circular):
-    modal = "G3"
+    modal = Path.ARC_CCW.to_gcode()
+
+
+class StartSequence(ConfigCommand):
+    spindle: Optional[int] = None
+    coolant: Optional[CoolantState] = None
+
+    def __init__(
+        self, spindle: Optional[int] = None, coolant: Optional[CoolantState] = None
+    ) -> None:
+        self.spindle = spindle
+        self.coolant = coolant
+        super().__init__()
+
+    def to_gcode(self) -> str:
+        gcode_str = CutterState.ON_CW.to_gcode()
+
+        if self.spindle is not None:
+            gcode_str += f" S{self.spindle}"
+
+        if self.coolant is not None:
+            gcode_str += f" {self.coolant.to_gcode()}"
+
+        return gcode_str
+
+
+class StopSequence(ConfigCommand):
+    coolant: Optional[CoolantState] = None
+
+    def __init__(self, coolant: Optional[CoolantState] = None):
+        self.coolant = coolant
+        super().__init__()
+
+    def to_gcode(self) -> str:
+        gcode_str = CutterState.OFF.to_gcode()
+        if self.coolant is not None:
+            gcode_str += f" {CoolantState.OFF.to_gcode()}"
+
+        return gcode_str
+
+
+class SafetyBlock(ConfigCommand):
+    def to_gcode(self) -> str:
+        return "\n".join(
+            (
+                " ".join(
+                    (
+                        DistanceMode.ABSOLUTE.to_gcode(),
+                        WorkOffset.OFFSET_1.to_gcode(),
+                        PlannerControlMode.BLEND.to_gcode(),
+                        SpindleControlMode.MAX_SPINDLE_SPEED.to_gcode(),
+                        WorkPlane.XY.to_gcode(),
+                        FeedRateControlMode.UNITS_PER_MINUTE.to_gcode(),
+                    )
+                ),
+                " ".join(
+                    (
+                        LengthCompensation.OFF.to_gcode(),
+                        RadiusCompensation.OFF.to_gcode(),
+                        CannedCycle.CANCEL.to_gcode(),
+                    )
+                ),
+                Unit.METRIC.to_gcode(),
+                HomePosition.HOME_2.to_gcode(),
+            )
+        )
+
+
+class ToolChange(ConfigCommand):
+    tool_number: Optional[int] = None
+    spindle: Optional[int] = None
+    coolant: Optional[CoolantState] = None
+
+    def __init__(
+        self,
+        tool_number: int,
+        spindle: Optional[int] = None,
+        coolant: Optional[CoolantState] = None,
+    ):
+        self.tool_number = tool_number
+        self.spindle = spindle
+        self.coolant = coolant
+
+        super().__init__()
+
+    def to_gcode(self) -> str:
+        return "\n".join(
+            (
+                StopSequence(self.coolant).to_gcode(),
+                HomePosition.HOME_2.to_gcode(),
+                ProgramControlMode.PAUSE_OPTIONAL.to_gcode(),
+                " ".join(
+                    (
+                        f"T{self.tool_number}",
+                        LengthCompensation.ON.to_gcode(),
+                        f"H{self.tool_number}",
+                        AutomaticChangerMode.TOOL_CHANGE.to_gcode(),
+                    )
+                ),
+                StartSequence(self.spindle, self.coolant).to_gcode(),
+            )
+        )
