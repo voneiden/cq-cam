@@ -138,10 +138,6 @@ class Job:
                 commands = [StartSequence(speed, self.coolant)]
                 self = self._add_operation("Speed Change", commands)
 
-            # for operation in self.operations:
-            #     print(operation.name)
-            # print("=========================")
-
             # Update Job attributes
             self.tool_number = tool_number
             self.tool_diameter = tool_diameter
@@ -169,6 +165,7 @@ class Job:
             raise ValueError('Set at least one of "outer_offset" or "inner_offset"')
         outer_wires, inner_wires = extract_wires(shape)
 
+        self = self.update_tool(tool)
         # Prefer inner wires first
         commands = []
         if inner_wires and inner_offset is not None:
@@ -201,6 +198,7 @@ class Job:
         tabs=None,
         tool: Optional[Tool] = None,
     ):
+        self = self.update_tool(tool)
         if isinstance(wires, cq.Wire):
             wires = [wires]
 
@@ -227,6 +225,7 @@ class Job:
         stepdown: Optional[float] = None,
         tool: Optional[Tool] = None,
     ) -> Job:
+        self = self.update_tool(tool)
         if isinstance(op_areas, cq.Workplane):
             op_areas = op_areas.objects
         elif isinstance(op_areas, cq.Face):
@@ -253,6 +252,7 @@ class Job:
     def drill(self, op_areas, tool: Optional[Tool] = None, **kwargs) -> Job:
         from cq_cam.operations.drill import Drill
 
+        self = self.update_tool(tool)
         drill = Drill(self, o=op_areas, **kwargs)
         return self._add_operation("Drill", drill.commands)
 

@@ -6,7 +6,12 @@ from cq_cam.fluent import Job
 
 @pytest.fixture
 def box():
-    return cq.Workplane().rect(5, 5).extrude(2)
+    return cq.Workplane("XY").rect(5, 5).extrude(2)
+
+
+@pytest.fixture
+def big_box():
+    return cq.Workplane("XY").box(10, 10, 5)
 
 
 @pytest.fixture

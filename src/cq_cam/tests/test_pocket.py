@@ -6,6 +6,9 @@ from cq_cam.utils.geometry_op import PathFace, offset_face
 from cq_cam.utils.tests.conftest import round_array
 from cq_cam.utils.utils import break_compound_to_faces
 
+tool_change_label = "(Job - Tool Change)\n"
+speed_change_label = "(Job - Speed Change)\n"
+
 
 def test_offset_face():
     wp = (
@@ -61,8 +64,8 @@ def test_make_from_wire_with_bigger_inner_than_outer():
 
 def test_stepdown(job, box):
     wp = box.faces(">Z").workplane().rect(2, 2).cutBlind(-1)
-    pocket_face = wp.faces(">Z[1]")
-    job = job.pocket(pocket_face, stepdown=0.5)
+    face = wp.faces(">Z[1]")
+    job = job.pocket(face, stepdown=0.5)
     assert job.operations[0].to_gcode() == (
         "(Job - Pocket)\n"
         "G0Z10\n"
