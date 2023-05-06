@@ -80,7 +80,6 @@ class Job:
         self.speed = speed
         self.tool_diameter = tool_diameter
         self.tool_number = tool_number
-        self.tool_radius = tool_diameter / 2 if tool_diameter else None
         self.name = name
         self.plunge_feed = feed if plunge_feed is None else plunge_feed
         self.rapid_height = (
@@ -277,3 +276,7 @@ class Job:
         job = copy(self)
         job.operations = [*self.operations, Operation(job, name, commands)]
         return job
+
+    @property
+    def tool_radius(self):
+        return self.tool_diameter / 2 if self.tool_diameter else None
