@@ -196,9 +196,6 @@ class ProgramControlMode(GCodeEnum):
     END = "M2"
     END_RESET = "M30"
 
-    def to_gcode(self):
-        return self._value_
-
 
 class CutterState(GCodeEnum):
     ON_CW = "M3"
