@@ -114,6 +114,11 @@ class AbsoluteCV(CommandVector):
 class Command(ABC):
     modal = None
 
+    @abstractmethod
+    def to_gcode(self) -> tuple[str, Optional[cq.Vector]]:
+        """Output all the necessary G-Code required to perform the command"""
+        pass
+
 
 class MotionCommand(Command, ABC):
     max_depth: Optional[float]
@@ -163,11 +168,6 @@ class MotionCommand(Command, ABC):
         return "".join(coords), end
 
     @abstractmethod
-    def to_gcode(self) -> tuple[str, cq.Vector]:
-        """Output all the necessary G-Code required to perform the command"""
-        pass
-
-    @abstractmethod
     def to_ais_shape(
         self, as_edges=False, alt_color=False
     ) -> tuple[AIS_Shape, cq.Vector]:
@@ -175,9 +175,7 @@ class MotionCommand(Command, ABC):
 
 
 class ConfigCommand(Command, ABC):
-    @abstractmethod
-    def to_gcode(self) -> str:
-        pass
+    pass
 
 
 class Linear(MotionCommand, ABC):
@@ -346,7 +344,7 @@ class StartSequence(ConfigCommand):
         self.coolant = coolant
         super().__init__()
 
-    def to_gcode(self) -> str:
+    def to_gcode(self) -> tuple[str, cq.Vector]:
         gcode_str = CutterState.ON_CW.to_gcode()
 
         if self.spindle is not None:
@@ -355,7 +353,7 @@ class StartSequence(ConfigCommand):
         if self.coolant is not None:
             gcode_str += f" {self.coolant.to_gcode()}"
 
-        return gcode_str
+        return (gcode_str, None)
 
 
 class StopSequence(ConfigCommand):
@@ -365,38 +363,41 @@ class StopSequence(ConfigCommand):
         self.coolant = coolant
         super().__init__()
 
-    def to_gcode(self) -> str:
+    def to_gcode(self) -> tuple[str, cq.Vector]:
         gcode_str = CutterState.OFF.to_gcode()
         if self.coolant is not None:
             gcode_str += f" {CoolantState.OFF.to_gcode()}"
 
-        return gcode_str
+        return (gcode_str, None)
 
 
 class SafetyBlock(ConfigCommand):
-    def to_gcode(self) -> str:
-        return "\n".join(
-            (
-                " ".join(
-                    (
-                        DistanceMode.ABSOLUTE.to_gcode(),
-                        WorkOffset.OFFSET_1.to_gcode(),
-                        PlannerControlMode.BLEND.to_gcode(),
-                        SpindleControlMode.MAX_SPINDLE_SPEED.to_gcode(),
-                        WorkPlane.XY.to_gcode(),
-                        FeedRateControlMode.UNITS_PER_MINUTE.to_gcode(),
-                    )
-                ),
-                " ".join(
-                    (
-                        LengthCompensation.OFF.to_gcode(),
-                        RadiusCompensation.OFF.to_gcode(),
-                        CannedCycle.CANCEL.to_gcode(),
-                    )
-                ),
-                Unit.METRIC.to_gcode(),
-                HomePosition.HOME_2.to_gcode(),
-            )
+    def to_gcode(self) -> tuple[str, cq.Vector]:
+        return (
+            "\n".join(
+                (
+                    " ".join(
+                        (
+                            DistanceMode.ABSOLUTE.to_gcode(),
+                            WorkOffset.OFFSET_1.to_gcode(),
+                            PlannerControlMode.BLEND.to_gcode(),
+                            SpindleControlMode.MAX_SPINDLE_SPEED.to_gcode(),
+                            WorkPlane.XY.to_gcode(),
+                            FeedRateControlMode.UNITS_PER_MINUTE.to_gcode(),
+                        )
+                    ),
+                    " ".join(
+                        (
+                            LengthCompensation.OFF.to_gcode(),
+                            RadiusCompensation.OFF.to_gcode(),
+                            CannedCycle.CANCEL.to_gcode(),
+                        )
+                    ),
+                    Unit.METRIC.to_gcode(),
+                    HomePosition.HOME_2.to_gcode(),
+                )
+            ),
+            None,
         )
 
 
@@ -417,20 +418,25 @@ class ToolChange(ConfigCommand):
 
         super().__init__()
 
-    def to_gcode(self) -> str:
-        return "\n".join(
-            (
-                StopSequence(self.coolant).to_gcode(),
-                HomePosition.HOME_2.to_gcode(),
-                ProgramControlMode.PAUSE_OPTIONAL.to_gcode(),
-                " ".join(
-                    (
-                        f"T{self.tool_number}",
-                        LengthCompensation.ON.to_gcode(),
-                        f"H{self.tool_number}",
-                        AutomaticChangerMode.TOOL_CHANGE.to_gcode(),
-                    )
-                ),
-                StartSequence(self.spindle, self.coolant).to_gcode(),
-            )
+    def to_gcode(self) -> tuple[str, cq.Vector]:
+        stop_sequence_gcode, _ = StopSequence(self.coolant).to_gcode()
+        start_sequence_gcode, _ = StartSequence(self.spindle, self.coolant).to_gcode()
+        return (
+            "\n".join(
+                (
+                    stop_sequence_gcode,
+                    HomePosition.HOME_2.to_gcode(),
+                    ProgramControlMode.PAUSE_OPTIONAL.to_gcode(),
+                    " ".join(
+                        (
+                            f"T{self.tool_number}",
+                            LengthCompensation.ON.to_gcode(),
+                            f"H{self.tool_number}",
+                            AutomaticChangerMode.TOOL_CHANGE.to_gcode(),
+                        )
+                    ),
+                    start_sequence_gcode,
+                )
+            ),
+            None,
         )

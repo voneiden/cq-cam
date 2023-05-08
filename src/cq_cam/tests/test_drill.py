@@ -1,10 +1,3 @@
-import cadquery as cq
-
-from cq_cam.fluent import Job
-from cq_cam.operations.tabs import EdgeTabs
-from cq_cam.utils.circle_bug_workaround import circle_bug_workaround
-
-
 def test_drill_superficially(box, job):
     box = box.faces(">Z").workplane().circle(1).cutThruAll()
     hole = [w for w in box.wires(">Z").objects if len(w.Edges()) == 1][0]
