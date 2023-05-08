@@ -1,5 +1,5 @@
 from math import isclose
-from typing import TYPE_CHECKING, List, Tuple, Union
+from typing import TYPE_CHECKING, List, Tuple, Union, Optional
 
 import cadquery as cq
 import numpy as np
@@ -108,7 +108,7 @@ def shift_edges(
 
 
 def route_edge(
-    edge: cq.Edge, start_p=None, end_p=None, arrow=False
+    edge: cq.Edge, start_p=None, end_p=None, arrow=False, feed: Optional[float] = None
 ) -> Tuple[List[MotionCommand], cq.Vector]:
     commands = []
     geom_type = edge.geomType()
@@ -116,7 +116,7 @@ def route_edge(
     end_cv = AbsoluteCV.from_vector(ep)
     if geom_type == "LINE":
         # commands.append(Cut(end_cv, arrow=edge_i % 5 == 0))
-        commands.append(Cut(end_cv, arrow=arrow))
+        commands.append(Cut(end_cv, arrow=arrow, feed=feed))
 
     elif geom_type == "ARC" or geom_type == "CIRCLE":
         sp = (
@@ -145,7 +145,7 @@ def route_edge(
         elif sp == ep:
             # Really tiny arc, might as well just cut it straight
             # TODO verify the sanity
-            commands.append(Cut(end=end_cv, arrow=arrow))
+            commands.append(Cut(end=end_cv, arrow=arrow, feed=feed))
         else:
             mid_p = np.linspace(start_p, end_p, 3)[1]
             mid = AbsoluteCV.from_vector(edge.positionAt(mid_p, "parameter"))
@@ -164,7 +164,11 @@ def route_edge(
         for length in np.linspace(i, j, n):
             # [e._geomAdaptor().Curve().Curve().BasisCurve().BasisCurve() for e in pocket.DEBUG[0].Edges()]
             commands.append(
-                Cut(AbsoluteCV.from_vector(edge.positionAt(length)), arrow=arrow)
+                Cut(
+                    AbsoluteCV.from_vector(edge.positionAt(length)),
+                    arrow=arrow,
+                    feed=feed,
+                )
             )
 
     else:
@@ -208,22 +212,24 @@ def route_wires(job: "Job", wires: List[Union[cq.Wire, cq.Edge]], stepover=None)
             start = edge_start_point(edges[0])
             if param:
                 start = edges[0].positionAt(param, "parameter")
-            commands.append(Cut(AbsoluteCV.from_vector(start)))
+            commands.append(Cut(AbsoluteCV.from_vector(start), feed=job.feed))
         else:
             commands += rapid_to(start, job.rapid_height, job.op_safe_height)
         for edge_i, edge in enumerate(edges):
             if edge_i == 0:
                 if param is not None:
-                    new_commands, end = route_edge(edge, start_p=param, arrow=True)
+                    new_commands, end = route_edge(
+                        edge, start_p=param, arrow=True, feed=job.feed
+                    )
                     commands += new_commands
                 else:
-                    new_commands, end = route_edge(edge, arrow=True)
+                    new_commands, end = route_edge(edge, arrow=True, feed=job.feed)
                     commands += new_commands
             else:
-                new_commands, end = route_edge(edge)
+                new_commands, end = route_edge(edge, feed=job.feed)
                 commands += new_commands
         if param:
-            new_commands, end = route_edge(edges[0], end_p=param)
+            new_commands, end = route_edge(edges[0], end_p=param, feed=job.feed)
             commands += new_commands
 
         previous_wire = wire
@@ -263,16 +269,16 @@ def route_polyface_outers(job: "Job", polyfaces: List[PathFace], stepover=None):
             index = poly_position[0]
             poly = shift_polygon(poly, index)
             start = closest_point
-            commands.append(Cut.abs(*start, polyface.depth))
+            commands.append(Cut.abs(*start, polyface.depth, feed=job.feed))
             pass
         else:
             commands += rapid_to(start, job.rapid_height, job.op_safe_height)
 
         for x, y in poly[1:]:
-            commands.append(Cut.abs(x, y, polyface.depth))
+            commands.append(Cut.abs(x, y, polyface.depth, feed=job.feed))
 
         if closest_point:
-            commands.append(Cut.abs(*closest_point, polyface.depth))
+            commands.append(Cut.abs(*closest_point, polyface.depth, feed=job.feed))
             previous_wire_end = closest_point
         else:
             previous_wire_end = poly[-1]
