@@ -58,15 +58,20 @@ def vertical_ramp(
 """
 
 
-def rapid_to(v: cq.Vector, rapid_height: float, safe_plunge_height=None):
+def rapid_to(
+    v: cq.Vector,
+    rapid_height: float,
+    safe_plunge_height=None,
+    feed: Optional[float] = None,
+):
     commands = [Rapid.abs(z=rapid_height), Rapid.abs(x=v.x, y=v.y, arrow=True)]
 
     if safe_plunge_height is None:
-        commands.append(Plunge.abs(z=v.z, arrow=True))
+        commands.append(Plunge.abs(z=v.z, arrow=True, feed=feed))
     else:
         commands.append(Rapid.abs(z=safe_plunge_height, arrow=True))
         if safe_plunge_height > v.z:
-            commands.append(Plunge.abs(z=v.z, arrow=True))
+            commands.append(Plunge.abs(z=v.z, arrow=True, feed=feed))
     return commands
 
 
@@ -205,7 +210,7 @@ def route_wires(job: "Job", wires: List[Union[cq.Wire, cq.Edge]], stepover=None)
             and isclose(ep.x, start.x, abs_tol=0.001)
             and isclose(ep.y, start.y, abs_tol=0.001)
         ):
-            commands.append(Plunge.abs(start.z, arrow=True))
+            commands.append(Plunge.abs(start.z, arrow=True, feed=job.feed))
         elif stepover and distance and distance <= stepover:
             # Determine the index of the edge, shift edges and use param?
             edges = shift_edges(edges, target)
@@ -214,7 +219,9 @@ def route_wires(job: "Job", wires: List[Union[cq.Wire, cq.Edge]], stepover=None)
                 start = edges[0].positionAt(param, "parameter")
             commands.append(Cut(AbsoluteCV.from_vector(start), feed=job.feed))
         else:
-            commands += rapid_to(start, job.rapid_height, job.op_safe_height)
+            commands += rapid_to(
+                start, job.rapid_height, job.op_safe_height, feed=job.feed
+            )
         for edge_i, edge in enumerate(edges):
             if edge_i == 0:
                 if param is not None:
@@ -272,7 +279,7 @@ def route_polyface_outers(job: "Job", polyfaces: List[PathFace], stepover=None):
             commands.append(Cut.abs(*start, polyface.depth, feed=job.feed))
             pass
         else:
-            commands += rapid_to(start, job.rapid_height, job.op_safe_height)
+            commands += rapid_to(start, job.rapid_height, job.op_safe_height, job.feed)
 
         for x, y in poly[1:]:
             commands.append(Cut.abs(x, y, polyface.depth, feed=job.feed))
