@@ -144,9 +144,13 @@ def route_edge(
             mid1_p, end1_p, mid2_p = np.linspace(start_p, end_p, 5)[1:-1]
             mid1 = AbsoluteCV.from_vector(edge.positionAt(mid1_p, "parameter"))
             end1 = AbsoluteCV.from_vector(edge.positionAt(end1_p, "parameter"))
-            commands.append(cmd(end=end1, center=center, mid=mid1, arrow=arrow))
+            commands.append(
+                cmd(end=end1, center=center, mid=mid1, arrow=arrow, feed=feed)
+            )
             mid2 = AbsoluteCV.from_vector(edge.positionAt(mid2_p, "parameter"))
-            commands.append(cmd(end=end_cv, center=center, mid=mid2, arrow=arrow))
+            commands.append(
+                cmd(end=end_cv, center=center, mid=mid2, arrow=arrow, feed=feed)
+            )
         elif sp == ep:
             # Really tiny arc, might as well just cut it straight
             # TODO verify the sanity
@@ -154,7 +158,9 @@ def route_edge(
         else:
             mid_p = np.linspace(start_p, end_p, 3)[1]
             mid = AbsoluteCV.from_vector(edge.positionAt(mid_p, "parameter"))
-            commands.append(cmd(end=end_cv, center=center, mid=mid, arrow=arrow))
+            commands.append(
+                cmd(end=end_cv, center=center, mid=mid, arrow=arrow, feed=feed)
+            )
 
     elif geom_type == "BSPLINE" or geom_type == "SPLINE" or geom_type == "OFFSET":
         # TODO precision
