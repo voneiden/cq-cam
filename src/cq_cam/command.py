@@ -125,14 +125,18 @@ class MotionCommand(Command, ABC):
     ais_color = "red"
     ais_alt_color = "darkred"
     previous_command: Union[MotionCommand, None]
+    feed: Optional[float] = None
     start: cq.Vector
     end: CommandVector
     tab: bool  # TODO not the right place to carry tab information imo?
 
-    def __init__(self, end: CommandVector, arrow=False, tab=False):
+    def __init__(
+        self, end: CommandVector, arrow=False, tab=False, feed: Optional[float] = None
+    ):
         self.end = end
         self.arrow = arrow
         self.tab = tab
+        self.feed = feed
         self.max_depth = None  # TODO whats this?
 
     @classmethod
@@ -181,6 +185,7 @@ class ConfigCommand(Command, ABC):
 class Linear(MotionCommand, ABC):
     def to_gcode(self) -> tuple[str, cq.Vector]:
         xyz, end = self.xyz_gcode(self.start)
+        print(self.__class__)
         return f"{self.print_modal(self.previous_command)}{xyz}", end
 
     def to_ais_shape(self, as_edges=False, alt_color=False):
