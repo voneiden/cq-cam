@@ -1,5 +1,5 @@
 """
-command.py builts upon the gcode letter addresses introduced in common.py to form full gcode command abstractions.
+command.py builts upon the gcode letter addresses introduced in `groups.py` to form full gcode command abstractions.
 It is organised in a similiar fashion, into motion and non motion commands.
 The code is strctured around the abstract classes CommandVector and Command:
 - CommandVector
@@ -43,7 +43,7 @@ import cadquery as cq
 from OCP.AIS import AIS_Line, AIS_Shape
 from OCP.Geom import Geom_CartesianPoint
 
-from cq_cam.common import (
+from cq_cam.groups import (
     ArcDistanceMode,
     AutomaticChangerMode,
     CannedCycle,

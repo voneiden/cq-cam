@@ -7,7 +7,7 @@ from typing import Union
 from cadquery import cq
 
 from cq_cam.command import Command, SafetyBlock, StartSequence, StopSequence, ToolChange
-from cq_cam.common import (
+from cq_cam.groups import (
     ArcDistanceMode,
     CoolantState,
     DistanceMode,

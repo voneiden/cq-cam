@@ -1,5 +1,5 @@
 """
-# G-code Letter and Word Address Syntax (common.py)
+# G-code Letter and Word Address Syntax
 
 G-code (also RS-274) is the most widely-used computer numerical control (CNC) programming language. 
 It is used mainly in computer-aided manufacturing to control automated machine tools, as well as from a 3D-printing slicer app.
@@ -70,7 +70,7 @@ M-code Modal Groups:
 from enum import Enum
 
 
-class GCodeAddress(Enum):
+class GCodeGroup(Enum):
     def __repr__(self):
         return f"{self.__class__.__name__}.{self._name_}"
 
@@ -106,7 +106,7 @@ The G-codes have been organised differently from the proposed modal groups.
 """
 
 
-class Path(GCodeAddress):
+class Path(GCodeGroup):
     RAPID = "G0"
     LINEAR = "G1"
     ARC_CW = "G2"
@@ -117,41 +117,41 @@ class Path(GCodeAddress):
     NURBS = "G5.2"
 
 
-class WorkPlane(GCodeAddress):
+class WorkPlane(GCodeGroup):
     XY = "G17"
     XZ = "G18"
     YZ = "G19"
 
 
-class Unit(GCodeAddress):
+class Unit(GCodeGroup):
     IMPERIAL = "G20"
     METRIC = "G21"
 
 
-class HomePosition(GCodeAddress):
+class HomePosition(GCodeGroup):
     HOME_1 = "G28"
     HOME_2 = "G30"
 
 
-class ProbeMode(GCodeAddress):
+class ProbeMode(GCodeGroup):
     ON_CONTACT_ERROR = "38.2"
     ON_CONTACT = "G38.3"
     LOSE_CONTACT_ERROR = "G38.4"
     LOSE_CONTACT = "G38.5"
 
 
-class RadiusCompensation(GCodeAddress):
+class RadiusCompensation(GCodeGroup):
     OFF = "G40"
     LEFT = "G41"
     RIGHT = "G42"
 
 
-class LengthCompensation(GCodeAddress):
+class LengthCompensation(GCodeGroup):
     ON = "G43"
     OFF = "G49"
 
 
-class WorkOffset(GCodeAddress):
+class WorkOffset(GCodeGroup):
     ABSOLUTE = "G53"
     OFFSET_1 = "G54"
     OFFSET_2 = "G55"
@@ -161,12 +161,12 @@ class WorkOffset(GCodeAddress):
     OFFSET_5 = "G58"
 
 
-class PlannerControlMode(GCodeAddress):
+class PlannerControlMode(GCodeGroup):
     EXACT = "G61"
     BLEND = "G64"
 
 
-class CannedCycle(GCodeAddress):
+class CannedCycle(GCodeGroup):
     CANCEL = "G80"
     DRILL_SIMPLE = "G81"
     DRILL_DWELL = "G82"
@@ -178,29 +178,29 @@ class CannedCycle(GCodeAddress):
     BORE_DWELL = "G89"
 
 
-class DistanceMode(GCodeAddress):
+class DistanceMode(GCodeGroup):
     ABSOLUTE = "G90"
     INCREMENTAL = "G91"
 
 
-class ArcDistanceMode(GCodeAddress):
+class ArcDistanceMode(GCodeGroup):
     ABSOLUTE = "G90.1"
     INCREMENTAL = "G91.1"
 
 
-class FeedRateControlMode(GCodeAddress):
+class FeedRateControlMode(GCodeGroup):
     INVERSE_TIME = "G93"
     UNITS_PER_MINUTE = "G94"
     UNITS_PER_REVOLUTION = "G95"
 
 
-class SpindleControlMode(GCodeAddress):
+class SpindleControlMode(GCodeGroup):
     MAX_SPINDLE_SPEED = "G50"
     SURFACE_SPEED = "G96"
     RPM = "G97"
 
 
-class CannedCycleReturnMode(GCodeAddress):
+class CannedCycleReturnMode(GCodeGroup):
     INITIAL = "G98"
     LAST = "G99"
 
@@ -215,30 +215,30 @@ Common M-Codes
 """
 
 
-class ProgramControlMode(GCodeAddress):
+class ProgramControlMode(GCodeGroup):
     PAUSE = "M0"
     PAUSE_OPTIONAL = "M1"
     END = "M2"
     END_RESET = "M30"
 
 
-class CutterState(GCodeAddress):
+class CutterState(GCodeGroup):
     ON_CW = "M3"
     ON_CCW = "M4"
     OFF = "M5"
 
 
-class AutomaticChangerMode(GCodeAddress):
+class AutomaticChangerMode(GCodeGroup):
     TOOL_CHANGE = "M6"
     PALLET_CHANGE = "M60"
 
 
-class CoolantState(GCodeAddress):
+class CoolantState(GCodeGroup):
     MIST = "M7"
     FLOOD = "M8"
     OFF = "M9"
 
 
-class VacuumState(GCodeAddress):
+class VacuumState(GCodeGroup):
     ON = "M10"
     OFF = "M11"
