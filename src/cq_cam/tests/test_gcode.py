@@ -64,7 +64,7 @@ class TestUtils(unittest.TestCase):
         self.assertEqual("M3", gcode)
 
     def test_start_sequence_spindle(self):
-        cmd = StartSequence(spindle=1000)
+        cmd = StartSequence(speed=1000)
         gcode, position = cmd.to_gcode()
         self.assertEqual("M3 S1000", gcode)
 
@@ -79,7 +79,7 @@ class TestUtils(unittest.TestCase):
         self.assertEqual("M3 M7", gcode)
 
     def test_start_sequence_spindle_coolant(self):
-        cmd = StartSequence(spindle=1000, coolant=CoolantState.FLOOD)
+        cmd = StartSequence(speed=1000, coolant=CoolantState.FLOOD)
         gcode, position = cmd.to_gcode()
         self.assertEqual("M3 S1000 M8", gcode)
 
@@ -94,7 +94,7 @@ class TestUtils(unittest.TestCase):
         self.assertEqual("M5\nG30\nM1\nT2 G43 H2 M6\nM3", gcode)
 
     def test_tool_change_spindle(self):
-        cmd = ToolChange(2, spindle=1000)
+        cmd = ToolChange(2, speed=1000)
         gcode, position = cmd.to_gcode()
         self.assertEqual("M5\nG30\nM1\nT2 G43 H2 M6\nM3 S1000", gcode)
 
@@ -109,6 +109,6 @@ class TestUtils(unittest.TestCase):
         self.assertEqual("M5 M9\nG30\nM1\nT2 G43 H2 M6\nM3 M7", gcode)
 
     def test_tool_change_spindle_coolant(self):
-        cmd = ToolChange(2, spindle=1000, coolant=CoolantState.FLOOD)
+        cmd = ToolChange(2, speed=1000, coolant=CoolantState.FLOOD)
         gcode, position = cmd.to_gcode()
         self.assertEqual("M5 M9\nG30\nM1\nT2 G43 H2 M6\nM3 S1000 M8", gcode)

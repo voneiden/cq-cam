@@ -352,21 +352,21 @@ class CircularCCW(Circular):
 
 
 class StartSequence(ConfigCommand):
-    spindle: int | None
+    speed: int | None
     coolant: CoolantState | None
 
     def __init__(
-        self, spindle: int | None = None, coolant: CoolantState | None = None
+        self, speed: int | None = None, coolant: CoolantState | None = None
     ) -> None:
-        self.spindle = spindle
+        self.speed = speed
         self.coolant = coolant
         super().__init__()
 
     def to_gcode(self) -> tuple[str, cq.Vector]:
         gcode_str = str(CutterState.ON_CW)
 
-        if self.spindle is not None:
-            gcode_str += f" S{self.spindle}"
+        if self.speed is not None:
+            gcode_str += f" S{self.speed}"
 
         if self.coolant is not None:
             gcode_str += f" {str(self.coolant)}"
@@ -421,24 +421,24 @@ class SafetyBlock(ConfigCommand):
 
 class ToolChange(ConfigCommand):
     tool_number: int | None
-    spindle: int | None
+    speed: int | None
     coolant: CoolantState | None
 
     def __init__(
         self,
         tool_number: int,
-        spindle: int | None = None,
+        speed: int | None = None,
         coolant: CoolantState | None = None,
     ):
         self.tool_number = tool_number
-        self.spindle = spindle
+        self.speed = speed
         self.coolant = coolant
 
         super().__init__()
 
     def to_gcode(self) -> tuple[str, cq.Vector]:
         stop_sequence_gcode, _ = StopSequence(self.coolant).to_gcode()
-        start_sequence_gcode, _ = StartSequence(self.spindle, self.coolant).to_gcode()
+        start_sequence_gcode, _ = StartSequence(self.speed, self.coolant).to_gcode()
         return (
             "\n".join(
                 (

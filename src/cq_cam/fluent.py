@@ -277,7 +277,7 @@ class Job:
     def to_gcode(self):
         task_break = "\n\n\n"
         start_sequence_gcode, _ = StartSequence(
-            spindle=self.speed, coolant=self.coolant
+            speed=self.speed, coolant=self.coolant
         ).to_gcode()
         stop_sequence_gcode, _ = StopSequence(coolant=self.coolant).to_gcode()
         safety_block_gcode, _ = SafetyBlock().to_gcode()
