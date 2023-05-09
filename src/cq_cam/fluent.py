@@ -282,7 +282,7 @@ class Job:
         stop_sequence_gcode, _ = StopSequence(coolant=self.coolant).to_gcode()
         safety_block_gcode, _ = SafetyBlock().to_gcode()
         return (
-            f"({self.name} - Feedrate: {self.feed} - Unit: {self.unit})\n"
+            f"({self.name} - Feedrate: {self.feed} - Unit: {repr(self.unit)})\n"
             f"{safety_block_gcode}\n"
             f"{start_sequence_gcode}\n"
             f"{task_break.join(task.to_gcode() for task in self.operations)}\n"

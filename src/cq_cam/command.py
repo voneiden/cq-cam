@@ -154,9 +154,8 @@ class MotionCommand(Command, ABC):
 
     def print_feed(self, previous: MotionCommand | None):
         previous_command = previous
-        while (
-            previous_command is not None
-            and previous_command.modal == Path.RAPID.to_gcode()
+        while previous_command is not None and previous_command.modal == str(
+            Path.RAPID
         ):
             previous_command = previous_command.previous_command
         if self.feed and (
@@ -228,12 +227,12 @@ class Linear(MotionCommand, ABC):
 
 
 class Rapid(Linear):
-    modal = Path.RAPID.to_gcode()
+    modal = str(Path.RAPID)
     ais_color = "green"
 
 
 class Cut(Linear):
-    modal = Path.LINEAR.to_gcode()
+    modal = str(Path.LINEAR)
 
 
 class Plunge(Cut):
@@ -345,11 +344,11 @@ class Circular(MotionCommand, ABC):
 
 
 class CircularCW(Circular):
-    modal = Path.ARC_CW.to_gcode()
+    modal = str(Path.ARC_CW)
 
 
 class CircularCCW(Circular):
-    modal = Path.ARC_CCW.to_gcode()
+    modal = str(Path.ARC_CCW)
 
 
 class StartSequence(ConfigCommand):
@@ -364,13 +363,13 @@ class StartSequence(ConfigCommand):
         super().__init__()
 
     def to_gcode(self) -> tuple[str, cq.Vector]:
-        gcode_str = CutterState.ON_CW.to_gcode()
+        gcode_str = str(CutterState.ON_CW)
 
         if self.spindle is not None:
             gcode_str += f" S{self.spindle}"
 
         if self.coolant is not None:
-            gcode_str += f" {self.coolant.to_gcode()}"
+            gcode_str += f" {str(self.coolant)}"
 
         return (gcode_str, None)
 
@@ -383,9 +382,9 @@ class StopSequence(ConfigCommand):
         super().__init__()
 
     def to_gcode(self) -> tuple[str, cq.Vector]:
-        gcode_str = CutterState.OFF.to_gcode()
+        gcode_str = str(CutterState.OFF)
         if self.coolant is not None:
-            gcode_str += f" {CoolantState.OFF.to_gcode()}"
+            gcode_str += f" {str(CoolantState.OFF)}"
 
         return (gcode_str, None)
 
@@ -397,23 +396,23 @@ class SafetyBlock(ConfigCommand):
                 (
                     " ".join(
                         (
-                            DistanceMode.ABSOLUTE.to_gcode(),
-                            WorkOffset.OFFSET_1.to_gcode(),
-                            PlannerControlMode.BLEND.to_gcode(),
-                            SpindleControlMode.MAX_SPINDLE_SPEED.to_gcode(),
-                            WorkPlane.XY.to_gcode(),
-                            FeedRateControlMode.UNITS_PER_MINUTE.to_gcode(),
+                            str(DistanceMode.ABSOLUTE),
+                            str(WorkOffset.OFFSET_1),
+                            str(PlannerControlMode.BLEND),
+                            str(SpindleControlMode.MAX_SPINDLE_SPEED),
+                            str(WorkPlane.XY),
+                            str(FeedRateControlMode.UNITS_PER_MINUTE),
                         )
                     ),
                     " ".join(
                         (
-                            LengthCompensation.OFF.to_gcode(),
-                            RadiusCompensation.OFF.to_gcode(),
-                            CannedCycle.CANCEL.to_gcode(),
+                            str(LengthCompensation.OFF),
+                            str(RadiusCompensation.OFF),
+                            str(CannedCycle.CANCEL),
                         )
                     ),
-                    Unit.METRIC.to_gcode(),
-                    HomePosition.HOME_2.to_gcode(),
+                    str(Unit.METRIC),
+                    str(HomePosition.HOME_2),
                 )
             ),
             None,
@@ -444,14 +443,14 @@ class ToolChange(ConfigCommand):
             "\n".join(
                 (
                     stop_sequence_gcode,
-                    HomePosition.HOME_2.to_gcode(),
-                    ProgramControlMode.PAUSE_OPTIONAL.to_gcode(),
+                    str(HomePosition.HOME_2),
+                    str(ProgramControlMode.PAUSE_OPTIONAL),
                     " ".join(
                         (
                             f"T{self.tool_number}",
-                            LengthCompensation.ON.to_gcode(),
+                            str(LengthCompensation.ON),
                             f"H{self.tool_number}",
-                            AutomaticChangerMode.TOOL_CHANGE.to_gcode(),
+                            str(AutomaticChangerMode.TOOL_CHANGE),
                         )
                     ),
                     start_sequence_gcode,

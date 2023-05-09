@@ -50,7 +50,10 @@ from enum import Enum
 
 
 class GCodeAddress(Enum):
-    def to_gcode(self) -> str:
+    def __repr__(self):
+        return f"{self.__class__.__name__}.{self._name_}"
+
+    def __str__(self):
         return self._value_
 
 
