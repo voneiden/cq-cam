@@ -1,6 +1,6 @@
 import itertools
 import logging
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import cadquery as cq
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge
@@ -30,8 +30,8 @@ def profile(
     job: "Job",
     wire: cq.Wire,
     offset: float,
-    stepdown: Optional[int] = None,
-    tabs: Optional[Tabs] = None,
+    stepdown: int | None = None,
+    tabs: Tabs | None = None,
 ):
     """
     A 2.5D profile operation

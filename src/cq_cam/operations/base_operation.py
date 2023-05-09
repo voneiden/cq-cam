@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Optional, Union
+from typing import Union
 
 from cadquery import cq
 from OCP.BRepFeat import BRepFeat
@@ -104,7 +104,7 @@ class FaceBaseOperation(Operation, ABC):
     wires that the profile will operate on. 
     """
 
-    avoid: Optional[Union[cq.Workplane, list[_op_o_shapes], _op_o_shapes]] = None
+    avoid: Union[cq.Workplane, list[_op_o_shapes], _op_o_shapes] | None = None
     """ [INOP] List of faces that the tool may not enter. This option
     can be relevant when using an `outer_boundary_offset` that
     would otherwise cause the tool to enter features you do
@@ -126,14 +126,14 @@ class FaceBaseOperation(Operation, ABC):
     When doing open 2.5D pockets, see `avoid`.
     """
 
-    inner_boundary_offset: Optional[Union[float, tuple[float, float]]] = 1
+    inner_boundary_offset: Union[float, tuple[float, float]] | None = 1
     """ See `outer_boundary_offset`  """
 
-    boundary_final_pass_stepover: Union[float, None] = None
+    boundary_final_pass_stepover: float | None = None
     """ Stepover for a final boundary (profile) pass.
     """
 
-    stepdown: Union[float, None] = None
+    stepdown: float | None = None
     """ Maximum distance to step down on each pass 
     """
 

@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field
-from typing import Optional
 
 from cq_cam.utils.utils import cached_dist2
 
@@ -34,7 +33,7 @@ class LinkedPolygon:
 
         self.linked_points.append(point)
 
-    def reset(self, start_point: Optional[tuple[float, float]] = None):
+    def reset(self, start_point: tuple[float, float] | None = None):
         """
         Reset the internal state for `nearest_linked`
 
@@ -46,7 +45,7 @@ class LinkedPolygon:
         if start_point:
             self._linked_points.remove(start_point)
 
-    def drop(self, point: Optional[tuple[float, float]]):
+    def drop(self, point: tuple[float, float] | None):
         self._linked_points.remove(point)
 
     def nearest_linked(self, point: tuple[float, float]):

@@ -1,6 +1,6 @@
 import logging
 from collections import defaultdict
-from typing import TYPE_CHECKING, Literal, Optional
+from typing import TYPE_CHECKING, Literal
 
 import cadquery as cq
 import numpy as np
@@ -29,13 +29,13 @@ if TYPE_CHECKING:
 def pocket(
     job: "Job",
     op_areas: list[cq.Face],
-    avoid_areas: Optional[list[cq.Face]] = None,
-    outer_offset: Optional[OffsetInput] = None,
-    inner_offset: Optional[OffsetInput] = None,
-    avoid_outer_offset: Optional[OffsetInput] = None,
-    avoid_inner_offset: Optional[OffsetInput] = None,
-    stepover: Optional[OffsetInput] = None,
-    stepdown: Optional[float] = None,
+    avoid_areas: list[cq.Face] | None = None,
+    outer_offset: OffsetInput | None = None,
+    inner_offset: OffsetInput | None = None,
+    avoid_outer_offset: OffsetInput | None = None,
+    avoid_inner_offset: OffsetInput | None = None,
+    stepover: OffsetInput | None = None,
+    stepdown: float | None = None,
     engine: Literal["clipper", "cq"] = "clipper",
 ):
     if avoid_areas is None:
@@ -113,7 +113,7 @@ def combine_outers(poly_faces: list[PathFace], depth) -> list[Path]:
 
 def determine_stepdown_start_depth(
     pocket_op: PathFace, shallower_pocket_ops: list[PathFace]
-) -> Optional[float]:
+) -> float | None:
     stepdown_start_depth = [
         op.depth
         for op in shallower_pocket_ops
@@ -127,7 +127,7 @@ def determine_stepdown_start_depth(
 
 
 def apply_stepdown(
-    sequences: list[list[PathFace]], start_depth: Optional[float], stepdown: float
+    sequences: list[list[PathFace]], start_depth: float | None, stepdown: float
 ) -> list[list[PathFace]]:
     start_depth = -stepdown if start_depth is None else start_depth - stepdown
 

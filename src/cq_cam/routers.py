@@ -1,5 +1,5 @@
 from math import isclose
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING, Union
 
 import cadquery as cq
 import numpy as np
@@ -62,7 +62,7 @@ def rapid_to(
     v: cq.Vector,
     rapid_height: float,
     safe_plunge_height=None,
-    plunge_feed: Optional[float] = None,
+    feed: float | None = None,
 ):
     commands = [Rapid.abs(z=rapid_height), Rapid.abs(x=v.x, y=v.y, arrow=True)]
 
@@ -113,7 +113,7 @@ def shift_edges(
 
 
 def route_edge(
-    edge: cq.Edge, start_p=None, end_p=None, arrow=False, feed: Optional[float] = None
+    edge: cq.Edge, start_p=None, end_p=None, arrow=False, feed: float | None = None
 ) -> tuple[list[MotionCommand], cq.Vector]:
     commands = []
     geom_type = edge.geomType()
