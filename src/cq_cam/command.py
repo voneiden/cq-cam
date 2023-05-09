@@ -198,7 +198,6 @@ class ConfigCommand(Command, ABC):
 class Linear(MotionCommand, ABC):
     def to_gcode(self) -> tuple[str, cq.Vector]:
         xyz, end = self.xyz_gcode(self.start)
-        print(self.__class__)
         return (
             f"{self.print_modal(self.previous_command)}{xyz}{self.print_feed(self.previous_command)}",
             end,
