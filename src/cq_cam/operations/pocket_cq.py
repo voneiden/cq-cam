@@ -137,7 +137,7 @@ def fill_pocket_contour_shrink(pocket: cq.Face, step: float) -> list[list[cq.Wir
 
 
 def pocket_cq(
-    job,
+    job: "Job",
     op_areas: list[cq.Face],
     avoid_areas: list[cq.Face],
     outer_offset: float,

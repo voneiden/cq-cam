@@ -110,7 +110,7 @@ def test_profile_stepdown(job: Job, bottom_face):
     )
 
 
-def test_profile_tabs(job, bottom_face):
+def test_profile_tabs(job: Job, bottom_face):
     code = job.profile(
         bottom_face, outer_offset=0, tabs=EdgeTabs(spacing=2, width=1, height=1)
     ).to_gcode()
@@ -164,7 +164,7 @@ def test_profile_tabs(job, bottom_face):
     )
 
 
-def test_profile_wire_tabs(job, bottom_face):
+def test_profile_wire_tabs(job: Job, bottom_face):
     code = job.profile(
         bottom_face, outer_offset=0, tabs=WireTabs(count=2, width=1, height=1)
     ).to_gcode()

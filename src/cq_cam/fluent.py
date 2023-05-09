@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 class Operation:
-    def __init__(self, job, name: str, commands: list[Command]):
+    def __init__(self, job: Job, name: str, commands: list[Command]):
         self.job = job
         self.name = name
         self.commands = commands

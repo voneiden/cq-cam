@@ -222,7 +222,7 @@ def fill_pocket_contour_shrink(pocket: PathFace, step: float) -> list[list[PathF
 
 
 def pocket_clipper(
-    job,
+    job: "Job",
     op_areas: list[PathFace],
     avoid_areas: list[PathFace],
     outer_offset: float,

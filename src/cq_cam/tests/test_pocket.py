@@ -1,6 +1,7 @@
 import cadquery as cq
 import pytest
 
+from cq_cam import Job
 from cq_cam.operations.pocket import apply_stepdown, determine_stepdown_start_depth
 from cq_cam.utils.geometry_op import PathFace, offset_face
 from cq_cam.utils.tests.conftest import round_array
@@ -62,7 +63,7 @@ def test_make_from_wire_with_bigger_inner_than_outer():
     assert len(compound_faces) == 0
 
 
-def test_stepdown(job, box):
+def test_stepdown(job: Job, box):
     wp = box.faces(">Z").workplane().rect(2, 2).cutBlind(-1)
     face = wp.faces(">Z[1]")
     job = job.pocket(face, stepdown=0.5)
