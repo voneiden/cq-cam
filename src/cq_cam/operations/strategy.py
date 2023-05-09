@@ -1,6 +1,5 @@
 import logging
 from itertools import pairwise
-from typing import Dict
 
 import cadquery as cq
 import numpy as np
@@ -152,8 +151,8 @@ class ZigZagStrategy(Strategy):
     def _route_zig_zag(
         linked_polygons: list[LinkedPolygon],
         scanlines: tuple[tuple[tuple[float, float], tuple[float, float]]],
-        scanpoint_to_linked_polygon: Dict[tuple[float, float], LinkedPolygon],
-        scanpoint_to_scanline: Dict[tuple[float, float], list[tuple[float, float]]],
+        scanpoint_to_linked_polygon: dict[tuple[float, float], LinkedPolygon],
+        scanpoint_to_scanline: dict[tuple[float, float], list[tuple[float, float]]],
     ) -> list[list[tuple[float, float]]]:
         # Prepare to route the zigzag
         for linked_polygon in linked_polygons:
