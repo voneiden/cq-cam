@@ -49,7 +49,7 @@ In addition to the G and M address there are other letter addresses that are use
 from enum import Enum
 
 
-class GCodeEnum(Enum):
+class GCodeAddress(Enum):
     def to_gcode(self) -> str:
         return self._value_
 
@@ -81,7 +81,7 @@ The G-codes have been organised differently from the proposed modal groups.
 """
 
 
-class Path(GCodeEnum):
+class Path(GCodeAddress):
     RAPID = "G0"
     LINEAR = "G1"
     ARC_CW = "G2"
@@ -92,41 +92,41 @@ class Path(GCodeEnum):
     NURBS = "G5.2"
 
 
-class WorkPlane(GCodeEnum):
+class WorkPlane(GCodeAddress):
     XY = "G17"
     XZ = "G18"
     YZ = "G19"
 
 
-class Unit(GCodeEnum):
+class Unit(GCodeAddress):
     IMPERIAL = "G20"
     METRIC = "G21"
 
 
-class HomePosition(GCodeEnum):
+class HomePosition(GCodeAddress):
     HOME_1 = "G28"
     HOME_2 = "G30"
 
 
-class ProbeMode(GCodeEnum):
+class ProbeMode(GCodeAddress):
     ON_CONTACT_ERROR = "38.2"
     ON_CONTACT = "G38.3"
     LOSE_CONTACT_ERROR = "G38.4"
     LOSE_CONTACT = "G38.5"
 
 
-class RadiusCompensation(GCodeEnum):
+class RadiusCompensation(GCodeAddress):
     OFF = "G40"
     LEFT = "G41"
     RIGHT = "G42"
 
 
-class LengthCompensation(GCodeEnum):
+class LengthCompensation(GCodeAddress):
     ON = "G43"
     OFF = "G49"
 
 
-class WorkOffset(GCodeEnum):
+class WorkOffset(GCodeAddress):
     ABSOLUTE = "G53"
     OFFSET_1 = "G54"
     OFFSET_2 = "G55"
@@ -136,12 +136,12 @@ class WorkOffset(GCodeEnum):
     OFFSET_5 = "G58"
 
 
-class PlannerControlMode(GCodeEnum):
+class PlannerControlMode(GCodeAddress):
     EXACT = "G61"
     BLEND = "G64"
 
 
-class CannedCycle(GCodeEnum):
+class CannedCycle(GCodeAddress):
     CANCEL = "G80"
     DRILL_SIMPLE = "G81"
     DRILL_DWELL = "G82"
@@ -153,29 +153,29 @@ class CannedCycle(GCodeEnum):
     BORE_DWELL = "G89"
 
 
-class DistanceMode(GCodeEnum):
+class DistanceMode(GCodeAddress):
     ABSOLUTE = "G90"
     INCREMENTAL = "G91"
 
 
-class ArcDistanceMode(GCodeEnum):
+class ArcDistanceMode(GCodeAddress):
     ABSOLUTE = "G90.1"
     INCREMENTAL = "G91.1"
 
 
-class FeedRateControlMode(GCodeEnum):
+class FeedRateControlMode(GCodeAddress):
     INVERSE_TIME = "G93"
     UNITS_PER_MINUTE = "G94"
     UNITS_PER_REVOLUTION = "G95"
 
 
-class SpindleControlMode(GCodeEnum):
+class SpindleControlMode(GCodeAddress):
     MAX_SPINDLE_SPEED = "G50"
     SURFACE_SPEED = "G96"
     RPM = "G97"
 
 
-class CannedCycleReturnMode(GCodeEnum):
+class CannedCycleReturnMode(GCodeAddress):
     INITIAL = "G98"
     LAST = "G99"
 
@@ -190,30 +190,30 @@ Common M-Codes
 """
 
 
-class ProgramControlMode(GCodeEnum):
+class ProgramControlMode(GCodeAddress):
     PAUSE = "M0"
     PAUSE_OPTIONAL = "M1"
     END = "M2"
     END_RESET = "M30"
 
 
-class CutterState(GCodeEnum):
+class CutterState(GCodeAddress):
     ON_CW = "M3"
     ON_CCW = "M4"
     OFF = "M5"
 
 
-class AutomaticChangerMode(GCodeEnum):
+class AutomaticChangerMode(GCodeAddress):
     TOOL_CHANGE = "M6"
     PALLET_CHANGE = "M60"
 
 
-class CoolantState(GCodeEnum):
+class CoolantState(GCodeAddress):
     MIST = "M7"
     FLOOD = "M8"
     OFF = "M9"
 
 
-class VacuumState(GCodeEnum):
+class VacuumState(GCodeAddress):
     ON = "M10"
     OFF = "M11"
