@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from copy import copy
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 from cadquery import cq
 
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 class Operation:
-    def __init__(self, job, name: str, commands: List[Command]):
+    def __init__(self, job, name: str, commands: list[Command]):
         self.job = job
         self.name = name
         self.commands = commands
@@ -102,7 +102,7 @@ class Job:
 
         self.max_stepdown_count = 100
 
-        self.operations: List[Operation] = []
+        self.operations: list[Operation] = []
 
     """
     There are two checks that must happen between operations:
@@ -151,7 +151,7 @@ class Job:
     # ##################
     def profile(
         self,
-        shape: Union[cq.Workplane, cq.Shape, List[cq.Shape]],
+        shape: Union[cq.Workplane, cq.Shape, list[cq.Shape]],
         outer_offset=1,
         inner_offset=-1,
         stepdown=None,
@@ -215,8 +215,8 @@ class Job:
 
     def pocket(
         self,
-        op_areas: Union[cq.Workplane, cq.Face, List[cq.Face]],
-        avoid_areas: Optional[Union[cq.Workplane, cq.Face, List[cq.Face]]] = None,
+        op_areas: Union[cq.Workplane, cq.Face, list[cq.Face]],
+        avoid_areas: Optional[Union[cq.Workplane, cq.Face, list[cq.Face]]] = None,
         outer_offset: Optional[OffsetInput] = None,
         inner_offset: Optional[OffsetInput] = None,
         avoid_outer_offset: Optional[OffsetInput] = None,
@@ -335,7 +335,7 @@ class Job:
             for operation in self.operations
         ]
 
-    def _add_operation(self, name: str, commands: List[Command]):
+    def _add_operation(self, name: str, commands: list[Command]):
         job = copy(self)
         job.operations = [*self.operations, Operation(job, name, commands)]
         return job

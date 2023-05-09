@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 from cadquery import cq
 from OCP.BRepFeat import BRepFeat
@@ -20,7 +20,7 @@ class Operation(ABC):
     job: "Job"
     """ The `Job` which this task belongs to.
     """
-    commands: List[MotionCommand] = field(init=False, default_factory=list)
+    commands: list[MotionCommand] = field(init=False, default_factory=list)
     """List of commands that this task wants to perform.
     """
 
@@ -49,7 +49,7 @@ class Operation(ABC):
         return "\n".join(command_gcode_generator(start))
 
     @staticmethod
-    def break_compound_to_faces(compound: Union[cq.Compound, cq.Face]) -> List[cq.Face]:
+    def break_compound_to_faces(compound: Union[cq.Compound, cq.Face]) -> list[cq.Face]:
         faces = []
         explorer = TopExp_Explorer(compound.wrapped, TopAbs_FACE)
         while explorer.More():
@@ -59,7 +59,7 @@ class Operation(ABC):
         return faces
 
     @staticmethod
-    def combine_faces(faces: List[cq.Face]) -> List[Union[cq.Compound, cq.Face]]:
+    def combine_faces(faces: list[cq.Face]) -> list[Union[cq.Compound, cq.Face]]:
         return [
             compound
             for compound in cq.Workplane().add(faces).combine().objects
@@ -67,7 +67,7 @@ class Operation(ABC):
         ]
 
     @classmethod
-    def combine_faces_and_break(cls, faces: List[cq.Face]) -> List[List[cq.Face]]:
+    def combine_faces_and_break(cls, faces: list[cq.Face]) -> list[list[cq.Face]]:
         """
         Combine a list of faces into compounds and break the compounds back into faces
         """
@@ -80,7 +80,7 @@ class Operation(ABC):
                 results.append(combined)
         return results
 
-    def transform_shapes_to_global(self, faces: List[cq.Shape]) -> List[cq.Shape]:
+    def transform_shapes_to_global(self, faces: list[cq.Shape]) -> list[cq.Shape]:
         matrix = self.job.top.fG
         return [face.transformShape(matrix) for face in faces]
 
@@ -99,12 +99,12 @@ class FaceBaseOperation(Operation, ABC):
 
     _op_o_shapes = Union[cq.Wire, cq.Face]
 
-    o: Union[cq.Workplane, List[_op_o_shapes], _op_o_shapes] = None
+    o: Union[cq.Workplane, list[_op_o_shapes], _op_o_shapes] = None
     """ The cadquery Workplane containing faces and/or
     wires that the profile will operate on. 
     """
 
-    avoid: Optional[Union[cq.Workplane, List[_op_o_shapes], _op_o_shapes]] = None
+    avoid: Optional[Union[cq.Workplane, list[_op_o_shapes], _op_o_shapes]] = None
     """ [INOP] List of faces that the tool may not enter. This option
     can be relevant when using an `outer_boundary_offset` that
     would otherwise cause the tool to enter features you do
@@ -149,7 +149,7 @@ class FaceBaseOperation(Operation, ABC):
         pass
 
     def _wp_to_faces(self, name, o):
-        faces: List[cq.Face] = []
+        faces: list[cq.Face] = []
         for obj in self._o_objects(o):
             if isinstance(obj, cq.Face):
                 faces.append(obj)
@@ -175,7 +175,7 @@ class FaceBaseOperation(Operation, ABC):
     def _avoid(self):
         return self._wp_to_faces("avoid", self.avoid)
 
-    def offset_boundary(self, boundary: cq.Face) -> List[cq.Face]:
+    def offset_boundary(self, boundary: cq.Face) -> list[cq.Face]:
         assert boundary.geomType() in ("PLANE", "CIRCLE")
 
         outer_offset = (

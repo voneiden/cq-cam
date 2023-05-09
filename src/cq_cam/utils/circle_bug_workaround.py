@@ -1,9 +1,7 @@
-from typing import List
-
 import cadquery as cq
 
 
-def circle_bug_workaround(source_wire: cq.Wire, target_wires: List[cq.Wire]):
+def circle_bug_workaround(source_wire: cq.Wire, target_wires: list[cq.Wire]):
     """
     FreeCAD style workaround for
     https://github.com/CadQuery/cadquery/issues/896

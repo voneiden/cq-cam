@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import List
 
 import cadquery as cq
 import numpy as np
@@ -156,7 +155,7 @@ class Surface3D(FaceBaseOperation):
     @classmethod
     def shape_to_triangles(
         cls, shape: cq.Shape, tolerance: float = 1e-3, angular_tolerance: float = 0.1
-    ) -> List[tuple[tuple[float, float, float], ...]]:
+    ) -> list[tuple[tuple[float, float, float], ...]]:
         # BRepMesh_IncrementalMesh gets mad if you try to pass a Compound to it
         if isinstance(shape, cq.Compound):
             faces = cls.break_compound_to_faces(shape)
@@ -192,7 +191,7 @@ class Surface3D(FaceBaseOperation):
 
     @staticmethod
     def _chop_sequences_by_depth(
-        sequences: List[List[tuple[float, float, float]]], last_depth: float
+        sequences: list[list[tuple[float, float, float]]], last_depth: float
     ):
         new_sequences = []
         for sequence in sequences:
@@ -215,7 +214,7 @@ def point_to_tuple(point: gp_Pnt) -> tuple[float, float, float]:
 
 def shape_to_triangles(
     shape: cq.Shape, tolerance: float = 1e-3, angular_tolerance: float = 0.1
-) -> List[tuple[tuple[float, float, float], ...]]:
+) -> list[tuple[tuple[float, float, float], ...]]:
     mesh = BRepMesh_IncrementalMesh(shape.wrapped, tolerance, True, angular_tolerance)
     mesh.Perform()
 

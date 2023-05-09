@@ -1,6 +1,6 @@
 import itertools
 import logging
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, Optional
 
 import cadquery as cq
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge
@@ -53,7 +53,7 @@ def profile(
     for base_feature in base_features:
         base_zmin = base_feature.BoundingBox().zmin
         tab_z = base_zmin + tabs.height if tabs else None
-        layers: List[cq.Wire] = [base_feature]
+        layers: list[cq.Wire] = [base_feature]
         if stepdown:
             step = cq.Vector(0, 0, 1) * stepdown
 

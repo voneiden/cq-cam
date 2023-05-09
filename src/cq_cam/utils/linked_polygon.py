@@ -1,14 +1,14 @@
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import Optional
 
 from cq_cam.utils.utils import cached_dist2
 
 
 @dataclass
 class LinkedPolygon:
-    polygon: List[tuple[float, float]]
-    linked_points: List[tuple[float, float]] = field(default_factory=list)
-    _linked_points: List[tuple[float, float]] = field(default_factory=list)
+    polygon: list[tuple[float, float]]
+    linked_points: list[tuple[float, float]] = field(default_factory=list)
+    _linked_points: list[tuple[float, float]] = field(default_factory=list)
 
     def link_point(
         self,

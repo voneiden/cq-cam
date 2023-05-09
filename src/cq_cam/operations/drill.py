@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Union
+from typing import Union
 
 import cadquery as cq
 
@@ -17,14 +17,14 @@ class Drill(Operation):
     """ The cadquery Workplane containing faces and/or
     wires that the profile will operate on. 
     """
-    o: Union[cq.Workplane, List[_op_o_shapes], _op_o_shapes] = None
+    o: Union[cq.Workplane, list[_op_o_shapes], _op_o_shapes] = None
     depth: float = None
 
     def __post_init__(self):
         # TODO max depth
         # TODO evacuate chips?
         transform_f = self.job.top.toWorldCoords
-        drill_vectors: List[cq.Vector] = []
+        drill_vectors: list[cq.Vector] = []
 
         if self.o is None:
             raise OperationError("o must be defined")

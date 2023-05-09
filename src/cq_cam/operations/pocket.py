@@ -1,6 +1,6 @@
 import logging
 from collections import defaultdict
-from typing import TYPE_CHECKING, List, Literal, Optional
+from typing import TYPE_CHECKING, Literal, Optional
 
 import cadquery as cq
 import numpy as np
@@ -28,8 +28,8 @@ if TYPE_CHECKING:
 
 def pocket(
     job: "Job",
-    op_areas: List[cq.Face],
-    avoid_areas: Optional[List[cq.Face]] = None,
+    op_areas: list[cq.Face],
+    avoid_areas: Optional[list[cq.Face]] = None,
     outer_offset: Optional[OffsetInput] = None,
     inner_offset: Optional[OffsetInput] = None,
     avoid_outer_offset: Optional[OffsetInput] = None,
@@ -83,7 +83,7 @@ def pocket(
         raise ValueError("Unknown engine")
 
 
-def generate_depth_map(poly_faces: List[PathFace]):
+def generate_depth_map(poly_faces: list[PathFace]):
     depth_map = defaultdict(list)
 
     for face in poly_faces:
@@ -98,7 +98,7 @@ def generate_depth_map(poly_faces: List[PathFace]):
     return depth_map, depths
 
 
-def combine_poly_faces(poly_faces: List[PathFace], depth) -> List[PathFace]:
+def combine_poly_faces(poly_faces: list[PathFace], depth) -> list[PathFace]:
     outers = [poly_face.outer for poly_face in poly_faces]
     inners = flatten_list([poly_face.inners for poly_face in poly_faces])
 
@@ -106,7 +106,7 @@ def combine_poly_faces(poly_faces: List[PathFace], depth) -> List[PathFace]:
     return difference_poly_tree(new_outers, inners, depth)
 
 
-def combine_outers(poly_faces: List[PathFace], depth) -> List[Path]:
+def combine_outers(poly_faces: list[PathFace], depth) -> list[Path]:
     outers = [poly_face.outer for poly_face in poly_faces]
     return [poly_face.outer for poly_face in union_poly_tree(outers, [], depth)]
 
@@ -148,8 +148,8 @@ def apply_stepdown(
 
 
 def build_pocket_ops(
-    op_areas: List[PathFace], avoid_areas: List[PathFace]
-) -> List[PathFace]:
+    op_areas: list[PathFace], avoid_areas: list[PathFace]
+) -> list[PathFace]:
     # Determine depth of each face
     depth_map, depths = generate_depth_map(op_areas)
     avoid_depth_map, avoid_depths = generate_depth_map(avoid_areas)

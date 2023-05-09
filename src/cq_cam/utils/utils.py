@@ -1,7 +1,7 @@
 import itertools
 import math
 from functools import cache
-from typing import Iterable, List, T, Union
+from typing import Iterable, T, Union
 
 import numpy as np
 import pyclipper
@@ -72,7 +72,7 @@ def position_space(edge: cq.Edge, tolerance=0.1):
     return np.linspace(0, 1, math.ceil(edge.Length() / tolerance))
 
 
-def flatten_edges(edges: List[cq.Edge]):
+def flatten_edges(edges: list[cq.Edge]):
     vxs = []
     for i, edge in enumerate(edges):
         # LINE ARC CIRCLE SPLINE
@@ -93,7 +93,7 @@ def flatten_edges(edges: List[cq.Edge]):
     return vxs
 
 
-def flatten_wire(wire: cq.Wire) -> List[cq.Vector]:
+def flatten_wire(wire: cq.Wire) -> list[cq.Vector]:
     return flatten_edges(wire_to_ordered_edges(wire))
 
 
@@ -127,7 +127,7 @@ def is_arc_clockwise2(arc: cq.Edge):
     return normal.z < 0
 
 
-def wire_to_ordered_edges(wire: cq.Wire) -> List[cq.Edge]:
+def wire_to_ordered_edges(wire: cq.Wire) -> list[cq.Edge]:
     """
     It's a trap.
 
@@ -166,7 +166,7 @@ def cut_clockwise(positive_offset: bool, spindle_clockwise: bool, climb: bool):
     return bool((positive_offset + spindle_clockwise + climb) % 2)
 
 
-def flatten_list(lst: Iterable[Iterable[T]]) -> List[T]:
+def flatten_list(lst: Iterable[Iterable[T]]) -> list[T]:
     return [element for nested_lst in lst for element in nested_lst]
 
 
@@ -348,8 +348,8 @@ def project_face(face: cq.Face, projection_dir=(0, 0, 1)) -> cq.Face:
 
 
 def extract_wires(
-    shape: Union[cq.Workplane, cq.Shape, List[cq.Shape]]
-) -> tuple[List[cq.Wire], List[cq.Wire]]:
+    shape: Union[cq.Workplane, cq.Shape, list[cq.Shape]]
+) -> tuple[list[cq.Wire], list[cq.Wire]]:
     if isinstance(shape, cq.Workplane):
         return extract_wires(shape.objects)
 
@@ -397,7 +397,7 @@ def optimize_float(v: float):
 
 def break_compound_to(
     compound: cq.Compound, shape_type: TopAbs_ShapeEnum
-) -> List[TopoDS_Shape]:
+) -> list[TopoDS_Shape]:
     shapes = []
     explorer = TopExp_Explorer(compound.wrapped, shape_type)
     while explorer.More():
