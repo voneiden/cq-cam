@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Union
 
 from cadquery import cq
 from OCP.BRepFeat import BRepFeat
@@ -115,7 +115,7 @@ class FaceBaseOperation(Operation, ABC):
     For example a value of 0.5 means the operation tries to use 
     50% of the tool width."""
 
-    outer_boundary_offset: Union[float, Tuple[float, float]] = -1
+    outer_boundary_offset: Union[float, tuple[float, float]] = -1
     """ Offset is in multiples of tool diameter
       * -1 for closed pockets and inside profiles
       * 0 for open pockets
@@ -126,7 +126,7 @@ class FaceBaseOperation(Operation, ABC):
     When doing open 2.5D pockets, see `avoid`.
     """
 
-    inner_boundary_offset: Optional[Union[float, Tuple[float, float]]] = 1
+    inner_boundary_offset: Optional[Union[float, tuple[float, float]]] = 1
     """ See `outer_boundary_offset`  """
 
     boundary_final_pass_stepover: Union[float, None] = None

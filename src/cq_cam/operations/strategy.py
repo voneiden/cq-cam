@@ -1,6 +1,6 @@
 import logging
 from itertools import pairwise
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 import cadquery as cq
 import numpy as np
@@ -8,7 +8,7 @@ import numpy as np
 from cq_cam.utils.linked_polygon import LinkedPolygon
 from cq_cam.utils.utils import WireClipper, cached_dist2, dist_to_segment_squared
 
-Scanpoint = Tuple[float, float]
+Scanpoint = tuple[float, float]
 Scanline = List[Scanpoint]
 
 logger = logging.getLogger(__name__)
@@ -21,8 +21,8 @@ class Strategy:
 
     @staticmethod
     def _pick_nearest(
-        point: Tuple[float, float], options: List[Tuple[float, float]]
-    ) -> Tuple[float, float]:
+        point: tuple[float, float], options: List[tuple[float, float]]
+    ) -> tuple[float, float]:
         nearest = (cached_dist2(point, options[0]), options[0])
         for option in options[1:]:
             dist2 = cached_dist2(point, option)
@@ -32,7 +32,7 @@ class Strategy:
 
     @classmethod
     def _sort_clipper_output(
-        cls, output_paths: Tuple[Tuple[Tuple[float, float], Tuple[float, float]]]
+        cls, output_paths: tuple[tuple[tuple[float, float], tuple[float, float]]]
     ):
         paths = [output_paths[0]]
         point = output_paths[0][-1]
@@ -128,7 +128,7 @@ class ZigZagStrategy(Strategy):
 
     @staticmethod
     def _link_scanpoints_to_boundaries(
-        scanpoints: List[Scanpoint], boundaries: List[List[Tuple[float, float]]]
+        scanpoints: List[Scanpoint], boundaries: List[List[tuple[float, float]]]
     ):
         remaining_scanpoints = scanpoints[:]
         scanpoint_to_linked_polygon = {}
@@ -151,10 +151,10 @@ class ZigZagStrategy(Strategy):
     @staticmethod
     def _route_zig_zag(
         linked_polygons: List[LinkedPolygon],
-        scanlines: Tuple[Tuple[Tuple[float, float], Tuple[float, float]]],
-        scanpoint_to_linked_polygon: Dict[Tuple[float, float], LinkedPolygon],
-        scanpoint_to_scanline: Dict[Tuple[float, float], List[Tuple[float, float]]],
-    ) -> List[List[Tuple[float, float]]]:
+        scanlines: tuple[tuple[tuple[float, float], tuple[float, float]]],
+        scanpoint_to_linked_polygon: Dict[tuple[float, float], LinkedPolygon],
+        scanpoint_to_scanline: Dict[tuple[float, float], List[tuple[float, float]]],
+    ) -> List[List[tuple[float, float]]]:
         # Prepare to route the zigzag
         for linked_polygon in linked_polygons:
             linked_polygon.reset()

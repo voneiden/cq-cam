@@ -1,5 +1,5 @@
 from math import isclose
-from typing import TYPE_CHECKING, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, List, Optional, Union
 
 import cadquery as cq
 import numpy as np
@@ -114,7 +114,7 @@ def shift_edges(
 
 def route_edge(
     edge: cq.Edge, start_p=None, end_p=None, arrow=False, feed: Optional[float] = None
-) -> Tuple[List[MotionCommand], cq.Vector]:
+) -> tuple[List[MotionCommand], cq.Vector]:
     commands = []
     geom_type = edge.geomType()
     ep = edge_end_point(edge) if end_p is None else edge.positionAt(end_p, "parameter")

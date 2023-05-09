@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import List
 
 import cadquery as cq
 import numpy as np
@@ -90,7 +90,7 @@ def interpolate_edges_with_unstable_curves(
     return result, interpolated
 
 
-def vectors_to_2d_tuples(vectors: List[cq.Vector]) -> List[Tuple[float, float]]:
+def vectors_to_2d_tuples(vectors: List[cq.Vector]) -> List[tuple[float, float]]:
     return [(vector.x, vector.y) for vector in vectors]
 
 

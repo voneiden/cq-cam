@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Tuple
+from typing import List
 
 import cadquery as cq
 import numpy as np
@@ -156,7 +156,7 @@ class Surface3D(FaceBaseOperation):
     @classmethod
     def shape_to_triangles(
         cls, shape: cq.Shape, tolerance: float = 1e-3, angular_tolerance: float = 0.1
-    ) -> List[Tuple[Tuple[float, float, float], ...]]:
+    ) -> List[tuple[tuple[float, float, float], ...]]:
         # BRepMesh_IncrementalMesh gets mad if you try to pass a Compound to it
         if isinstance(shape, cq.Compound):
             faces = cls.break_compound_to_faces(shape)
@@ -192,7 +192,7 @@ class Surface3D(FaceBaseOperation):
 
     @staticmethod
     def _chop_sequences_by_depth(
-        sequences: List[List[Tuple[float, float, float]]], last_depth: float
+        sequences: List[List[tuple[float, float, float]]], last_depth: float
     ):
         new_sequences = []
         for sequence in sequences:
@@ -209,13 +209,13 @@ class Surface3D(FaceBaseOperation):
         return new_sequences
 
 
-def point_to_tuple(point: gp_Pnt) -> Tuple[float, float, float]:
+def point_to_tuple(point: gp_Pnt) -> tuple[float, float, float]:
     return point.X(), point.Y(), point.Z()
 
 
 def shape_to_triangles(
     shape: cq.Shape, tolerance: float = 1e-3, angular_tolerance: float = 0.1
-) -> List[Tuple[Tuple[float, float, float], ...]]:
+) -> List[tuple[tuple[float, float, float], ...]]:
     mesh = BRepMesh_IncrementalMesh(shape.wrapped, tolerance, True, angular_tolerance)
     mesh.Perform()
 
@@ -238,5 +238,5 @@ def shape_to_triangles(
     return triangles
 
 
-def cl_point_to_tuple(point: ocl.CLPoint) -> Tuple[float, float, float]:
+def cl_point_to_tuple(point: ocl.CLPoint) -> tuple[float, float, float]:
     return point.x, point.y, point.z
