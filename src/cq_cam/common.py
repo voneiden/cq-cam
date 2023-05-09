@@ -1,17 +1,54 @@
 """
+# G-code Letter and Word Address Syntax (common.py)
+
 G-code (also RS-274) is the most widely-used computer numerical control (CNC) programming language. 
 It is used mainly in computer-aided manufacturing to control automated machine tools, as well as from a 3D-printing slicer app.
-Here we concentrate on a subset of G-code relevant for 3-axis CNC machining.
+Here we concentrate on a subset of G-code relevant for 3-axis CNC machining. Explanations of commands that are out of scope will be included for completeness and it will be indicated that they are out of scope.
 
-The G-code syntax includes single letter addresses to configure the machine state and control the motors. 
-The two primary letter addresses are M-codes and G-codes. M-codes are known as machine codes (or more accurately miscalleneous codes) and G-codes are called preparatory codes.
-M-codes allow for state changes of the machine components and the running program. G-codes control the motion of the motors and the internal configuration of the machine. G-code commands can be catergorised as modal or non-modal.
-Modal commands remain in effect until they are replaced or cancelled by another command. Non-modal commands execute only once.
-M-code and G-code are further organised into modal groups.
+A G-code command (word address) is formed by single letter (letter address) followed by 2 digits. Multiple G-code commands on the same line are called command blocks
+```
+ G 01 XYZ
+⌊ ⌋  letter address
+⌊   ⌋  word  address
+⌊       ⌋  command block
+```
 
-G-code Modal Groups
+G-code word addresses are used to configure the machine state and control the motors. The two primary letter addresses are M-codes and G-codes. M-codes are known as machine codes (or more accurately miscellaneous codes) and G-codes are called preparatory codes. M-codes allow for state changes of the machine components and the running program. G-codes control the motion of the motors and the internal configuration of the machine. In addition to the G and M address there are other letter addresses that are used in conjunction with them
+
+Below is a comprehensive list of the available letter addresses:
+- A <inch/mm> - 4th Axis: G0, G1, G2,  G3 (out of scope)
+- B <inch/mm> - 5th Axis: G0, G1, G2,  G3 (out of scope)
+- C <inch/mm> - 6th Axis: G0, G1, G2,  G3 (out of scope)
+- D <0-200> - Radius Offset: G41, G42
+- E <0.0001-0.25>- Engraving Feed Rate: G187 (out of scope)
+- G <0-187> - Preparatory Function:
+- F <inch/mm> - Feed Rate: G1, G2, G3, G73, G74, G76, G81, G82, G83, G84, G85, G86, G87, G88, G89
+- H <0-200> - Tool Length Offset: G43, G44
+- I <inch/mm> - Arc Center in X Axis: G2, G3
+- J <inch/mm> - Arc Center in Y Axis: G2, G3
+- K <inch/mm> - Arc Center in Z Axis: G2, G3
+- L <0-32767> - Canned Cycle Loop Count: G81, G82, G83, G84, G85, G86, G88, G89
+- M <> - Miscllanesous Functions
+- N <0-99999> - Number of Block
+- O <0-99999> - Program Number
+- P <0.001-1000.0> - Dwell Time: G4, G73, G76, G85, G86, G88, G89
+- Q <0.001-100.0> - Canned Cycle Optional Data: G73, G76, G83, G87, 
+- R <inch/mm> - Circular Interpolation/Canned Cycle Data:, G73, G74, G76, G81, G82, G83, G84, G85, G86, G87, G88, G89
+- S <1-99999> - Spindle Speed: M3, M4
+- T <1-20>- Tool Selection: M6
+- X <inch/mm> - X Axis: G0, G1, G2, G3
+- Y <inch/mm> - Y Axis: G0, G1, G2, G3
+- Z <inch/mm> - Y Axis: G0, G1, G2, G3
+
+inch: 4 fractional positions
+mm: 3 fractional positions
+
+
+G-code commands can be categorized as modal or non-modal. Modal commands remain in effect until they are replaced or cancelled by another command. Non-modal commands execute in their block scope. M-code and G-code are further organized into modal groups
+
+G-code Modal Groups:
 - Group 0 - Non-modal codes: G4, G10 G28, G30, G52, G53, G92, G92.1, G92.2, G92.3 
-- Group 1 - Motion: G0, G1, G2, G3, G33, G38.n, G73, G76, G80, G81, G82, G83, G84, G85, G86, G87, G88, G89
+- Group 1 - Motion: G0, G1, G2, G3, G33, G38.n, G73, G74, G76, G80, G81, G82, G83, G84, G85, G86, G87, G88, G89
 - Group 2 - Plane: G17, G18, G19, G17.1, G18.1, G19.1
 - Group 3 - Distance Mode: G90, G91
 - Group 4 - Arc Distance Mode: G90.1, G91.1
@@ -28,22 +65,6 @@ M-code Modal Groups:
 - Group 4 - Stopping: M0, M1, M2, M30, M60
 - Group 7 - Spindle: M3, M4, M5
 - Group 8 - Coolant: M7, M8, M9
-
-In addition to the G and M address there are other letter addresses that are used in conjuction with them:
-- F - Feed Rate: G1, G2, G3
-- X - X Axis: G1, G2, G3
-- Y - Y Axis: G1, G2, G3
-- Z - Y Axis: G1, G2, G3
-- I - Arc Center in X Axis: G2, G3
-- J - Arc Center in Y Axis: G2, G3
-- K - Arc Center in Z Axis: G2, G3
-- R - Canned Cycle Arc Radius: G80, G81, G82, G83, G84, G85, G86, G88, G89
-- P - Canned Cycle Dwell Time: G80, G81, G82, G83, G84, G85, G86, G88, G89
-- L - Canned Cycle Loop Count: G80, G81, G82, G83, G84, G85, G86, G88, G89
-- S - Spindle: M3, M4
-- T - Tool Selection: M6
-- H - Tool Length Offset: G43
-- D - Radius Offset: G41, G42
 """
 
 from enum import Enum
@@ -63,7 +84,8 @@ The G-codes have been organised differently from the proposed modal groups.
 ## Motion Control
 - Paths: G00 (Rapid), G01 (Linear), G02 (Arc CW), G03 (Arc CCW), G04 (Pause/Dwell), G05 (Cubic Spline)
 - Home Position: G28 (Home 1), G30 (Home 2)
-- CannedCycle: G80 (Cancel), G81 (Simple), G82 (Simple Dwell), G83 (Peck), G84 (Tap), G98 (Retract to initial Z), G99 (Retruct to last Z)
+- FixedCycle: G73 (High Speed Peck Drill), G74 (Left-hand Tap), G76 (Boring),
+- CannedCycle: G80 (Cancel), G81 (Simple Drill), G82 (Simple Dwell), G83 (Peck), G84 (Right-hand Tap), G85 (Simple Bore), G86 (Bore Spindle Stop), G87 (Back Bore), G98 (Retract to initial Z), G99 (Retruct to last Z)
 - CannedCycleReturnMode: G98, G99
 
 ## Machine Configuration
