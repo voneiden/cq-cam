@@ -62,16 +62,16 @@ def rapid_to(
     v: cq.Vector,
     rapid_height: float,
     safe_plunge_height=None,
-    feed: Optional[float] = None,
+    plunge_feed: Optional[float] = None,
 ):
     commands = [Rapid.abs(z=rapid_height), Rapid.abs(x=v.x, y=v.y, arrow=True)]
 
     if safe_plunge_height is None:
-        commands.append(Plunge.abs(z=v.z, arrow=True, feed=feed))
+        commands.append(Plunge.abs(z=v.z, arrow=True, feed=plunge_feed))
     else:
         commands.append(Rapid.abs(z=safe_plunge_height, arrow=True))
         if safe_plunge_height > v.z:
-            commands.append(Plunge.abs(z=v.z, arrow=True, feed=feed))
+            commands.append(Plunge.abs(z=v.z, arrow=True, feed=plunge_feed))
     return commands
 
 
@@ -226,7 +226,7 @@ def route_wires(job: "Job", wires: List[Union[cq.Wire, cq.Edge]], stepover=None)
             commands.append(Cut(AbsoluteCV.from_vector(start), feed=job.feed))
         else:
             commands += rapid_to(
-                start, job.rapid_height, job.op_safe_height, feed=job.feed
+                start, job.rapid_height, job.op_safe_height, plunge_feed=job.plunge_feed
             )
         for edge_i, edge in enumerate(edges):
             if edge_i == 0:
@@ -285,7 +285,9 @@ def route_polyface_outers(job: "Job", polyfaces: List[PathFace], stepover=None):
             commands.append(Cut.abs(*start, polyface.depth, feed=job.feed))
             pass
         else:
-            commands += rapid_to(start, job.rapid_height, job.op_safe_height, job.feed)
+            commands += rapid_to(
+                start, job.rapid_height, job.op_safe_height, job.plunge_feed
+            )
 
         for x, y in poly[1:]:
             commands.append(Cut.abs(x, y, polyface.depth, feed=job.feed))
