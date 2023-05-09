@@ -1,5 +1,5 @@
 from math import isclose
-from typing import TYPE_CHECKING, List, Tuple, Union, Optional
+from typing import TYPE_CHECKING, List, Optional, Tuple, Union
 
 import cadquery as cq
 import numpy as np

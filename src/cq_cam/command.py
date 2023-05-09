@@ -153,6 +153,19 @@ class MotionCommand(Command, ABC):
             return self.modal
         return ""
 
+    def print_feed(self, previous: Optional[MotionCommand]):
+        previous_command = previous
+        while (
+            previous_command is not None
+            and previous_command.modal == Path.RAPID.to_gcode()
+        ):
+            previous_command = previous_command.previous_command
+        if self.feed and (
+            previous_command is None or previous_command.feed != self.feed
+        ):
+            return f"F{self.feed}"
+        return ""
+
     def xyz_gcode(self, start: cq.Vector, precision=3) -> tuple[str, cq.Vector]:
         coords = []
         end = self.end.to_vector(start)
@@ -186,7 +199,10 @@ class Linear(MotionCommand, ABC):
     def to_gcode(self) -> tuple[str, cq.Vector]:
         xyz, end = self.xyz_gcode(self.start)
         print(self.__class__)
-        return f"{self.print_modal(self.previous_command)}{xyz}", end
+        return (
+            f"{self.print_modal(self.previous_command)}{xyz}{self.print_feed(self.previous_command)}",
+            end,
+        )
 
     def to_ais_shape(self, as_edges=False, alt_color=False):
         end = self.end.to_vector(self.start)
