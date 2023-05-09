@@ -1,4 +1,5 @@
 import logging
+import math
 from functools import cached_property
 from itertools import pairwise
 from math import sqrt
@@ -36,14 +37,14 @@ class PathFace:
         self.depth = depth
 
     @classmethod
-    def from_cq_face(cls, cq_face: cq.Face):
+    def from_cq_face(cls, cq_face: cq.Face, precision: int):
         bbox = cq_face.BoundingBox()
         if round(bbox.zmin, 3) != round(bbox.zmax, 3):
             raise ValueError("PolyFace supports only flat faces")
 
         return cls(
-            wire_to_path(cq_face.outerWire()),
-            [wire_to_path(wire) for wire in cq_face.innerWires()],
+            wire_to_path(cq_face.outerWire(), precision),
+            [wire_to_path(wire, precision) for wire in cq_face.innerWires()],
             bbox.zmax,
         )
 
@@ -98,34 +99,44 @@ def offset_wire(
     return validated_wires
 
 
-def offset_path(path: ClosedPath, offset: float) -> list[Path]:
+def offset_path(path: ClosedPath, offset: float, precision: int) -> list[Path]:
     # noinspection PyArgumentList
     scaled_path = pc.scale_to_clipper(path)
 
     # noinspection PyArgumentList
     scaled_offset = pc.scale_to_clipper(offset)
-    # TODO precision?
 
-    # noinspection PyArgumentList
-    precision = pc.scale_to_clipper(0.01)
+    """
+    Calculating fixed length segments would work like this, but 
+    is it overkill? Probably.. 
+     
+    radius = abs(offset)
+    circumference = 2 * math.pi * radius
+    steps_for_precision = circumference * 10**precision
+    arc_tolerance = radius * (1 - math.cos(math.pi / steps_for_precision))
+    """
 
+    # To get a little more leeway, we divide the precision by two
     # noinspection PyArgumentList
-    pco = pc.PyclipperOffset(pc.scale_to_clipper(2.0), precision)
+    scaled_precision = pc.scale_to_clipper(10**-precision / 2)
+
+    # Use a scaled miter limit of 2. This is the default
+    # noinspection PyArgumentList
+    pco = pc.PyclipperOffset(pc.scale_to_clipper(2.0), scaled_precision)
     pco.AddPath(scaled_path, pc.JT_ROUND, pc.ET_CLOSEDPOLYGON)
 
-    # TODO determine good value for the CleanPolygons
     offset_paths = [
         close_path(pc.scale_from_clipper(offsetted_path))
         for offsetted_path in pc.CleanPolygons(
-            pco.Execute(scaled_offset), precision / 100
+            pco.Execute(scaled_offset), scaled_precision
         )
         if offsetted_path
     ]
     return offset_paths
 
 
-def wire_to_path(wire: cq.Wire) -> Path:
-    return vectors_to_2d_tuples(wire_to_vectors(wire))
+def wire_to_path(wire: cq.Wire, precision: int) -> Path:
+    return vectors_to_2d_tuples(wire_to_vectors(wire, precision))
 
 
 def path_to_wire(path: Path, reference: cq.Wire | float) -> cq.Wire:
@@ -187,12 +198,12 @@ def make_polyfaces(
 
 
 def offset_polyface(
-    polyface: PathFace, outer_offset: float, inner_offset: float
+    polyface: PathFace, outer_offset: float, inner_offset: float, precision: int
 ) -> list[PathFace]:
-    outers = offset_path(polyface.outer, outer_offset)
+    outers = offset_path(polyface.outer, outer_offset, precision)
     if polyface.inners:
         inners = flatten_list(
-            [offset_path(inner, inner_offset) for inner in polyface.inners]
+            [offset_path(inner, inner_offset, precision) for inner in polyface.inners]
         )
         return make_polyfaces(outers, inners, polyface.depth)
     else:

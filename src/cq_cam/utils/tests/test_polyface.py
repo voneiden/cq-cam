@@ -24,8 +24,8 @@ def test_make_polyface():
     inners = []
     faces: list[cq.Face] = wp.objects
     for face in faces:
-        outers.append(wire_to_path(face.outerWire()))
-        inners += [wire_to_path(inner) for inner in face.innerWires()]
+        outers.append(wire_to_path(face.outerWire(), 1))
+        inners += [wire_to_path(inner, 1) for inner in face.innerWires()]
 
     polyfaces = make_polyfaces(outers, inners, 0)
     assert len(polyfaces) == 2

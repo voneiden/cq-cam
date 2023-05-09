@@ -66,7 +66,7 @@ class Job:
         plunge_feed: float = None,
         rapid_height: float = None,
         op_safe_height: float = None,
-        gcode_precision: int = 3,
+        precision: int = 3,
         unit: Unit = Unit.METRIC,
         plane: WorkPlane = WorkPlane.XY,
         coordinate: WorkOffset = WorkOffset.OFFSET_1,
@@ -91,7 +91,7 @@ class Job:
             if op_safe_height is None
             else op_safe_height
         )
-        self.gcode_precision = gcode_precision
+        self.precision = precision
         self.unit = unit
         self.plane = plane
         self.coordinate = coordinate
