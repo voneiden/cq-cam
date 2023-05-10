@@ -71,7 +71,7 @@ def test_stepdown(job, box):
         "G0Z10\n"
         "X0.25Y0.25\n"
         "Z1\n"
-        "G1Z-0.5\n"
+        "G1Z-0.5F200\n"
         "X-0.25\n"
         "Y-0.25\n"
         "X0.25\n"

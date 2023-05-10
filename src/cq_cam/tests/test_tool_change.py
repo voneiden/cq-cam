@@ -16,7 +16,6 @@ def test_same_tool_diameter(job: Job, big_box, operation):
     tool_2 = Tool(tool_diameter=5, tool_number=2)
 
     face = wp.faces(">Z[1]").val()
-    print(operation.__name__)
 
     job = operation(job, face, tool=tool_1)
     job = operation(job, face, tool=tool_2)

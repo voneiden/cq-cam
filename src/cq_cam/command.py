@@ -125,14 +125,18 @@ class MotionCommand(Command, ABC):
     ais_color = "red"
     ais_alt_color = "darkred"
     previous_command: Union[MotionCommand, None]
+    feed: Optional[float] = None
     start: cq.Vector
     end: CommandVector
     tab: bool  # TODO not the right place to carry tab information imo?
 
-    def __init__(self, end: CommandVector, arrow=False, tab=False):
+    def __init__(
+        self, end: CommandVector, arrow=False, tab=False, feed: Optional[float] = None
+    ):
         self.end = end
         self.arrow = arrow
         self.tab = tab
+        self.feed = feed
         self.max_depth = None  # TODO whats this?
 
     @classmethod
@@ -147,6 +151,19 @@ class MotionCommand(Command, ABC):
     def print_modal(self, previous: Optional[MotionCommand]):
         if self.modal and (previous is None or previous.modal != self.modal):
             return self.modal
+        return ""
+
+    def print_feed(self, previous: Optional[MotionCommand]):
+        previous_command = previous
+        while (
+            previous_command is not None
+            and previous_command.modal == Path.RAPID.to_gcode()
+        ):
+            previous_command = previous_command.previous_command
+        if self.feed and (
+            previous_command is None or previous_command.feed != self.feed
+        ):
+            return f"F{self.feed}"
         return ""
 
     def xyz_gcode(self, start: cq.Vector, precision=3) -> tuple[str, cq.Vector]:
@@ -181,7 +198,10 @@ class ConfigCommand(Command, ABC):
 class Linear(MotionCommand, ABC):
     def to_gcode(self) -> tuple[str, cq.Vector]:
         xyz, end = self.xyz_gcode(self.start)
-        return f"{self.print_modal(self.previous_command)}{xyz}", end
+        return (
+            f"{self.print_modal(self.previous_command)}{xyz}{self.print_feed(self.previous_command)}",
+            end,
+        )
 
     def to_ais_shape(self, as_edges=False, alt_color=False):
         end = self.end.to_vector(self.start)

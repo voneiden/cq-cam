@@ -74,7 +74,7 @@ class Drill(Operation):
                     Rapid.abs(z=self.job.op_safe_height),
                     Rapid.abs(x=point[0], y=point[1]),
                     Rapid.abs(z=0),
-                    Plunge.abs(z=depth),  # TODO depth
+                    Plunge.abs(z=depth, feed=self.job.feed),  # TODO depth
                     # Rapid.abs(z=self.job.op_safe_height),
                 ]
             )
