@@ -1,49 +1,5 @@
 """
-# G-code Letter and Word Address Syntax
-
-G-code (also RS-274) is the most widely-used computer numerical control (CNC) programming language. 
-It is used mainly in computer-aided manufacturing to control automated machine tools, as well as from a 3D-printing slicer app.
-Here we concentrate on a subset of G-code relevant for 3-axis CNC machining. Explanations of commands that are out of scope will be included for completeness and it will be indicated that they are out of scope.
-
-A G-code command (word address) is formed by single letter (letter address) followed by 2 digits. Multiple G-code commands on the same line are called command blocks
-```
- G 01 XYZ
-⌊ ⌋  letter address
-⌊   ⌋  word  address
-⌊       ⌋  command block
-```
-
-G-code word addresses are used to configure the machine state and control the motors. The two primary letter addresses are M-codes and G-codes. M-codes are known as machine codes (or more accurately miscellaneous codes) and G-codes are called preparatory codes. M-codes allow for state changes of the machine components and the running program. G-codes control the motion of the motors and the internal configuration of the machine. In addition to the G and M address there are other letter addresses that are used in conjunction with them
-
-Below is a comprehensive list of the available letter addresses:
-- A <inch/mm> - 4th Axis: G0, G1, G2,  G3 (out of scope)
-- B <inch/mm> - 5th Axis: G0, G1, G2,  G3 (out of scope)
-- C <inch/mm> - 6th Axis: G0, G1, G2,  G3 (out of scope)
-- D <0-200> - Radius Offset: G41, G42
-- E <0.0001-0.25>- Engraving Feed Rate: G187 (out of scope)
-- G <0-187> - Preparatory Function:
-- F <inch/mm> - Feed Rate: G1, G2, G3, G73, G74, G76, G81, G82, G83, G84, G85, G86, G87, G88, G89
-- H <0-200> - Tool Length Offset: G43, G44
-- I <inch/mm> - Arc Center in X Axis: G2, G3
-- J <inch/mm> - Arc Center in Y Axis: G2, G3
-- K <inch/mm> - Arc Center in Z Axis: G2, G3
-- L <0-32767> - Canned Cycle Loop Count: G81, G82, G83, G84, G85, G86, G88, G89
-- M <> - Miscllanesous Functions
-- N <0-99999> - Number of Block
-- O <0-99999> - Program Number
-- P <0.001-1000.0> - Dwell Time: G4, G73, G76, G85, G86, G88, G89
-- Q <0.001-100.0> - Canned Cycle Optional Data: G73, G76, G83, G87, 
-- R <inch/mm> - Circular Interpolation/Canned Cycle Data:, G73, G74, G76, G81, G82, G83, G84, G85, G86, G87, G88, G89
-- S <1-99999> - Spindle Speed: M3, M4
-- T <1-20>- Tool Selection: M6
-- X <inch/mm> - X Axis: G0, G1, G2, G3
-- Y <inch/mm> - Y Axis: G0, G1, G2, G3
-- Z <inch/mm> - Y Axis: G0, G1, G2, G3
-
-inch: 4 fractional positions
-mm: 3 fractional positions
-
-
+# G-code Modal Groups
 G-code commands can be categorized as modal or non-modal. Modal commands remain in effect until they are replaced or cancelled by another command. Non-modal commands execute in their block scope. M-code and G-code are further organized into modal groups
 
 G-code Modal Groups:

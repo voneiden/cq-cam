@@ -43,6 +43,18 @@ import cadquery as cq
 from OCP.AIS import AIS_Line, AIS_Shape
 from OCP.Geom import Geom_CartesianPoint
 
+from cq_cam.address import (
+    ArcXAxis,
+    ArcYAxis,
+    ArcZAxis,
+    Feed,
+    Speed,
+    ToolLengthOffset,
+    ToolNumber,
+    XAxis,
+    YAxis,
+    ZAxis,
+)
 from cq_cam.groups import (
     ArcDistanceMode,
     AutomaticChangerMode,
@@ -62,7 +74,6 @@ from cq_cam.groups import (
     WorkOffset,
     WorkPlane,
 )
-from cq_cam.utils.utils import optimize_float
 from cq_cam.visualize import cached_occ_color
 
 
@@ -161,7 +172,7 @@ class MotionCommand(Command, ABC):
         if self.feed and (
             previous_command is None or previous_command.feed != self.feed
         ):
-            return f"F{self.feed}"
+            return f"{Feed(self.feed)}"
         return ""
 
     def xyz_gcode(self, start: cq.Vector, precision=3) -> tuple[str, cq.Vector]:
@@ -172,13 +183,13 @@ class MotionCommand(Command, ABC):
         # TODO use isclose
 
         if start.x != end.x:
-            coords.append(f"X{optimize_float(round(end.x, precision))}")
+            coords.append(f"{XAxis(end.x, precision)}")
 
         if start.y != end.y:
-            coords.append(f"Y{optimize_float(round(end.y, precision))}")
+            coords.append(f"{YAxis(end.y, precision)}")
 
         if start.z != end.z:
-            coords.append(f"Z{optimize_float(round(end.z, precision))}")
+            coords.append(f"{ZAxis(end.z, precision)}")
 
         return "".join(coords), end
 
@@ -292,19 +303,15 @@ class Circular(MotionCommand, ABC):
 
     def ijk_gcode(self, start: cq.Vector, precision=3):
         center = self.center.to_vector(start, relative=True)
-        i = optimize_float(round(center.x, precision))
-        j = optimize_float(round(center.y, precision))
-        k = optimize_float(round(center.z, precision))
-
         ijk = []
         if self.center.x is not None:
-            ijk.append(f"I{i}")
+            ijk.append(f"{ArcXAxis(center.x)}")
 
         if self.center.y is not None:
-            ijk.append(f"J{j}")
+            ijk.append(f"{ArcYAxis(center.y)}")
 
         if self.center.z is not None:
-            ijk.append(f"K{k}")
+            ijk.append(f"{ArcZAxis(center.z)}")
 
         return "".join(ijk)
 
@@ -362,15 +369,29 @@ class StartSequence(ConfigCommand):
         self.coolant = coolant
         super().__init__()
 
-    def to_gcode(self) -> tuple[str, cq.Vector]:
-        gcode_str = str(CutterState.ON_CW)
+    def __str__(self) -> str:
+        words = [f"{CutterState.ON_CW}"]
 
         if self.speed is not None:
-            gcode_str += f" S{self.speed}"
+            words.append(f"{Speed(self.speed)}")
 
         if self.coolant is not None:
-            gcode_str += f" {str(self.coolant)}"
+            words.append(f"{self.coolant}")
 
+        gcode_str = " ".join(words)
+
+        return gcode_str
+
+    def to_gcode(self) -> tuple[str, cq.Vector]:
+        words = [f"{CutterState.ON_CW}"]
+
+        if self.speed is not None:
+            words.append(f"{Speed(self.speed)}")
+
+        if self.coolant is not None:
+            words.append(f"{self.coolant}")
+
+        gcode_str = " ".join(words)
         return (gcode_str, None)
 
 
@@ -381,15 +402,49 @@ class StopSequence(ConfigCommand):
         self.coolant = coolant
         super().__init__()
 
-    def to_gcode(self) -> tuple[str, cq.Vector]:
-        gcode_str = str(CutterState.OFF)
+    def __str__(self) -> str:
+        words = [f"{CutterState.OFF}"]
         if self.coolant is not None:
-            gcode_str += f" {str(CoolantState.OFF)}"
+            words.append(f"{CoolantState.OFF}")
 
+        gcode_str = " ".join(words)
+        return gcode_str
+
+    def to_gcode(self) -> tuple[str, cq.Vector]:
+        words = [f"{CutterState.OFF}"]
+        if self.coolant is not None:
+            words.append(f"{CoolantState.OFF}")
+
+        gcode_str = " ".join(words)
         return (gcode_str, None)
 
 
 class SafetyBlock(ConfigCommand):
+    def __str__(self) -> str:
+        return "\n".join(
+            (
+                " ".join(
+                    (
+                        str(DistanceMode.ABSOLUTE),
+                        str(WorkOffset.OFFSET_1),
+                        str(PlannerControlMode.BLEND),
+                        str(SpindleControlMode.MAX_SPINDLE_SPEED),
+                        str(WorkPlane.XY),
+                        str(FeedRateControlMode.UNITS_PER_MINUTE),
+                    )
+                ),
+                " ".join(
+                    (
+                        str(LengthCompensation.OFF),
+                        str(RadiusCompensation.OFF),
+                        str(CannedCycle.CANCEL),
+                    )
+                ),
+                str(Unit.METRIC),
+                str(HomePosition.HOME_2),
+            )
+        )
+
     def to_gcode(self) -> tuple[str, cq.Vector]:
         return (
             "\n".join(
@@ -436,24 +491,40 @@ class ToolChange(ConfigCommand):
 
         super().__init__()
 
+    def __str__(self) -> str:
+        return "\n".join(
+            (
+                str(StopSequence(self.coolant)),
+                str(HomePosition.HOME_2),
+                str(ProgramControlMode.PAUSE_OPTIONAL),
+                " ".join(
+                    (
+                        f"{ToolNumber(self.tool_number)}",
+                        str(LengthCompensation.ON),
+                        f"{ToolLengthOffset(self.tool_number)}",
+                        str(AutomaticChangerMode.TOOL_CHANGE),
+                    )
+                ),
+                str(StartSequence(self.speed, self.coolant)),
+            )
+        )
+
     def to_gcode(self) -> tuple[str, cq.Vector]:
-        stop_sequence_gcode, _ = StopSequence(self.coolant).to_gcode()
-        start_sequence_gcode, _ = StartSequence(self.speed, self.coolant).to_gcode()
         return (
             "\n".join(
                 (
-                    stop_sequence_gcode,
+                    str(StopSequence(self.coolant)),
                     str(HomePosition.HOME_2),
                     str(ProgramControlMode.PAUSE_OPTIONAL),
                     " ".join(
                         (
-                            f"T{self.tool_number}",
+                            f"{ToolNumber(self.tool_number)}",
                             str(LengthCompensation.ON),
-                            f"H{self.tool_number}",
+                            f"{ToolLengthOffset(self.tool_number)}",
                             str(AutomaticChangerMode.TOOL_CHANGE),
                         )
                     ),
-                    start_sequence_gcode,
+                    str(StartSequence(self.speed, self.coolant)),
                 )
             ),
             None,
