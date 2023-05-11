@@ -62,7 +62,7 @@ def rapid_to(
     v: cq.Vector,
     rapid_height: float,
     safe_plunge_height=None,
-    feed: float | None = None,
+    plunge_feed: float | None = None,
 ):
     commands = [Rapid.abs(z=rapid_height), Rapid.abs(x=v.x, y=v.y, arrow=True)]
 
