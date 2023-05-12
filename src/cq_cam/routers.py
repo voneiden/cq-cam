@@ -16,6 +16,7 @@ from cq_cam.command import (
     Rapid,
 )
 from cq_cam.utils.geometry_op import Path, PathFace, distance_to_path
+from cq_cam.utils.interpolation import edge_interpolation_count
 from cq_cam.utils.utils import (
     edge_end_param,
     edge_end_point,
@@ -113,7 +114,12 @@ def shift_edges(
 
 
 def route_edge(
-    edge: cq.Edge, start_p=None, end_p=None, arrow=False, feed: float | None = None
+    edge: cq.Edge,
+    precision: int,
+    start_p=None,
+    end_p=None,
+    arrow=False,
+    feed: float | None = None,
 ) -> tuple[list[MotionCommand], cq.Vector]:
     commands = []
     geom_type = edge.geomType()
@@ -163,8 +169,7 @@ def route_edge(
             )
 
     elif geom_type == "BSPLINE" or geom_type == "SPLINE" or geom_type == "OFFSET":
-        # TODO precision
-        n = max(int(edge.Length() / 0.1), 2)
+        n = edge_interpolation_count(edge, precision)
 
         orientation = edge.wrapped.Orientation()
         if orientation == TopAbs_REVERSED:
@@ -232,17 +237,21 @@ def route_wires(job: "Job", wires: list[Union[cq.Wire, cq.Edge]], stepover=None)
             if edge_i == 0:
                 if param is not None:
                     new_commands, end = route_edge(
-                        edge, start_p=param, arrow=True, feed=job.feed
+                        edge, job.precision, start_p=param, arrow=True, feed=job.feed
                     )
                     commands += new_commands
                 else:
-                    new_commands, end = route_edge(edge, arrow=True, feed=job.feed)
+                    new_commands, end = route_edge(
+                        edge, job.precision, arrow=True, feed=job.feed
+                    )
                     commands += new_commands
             else:
-                new_commands, end = route_edge(edge, feed=job.feed)
+                new_commands, end = route_edge(edge, job.precision, feed=job.feed)
                 commands += new_commands
         if param:
-            new_commands, end = route_edge(edges[0], end_p=param, feed=job.feed)
+            new_commands, end = route_edge(
+                edges[0], job.precision, end_p=param, feed=job.feed
+            )
             commands += new_commands
 
         previous_wire = wire

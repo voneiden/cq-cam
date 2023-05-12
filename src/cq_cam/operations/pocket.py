@@ -59,8 +59,8 @@ def pocket(
     if engine == "clipper":
         return pocket_clipper(
             job,
-            [PathFace.from_cq_face(face) for face in op_areas],
-            [PathFace.from_cq_face(face) for face in avoid_areas],
+            [PathFace.from_cq_face(face, job.precision) for face in op_areas],
+            [PathFace.from_cq_face(face, job.precision) for face in avoid_areas],
             outer_offset,
             inner_offset,
             avoid_outer_offset,
@@ -187,7 +187,9 @@ def build_pocket_ops(
     return pocket_ops
 
 
-def fill_pocket_contour_shrink(pocket: PathFace, step: float) -> list[list[PathFace]]:
+def fill_pocket_contour_shrink(
+    pocket: PathFace, step: float, precision: int
+) -> list[list[PathFace]]:
     tree = Tree(PathFace(pocket.outer, [], depth=pocket.depth))
     i = 0
 
@@ -195,7 +197,7 @@ def fill_pocket_contour_shrink(pocket: PathFace, step: float) -> list[list[PathF
     try:
         while True:
             node = tree.next_unlocked
-            next_outer_candidates = offset_path(node.obj.outer, -step)
+            next_outer_candidates = offset_path(node.obj.outer, -step, precision)
             if next_outer_candidates and pocket.inners:
                 next_outers = [
                     face.outer
@@ -237,11 +239,13 @@ def pocket_clipper(
     offset_avoid_areas: list[PathFace] = []
 
     for face in op_areas:
-        offset_op_areas += offset_polyface(face, outer_offset, inner_offset)
+        offset_op_areas += offset_polyface(
+            face, outer_offset, inner_offset, job.precision
+        )
 
     for face in avoid_areas:
         offset_avoid_areas += offset_polyface(
-            face, avoid_outer_offset, avoid_inner_offset
+            face, avoid_outer_offset, avoid_inner_offset, job.precision
         )
 
     pocket_ops = build_pocket_ops(offset_op_areas, offset_avoid_areas)
@@ -250,7 +254,7 @@ def pocket_clipper(
     sequences: list[list[PathFace]] = []
     shallower_pocket_ops = []
     for pocket_op in pocket_ops:
-        fill_sequences = fill_pocket_contour_shrink(pocket_op, stepover)
+        fill_sequences = fill_pocket_contour_shrink(pocket_op, stepover, job.precision)
         if stepdown:
             stepdown_start_depth = determine_stepdown_start_depth(
                 pocket_op, shallower_pocket_ops

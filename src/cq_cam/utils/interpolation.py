@@ -33,11 +33,9 @@ def get_underlying_geom_type(edge: cq.Edge):
     return geom_LUT_CURVE[curve.__class__]
 
 
-def interpolate_edge_to_vectors(
-    edge: cq.Edge, precision: float = 0.1
-) -> list[cq.Vector]:
+def interpolate_edge_to_vectors(edge: cq.Edge, precision: int) -> list[cq.Vector]:
     # Interpolation must have at least two edges
-    n = max(int(edge.Length() / precision), 2)
+    n = edge_interpolation_count(edge, precision)
 
     orientation = edge.wrapped.Orientation()
     if orientation == TopAbs_REVERSED:
@@ -52,47 +50,11 @@ def interpolate_edge_to_vectors(
     return interpolations
 
 
-def interpolate_edge(edge: cq.Edge, precision: float = 0.1) -> list[cq.Edge]:
-    interpolations = interpolate_edge_to_vectors(edge, precision)
-
-    result = []
-    for a, b in zip(interpolations, interpolations[1:]):
-        result.append(cq.Edge.makeLine(a, b))
-
-    return result
-
-
-def interpolate_edges_with_unstable_curves(
-    edges: list[cq.Edge], precision: float = 0.1
-):
-    """
-    It appears some curves do not offset nicely with OCCT. BSPLINE is an example.
-    These curves unfortunately need to be interpolated to ensure stable offset performance.
-    :param edges:
-    :param precision:
-    :return:
-    """
-    result = []
-    interpolated = False
-    for edge in edges:
-        geom_type = edge.geomType()
-        if geom_type == "OFFSET":
-            geom_type = get_underlying_geom_type(edge)
-
-        if geom_type == "BSPLINE":
-            edges = interpolate_edge(edge, precision)
-            result += edges
-            interpolated = True
-        else:
-            result.append(edge)
-    return result, interpolated
-
-
 def vectors_to_2d_tuples(vectors: list[cq.Vector]) -> list[tuple[float, float]]:
     return [(vector.x, vector.y) for vector in vectors]
 
 
-def edge_to_vectors(edge: cq.Edge, precision: float = 0.01) -> list[cq.Vector]:
+def edge_to_vectors(edge: cq.Edge, precision: int) -> list[cq.Vector]:
     geom_type = edge.geomType()
     if geom_type == "OFFSET":
         geom_type = get_underlying_geom_type(edge)
@@ -103,9 +65,7 @@ def edge_to_vectors(edge: cq.Edge, precision: float = 0.01) -> list[cq.Vector]:
         return interpolate_edge_to_vectors(edge, precision)
 
 
-def wire_to_vectors(
-    wire: cq.Wire, precision: float = 0.01, close=True
-) -> list[cq.Vector]:
+def wire_to_vectors(wire: cq.Wire, precision: int, close=True) -> list[cq.Vector]:
     edges = wire_to_ordered_edges(wire)
 
     if not edges:
@@ -128,12 +88,5 @@ def wire_to_vectors(
     return vectors
 
 
-def interpolate_wire_with_unstable_edges(
-    wire: cq.Wire, precision: float = 0.1
-) -> cq.Wire:
-    edges, interpolated = interpolate_edges_with_unstable_curves(
-        wire.Edges(), precision
-    )
-    if not interpolated:
-        return wire
-    return cq.Wire.assembleEdges(edges)
+def edge_interpolation_count(edge: cq.Edge, precision: int):
+    return max(int(edge.Length() * 10**precision), 2)
