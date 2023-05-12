@@ -38,7 +38,6 @@ from __future__ import annotations
 
 import warnings
 from abc import ABC, abstractmethod
-from typing import Optional, Union
 
 import cadquery as cq
 from OCP.AIS import AIS_Line, AIS_Shape
@@ -115,23 +114,23 @@ class Command(ABC):
     modal = None
 
     @abstractmethod
-    def to_gcode(self) -> tuple[str, Optional[cq.Vector]]:
+    def to_gcode(self) -> tuple[str, cq.Vector | None]:
         """Output all the necessary G-Code required to perform the command"""
         pass
 
 
 class MotionCommand(Command, ABC):
-    max_depth: Optional[float]
+    max_depth: float | None
     ais_color = "red"
     ais_alt_color = "darkred"
-    previous_command: Union[MotionCommand, None]
-    feed: Optional[float] = None
+    previous_command: MotionCommand | None
+    feed: float | None
     start: cq.Vector
     end: CommandVector
     tab: bool  # TODO not the right place to carry tab information imo?
 
     def __init__(
-        self, end: CommandVector, arrow=False, tab=False, feed: Optional[float] = None
+        self, end: CommandVector, arrow=False, tab=False, feed: float | None = None
     ):
         self.end = end
         self.arrow = arrow
@@ -148,12 +147,12 @@ class MotionCommand(Command, ABC):
         warnings.warn("Relative CV is deprecated", DeprecationWarning)
         return cls(end=RelativeCV(x=x, y=y, z=z), **kwargs)
 
-    def print_modal(self, previous: Optional[MotionCommand]):
+    def print_modal(self, previous: MotionCommand | None):
         if self.modal and (previous is None or previous.modal != self.modal):
             return self.modal
         return ""
 
-    def print_feed(self, previous: Optional[MotionCommand]):
+    def print_feed(self, previous: MotionCommand | None):
         previous_command = previous
         while (
             previous_command is not None
@@ -354,11 +353,11 @@ class CircularCCW(Circular):
 
 
 class StartSequence(ConfigCommand):
-    spindle: Optional[int] = None
-    coolant: Optional[CoolantState] = None
+    spindle: int | None
+    coolant: CoolantState | None
 
     def __init__(
-        self, spindle: Optional[int] = None, coolant: Optional[CoolantState] = None
+        self, spindle: int | None = None, coolant: CoolantState | None = None
     ) -> None:
         self.spindle = spindle
         self.coolant = coolant
@@ -377,9 +376,9 @@ class StartSequence(ConfigCommand):
 
 
 class StopSequence(ConfigCommand):
-    coolant: Optional[CoolantState] = None
+    coolant: CoolantState | None
 
-    def __init__(self, coolant: Optional[CoolantState] = None):
+    def __init__(self, coolant: CoolantState | None = None):
         self.coolant = coolant
         super().__init__()
 
@@ -422,15 +421,15 @@ class SafetyBlock(ConfigCommand):
 
 
 class ToolChange(ConfigCommand):
-    tool_number: Optional[int] = None
-    spindle: Optional[int] = None
-    coolant: Optional[CoolantState] = None
+    tool_number: int | None
+    spindle: int | None
+    coolant: CoolantState | None
 
     def __init__(
         self,
         tool_number: int,
-        spindle: Optional[int] = None,
-        coolant: Optional[CoolantState] = None,
+        spindle: int | None = None,
+        coolant: CoolantState | None = None,
     ):
         self.tool_number = tool_number
         self.spindle = spindle

@@ -2,7 +2,7 @@ import logging
 from functools import cached_property
 from itertools import pairwise
 from math import sqrt
-from typing import Literal, Optional, TypeAlias
+from typing import Literal, TypeAlias
 
 import cadquery as cq
 import pyclipper as pc
@@ -55,7 +55,7 @@ class PathFace:
         return shapely.Polygon(shell=self.outer, holes=self.inners)
 
 
-def calculate_offset(tool_radius: float, offset: Optional[OffsetInput], default=None):
+def calculate_offset(tool_radius: float, offset: OffsetInput | None, default=None):
     if offset is None:
         offset = default or 0
 

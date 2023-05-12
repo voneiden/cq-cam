@@ -1,5 +1,3 @@
-from typing import List
-
 import cadquery as cq
 
 from cq_cam.utils.geometry_op import make_polyfaces, wire_to_path
@@ -24,7 +22,7 @@ def test_make_polyface():
 
     outers = []
     inners = []
-    faces: List[cq.Face] = wp.objects
+    faces: list[cq.Face] = wp.objects
     for face in faces:
         outers.append(wire_to_path(face.outerWire()))
         inners += [wire_to_path(inner) for inner in face.innerWires()]

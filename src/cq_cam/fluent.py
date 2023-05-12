@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from copy import copy
-from typing import List, Optional, Union
+from typing import Union
 
 from cadquery import cq
 
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 class Operation:
-    def __init__(self, job, name: str, commands: List[Command]):
+    def __init__(self, job: Job, name: str, commands: list[Command]):
         self.job = job
         self.name = name
         self.commands = commands
@@ -59,9 +59,9 @@ class Job:
         self,
         top: cq.Plane,
         feed: float,
-        speed: Optional[float] = None,
-        tool_diameter: Optional[float] = None,
-        tool_number: Optional[int] = None,
+        speed: float | None = None,
+        tool_diameter: float | None = None,
+        tool_number: int | None = None,
         name="Job",
         plunge_feed: float = None,
         rapid_height: float = None,
@@ -73,7 +73,7 @@ class Job:
         distance: DistanceMode = DistanceMode.ABSOLUTE,
         arc_distance: ArcDistanceMode = ArcDistanceMode.ABSOLUTE,
         controller_motion: PlannerControlMode = PlannerControlMode.BLEND,
-        coolant: Optional[CoolantState] = None,
+        coolant: CoolantState | None = None,
     ):
         self.top = top
         self.top_plane_face = cq.Face.makePlane(None, None, top.origin, top.zDir)
@@ -102,7 +102,7 @@ class Job:
 
         self.max_stepdown_count = 100
 
-        self.operations: List[Operation] = []
+        self.operations: list[Operation] = []
 
     """
     There are two checks that must happen between operations:
@@ -118,7 +118,7 @@ class Job:
     No special handling is need for the feed setting. It only needs to be updated for any subsequent operations that use it
     """
 
-    def update_tool(self, tool: Optional[Tool] = None) -> Job:
+    def update_tool(self, tool: Tool | None = None) -> Job:
         if tool is not None:
             # Initilize variables
             tool_diameter = (
@@ -151,12 +151,12 @@ class Job:
     # ##################
     def profile(
         self,
-        shape: Union[cq.Workplane, cq.Shape, List[cq.Shape]],
+        shape: Union[cq.Workplane, cq.Shape, list[cq.Shape]],
         outer_offset=1,
         inner_offset=-1,
         stepdown=None,
-        tabs: Optional[Tabs] = None,
-        tool: Optional[Tool] = None,
+        tabs: Tabs | None = None,
+        tool: Tool | None = None,
     ) -> Job:
         if self.tool_diameter is None:
             raise ValueError("Profile requires tool_diameter to be set")
@@ -196,7 +196,7 @@ class Job:
         offset=1,
         stepdown=None,
         tabs=None,
-        tool: Optional[Tool] = None,
+        tool: Tool | None = None,
     ):
         self = self.update_tool(tool)
         if isinstance(wires, cq.Wire):
@@ -215,15 +215,15 @@ class Job:
 
     def pocket(
         self,
-        op_areas: Union[cq.Workplane, cq.Face, List[cq.Face]],
-        avoid_areas: Optional[Union[cq.Workplane, cq.Face, List[cq.Face]]] = None,
-        outer_offset: Optional[OffsetInput] = None,
-        inner_offset: Optional[OffsetInput] = None,
-        avoid_outer_offset: Optional[OffsetInput] = None,
-        avoid_inner_offset: Optional[OffsetInput] = None,
-        stepover: Optional[OffsetInput] = None,
-        stepdown: Optional[float] = None,
-        tool: Optional[Tool] = None,
+        op_areas: Union[cq.Workplane, cq.Face, list[cq.Face]],
+        avoid_areas: Union[cq.Workplane, cq.Face, list[cq.Face]] | None = None,
+        outer_offset: OffsetInput | None = None,
+        inner_offset: OffsetInput | None = None,
+        avoid_outer_offset: OffsetInput | None = None,
+        avoid_inner_offset: OffsetInput | None = None,
+        stepover: OffsetInput | None = None,
+        stepdown: float | None = None,
+        tool: Tool | None = None,
     ) -> Job:
         self = self.update_tool(tool)
         if isinstance(op_areas, cq.Workplane):
@@ -249,7 +249,7 @@ class Job:
         )
         return self._add_operation("Pocket", commands)
 
-    def drill(self, op_areas, tool: Optional[Tool] = None, **kwargs) -> Job:
+    def drill(self, op_areas, tool: Tool | None = None, **kwargs) -> Job:
         from cq_cam.operations.drill import Drill
 
         self = self.update_tool(tool)
@@ -335,7 +335,7 @@ class Job:
             for operation in self.operations
         ]
 
-    def _add_operation(self, name: str, commands: List[Command]):
+    def _add_operation(self, name: str, commands: list[Command]):
         job = copy(self)
         job.operations = [*self.operations, Operation(job, name, commands)]
         return job

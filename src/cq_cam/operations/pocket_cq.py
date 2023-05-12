@@ -1,6 +1,6 @@
 import logging
 from collections import defaultdict
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING
 
 import cadquery as cq
 from OCP.StdFail import StdFail_NotDone
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from cq_cam.fluent import Job
 
 
-def generate_depth_map(faces: List[cq.Face]):
+def generate_depth_map(faces: list[cq.Face]):
     depth_map = defaultdict(list)
 
     for face in faces:
@@ -34,7 +34,7 @@ def generate_depth_map(faces: List[cq.Face]):
     return depth_map, depths
 
 
-def combine_faces(faces: List[cq.Face]) -> List[cq.Face]:
+def combine_faces(faces: list[cq.Face]) -> list[cq.Face]:
     """Given a list of faces, fuse them together to form
     bigger faces"""
 
@@ -51,8 +51,8 @@ def combine_faces(faces: List[cq.Face]) -> List[cq.Face]:
 
 
 def build_pocket_ops(
-    job: "Job", op_areas: List[cq.Face], avoid_areas: List[cq.Face]
-) -> List[cq.Face]:
+    job: "Job", op_areas: list[cq.Face], avoid_areas: list[cq.Face]
+) -> list[cq.Face]:
     # Determine depth of each face
     depth_map, depths = generate_depth_map(op_areas)
     avoid_depth_map, avoid_depths = generate_depth_map(avoid_areas)
@@ -95,11 +95,11 @@ def build_pocket_ops(
     return pocket_ops
 
 
-def fill_pocket(pocket: cq.Face, offset: float) -> List[List[cq.Wire]]:
+def fill_pocket(pocket: cq.Face, offset: float) -> list[list[cq.Wire]]:
     return fill_pocket_contour_shrink(pocket, offset)
 
 
-def fill_pocket_contour_shrink(pocket: cq.Face, step: float) -> List[List[cq.Wire]]:
+def fill_pocket_contour_shrink(pocket: cq.Face, step: float) -> list[list[cq.Wire]]:
     inner_faces = [cq.Face.makeFromWires(inner) for inner in pocket.innerWires()]
     tree = Tree(pocket.outerWire())
     i = 0
@@ -137,9 +137,9 @@ def fill_pocket_contour_shrink(pocket: cq.Face, step: float) -> List[List[cq.Wir
 
 
 def pocket_cq(
-    job,
-    op_areas: List[cq.Face],
-    avoid_areas: List[cq.Face],
+    job: "Job",
+    op_areas: list[cq.Face],
+    avoid_areas: list[cq.Face],
     outer_offset: float,
     inner_offset: float,
     avoid_outer_offset: float,
@@ -160,7 +160,7 @@ def pocket_cq(
     pocket_ops = build_pocket_ops(job, offset_op_areas, offset_avoid_areas)
 
     # Apply pocket fill
-    sequences: List[List[cq.Wire]] = []
+    sequences: list[list[cq.Wire]] = []
     for pocket_op in pocket_ops:
         sequences += fill_pocket_contour_shrink(pocket_op, stepover)
 
