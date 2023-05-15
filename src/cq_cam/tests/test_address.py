@@ -1,6 +1,5 @@
-import unittest
-
 import cadquery as cq
+import pytest
 
 from cq_cam.address import (
     IJK,
@@ -20,62 +19,74 @@ from cq_cam.address import (
 )
 
 
-class TestUtils(unittest.TestCase):
-    def test_x_axis(self):
-        gcode = f"{XAxis(10.0)}"
-        self.assertEqual("X10", gcode)
+def test_x_axis():
+    gcode = f"{XAxis(10.0)}"
+    assert gcode == "X10"
 
-    def test_y_axis(self):
-        gcode = f"{YAxis(10.0)}"
-        self.assertEqual("Y10", gcode)
 
-    def test_z_axis(self):
-        gcode = f"{ZAxis(10.0)}"
-        self.assertEqual("Z10", gcode)
+def test_y_axis():
+    gcode = f"{YAxis(10.0)}"
+    assert gcode == "Y10"
 
-    def test_i_axis(self):
-        gcode = f"{ArcXAxis(10.0)}"
-        self.assertEqual("I10", gcode)
 
-    def test_j_axis(self):
-        gcode = f"{ArcYAxis(10.0)}"
-        self.assertEqual("J10", gcode)
+def test_z_axis():
+    gcode = f"{ZAxis(10.0)}"
+    assert gcode == "Z10"
 
-    def test_k_axis(self):
-        gcode = f"{ArcZAxis(10.0)}"
-        self.assertEqual("K10", gcode)
 
-    def test_feed(self):
-        gcode = f"{Feed(10.0)}"
-        self.assertEqual("F10.0", gcode)
+def test_i_axis():
+    gcode = f"{ArcXAxis(10.0)}"
+    assert gcode == "I10"
 
-    def test_speed(self):
-        gcode = f"{Speed(10)}"
-        self.assertEqual("S10", gcode)
 
-    def test_dwell(self):
-        gcode = f"{DwellTime(10.0)}"
-        self.assertEqual("P10.0", gcode)
+def test_j_axis():
+    gcode = f"{ArcYAxis(10.0)}"
+    assert gcode == "J10"
 
-    def test_tool_number(self):
-        gcode = f"{ToolNumber(10)}"
-        self.assertEqual("T10", gcode)
 
-    def test_tool_length(self):
-        gcode = f"{ToolLengthOffset(10)}"
-        self.assertEqual("H10", gcode)
+def test_k_axis():
+    gcode = f"{ArcZAxis(10.0)}"
+    assert gcode == "K10"
 
-    def test_tool_radius(self):
-        gcode = f"{ToolRadiusOffset(10)}"
-        self.assertEqual("D10", gcode)
 
-    def test_xyz(self):
-        end = cq.Vector(10.0, 20.0, 30.0)
-        gcode = f"{XYZ(end)}"
-        self.assertEqual("X10 Y20 Z30", gcode)
+def test_feed():
+    gcode = f"{Feed(10.0)}"
+    assert gcode == "F10.0"
 
-    def test_ijk(self):
-        start = cq.Vector(10.0, 20.0, 30.0)
-        center = cq.Vector(5.0, 5.0, 5.0)
-        gcode = f"{IJK(start, center)}"
-        self.assertEqual("I-5 J-15 K-25", gcode)
+
+def test_speed():
+    gcode = f"{Speed(10)}"
+    assert gcode == "S10"
+
+
+def test_dwell():
+    gcode = f"{DwellTime(10.0)}"
+    assert gcode == "P10.0"
+
+
+def test_tool_number():
+    gcode = f"{ToolNumber(10)}"
+    assert gcode == "T10"
+
+
+def test_tool_length():
+    gcode = f"{ToolLengthOffset(10)}"
+    assert gcode == "H10"
+
+
+def test_tool_radius():
+    gcode = f"{ToolRadiusOffset(10)}"
+    assert gcode == "D10"
+
+
+def test_xyz():
+    end = cq.Vector(10.0, 20.0, 30.0)
+    gcode = f"{XYZ(end)}"
+    assert gcode == "X10 Y20 Z30"
+
+
+def test_ijk():
+    start = cq.Vector(10.0, 20.0, 30.0)
+    center = cq.Vector(5.0, 5.0, 5.0)
+    gcode = f"{IJK(start, center)}"
+    assert gcode == "I-5 J-15 K-25"

@@ -159,7 +159,7 @@ def pocket_cq(
     # Build pocket boundary geometry (Face)
     pocket_ops = build_pocket_ops(job, offset_op_areas, offset_avoid_areas)
 
-    # Apply pocket fill (covert to Wire)
+    # Apply pocket fill (convert to Wire)
     sequences: list[list[cq.Wire]] = []
     for pocket_op in pocket_ops:
         sequences += fill_pocket_contour_shrink(pocket_op, stepover)
