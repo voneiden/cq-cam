@@ -169,7 +169,7 @@ class Command(ABC):
     modal = None
 
     @abstractmethod
-    def to_gcode(self) -> tuple[str, cq.Vector | None]:
+    def to_gcode(self) -> str:
         """Output all the necessary G-Code required to perform the command"""
         pass
 
@@ -234,7 +234,7 @@ class ConfigCommand(Command, ABC):
 
 
 class Linear(MotionCommand, ABC):
-    def to_gcode(self) -> tuple[str, cq.Vector]:
+    def to_gcode(self) -> str:
         modal = self.modal
         xyz = str(XYZ(self.end))
         feed = self.print_feed()
@@ -242,10 +242,7 @@ class Linear(MotionCommand, ABC):
         if feed != "":
             words.append(feed)
 
-        return (
-            " ".join(words),
-            None,
-        )
+        return " ".join(words)
 
     def to_ais_shape(self, as_edges=False, alt_color=False):
         start = cq.Vector(self.start.x, self.start.y, self.start.z)
@@ -362,7 +359,7 @@ class Circular(MotionCommand, ABC):
         self.center = center
         self.mid = mid
 
-    def to_gcode(self) -> tuple[str, cq.Vector]:
+    def to_gcode(self) -> str:
         modal = self.modal
         xyz = str(XYZ(self.end))
         center = self.center.to_vector(self.start, relative=True)
@@ -371,7 +368,7 @@ class Circular(MotionCommand, ABC):
         words = [modal, xyz, ijk]
         if feed != "":
             words.append(feed)
-        return " ".join(words), None
+        return " ".join(words)
 
     def to_ais_shape(self, as_edges=False, alt_color=False):
         end = self.end.to_vector(self.start)
@@ -435,7 +432,7 @@ class StartSequence(ConfigCommand):
 
         return gcode_str
 
-    def to_gcode(self) -> tuple[str, cq.Vector]:
+    def to_gcode(self) -> str:
         words = [f"{CutterState.ON_CW}"]
 
         if self.speed is not None:
@@ -445,7 +442,7 @@ class StartSequence(ConfigCommand):
             words.append(f"{self.coolant}")
 
         gcode_str = " ".join(words)
-        return (gcode_str, None)
+        return gcode_str
 
 
 class StopSequence(ConfigCommand):
@@ -463,13 +460,13 @@ class StopSequence(ConfigCommand):
         gcode_str = " ".join(words)
         return gcode_str
 
-    def to_gcode(self) -> tuple[str, cq.Vector]:
+    def to_gcode(self) -> str:
         words = [f"{CutterState.OFF}"]
         if self.coolant is not None:
             words.append(f"{CoolantState.OFF}")
 
         gcode_str = " ".join(words)
-        return (gcode_str, None)
+        return gcode_str
 
 
 class SafetyBlock(ConfigCommand):
@@ -499,32 +496,30 @@ class SafetyBlock(ConfigCommand):
             )
         )
 
-    def to_gcode(self) -> tuple[str, cq.Vector]:
-        return (
-            "\n".join(
-                (
-                    " ".join(
-                        (
-                            str(DistanceMode.ABSOLUTE),
-                            str(WorkOffset.OFFSET_1),
-                            str(PlannerControlMode.CONTINUOUS),
-                            str(SpindleControlMode.MAX_SPINDLE_SPEED),
-                            str(WorkPlane.XY),
-                            str(FeedRateControlMode.UNITS_PER_MINUTE),
-                        )
-                    ),
-                    " ".join(
-                        (
-                            str(LengthCompensation.OFF),
-                            str(RadiusCompensation.OFF),
-                            str(CannedCycle.CANCEL),
-                        )
-                    ),
-                    str(Unit.METRIC),
-                    str(Position.SECONDARY_HOME),
-                )
-            ),
-            None,
+    def to_gcode(self) -> str:
+        return "\n".join(
+            (
+                " ".join(
+                    (
+                        str(DistanceMode.ABSOLUTE),
+                        # str(ArcDistanceMode.INCREMENTAL),
+                        str(WorkOffset.OFFSET_1),
+                        str(PlannerControlMode.CONTINUOUS),
+                        str(SpindleControlMode.MAX_SPINDLE_SPEED),
+                        str(WorkPlane.XY),
+                        str(FeedRateControlMode.UNITS_PER_MINUTE),
+                    )
+                ),
+                " ".join(
+                    (
+                        str(LengthCompensation.OFF),
+                        str(RadiusCompensation.OFF),
+                        str(CannedCycle.CANCEL),
+                    )
+                ),
+                str(Unit.METRIC),
+                str(Position.SECONDARY_HOME),
+            )
         )
 
 
@@ -563,23 +558,20 @@ class ToolChange(ConfigCommand):
             )
         )
 
-    def to_gcode(self) -> tuple[str, cq.Vector]:
-        return (
-            "\n".join(
-                (
-                    str(StopSequence(self.coolant)),
-                    str(Position.SECONDARY_HOME),
-                    str(ProgramControlMode.PAUSE_OPTIONAL),
-                    " ".join(
-                        (
-                            f"{ToolNumber(self.tool_number)}",
-                            str(LengthCompensation.ON),
-                            f"{ToolLengthOffset(self.tool_number)}",
-                            str(AutomaticChangerMode.TOOL_CHANGE),
-                        )
-                    ),
-                    str(StartSequence(self.speed, self.coolant)),
-                )
-            ),
-            None,
+    def to_gcode(self) -> str:
+        return "\n".join(
+            (
+                str(StopSequence(self.coolant)),
+                str(Position.SECONDARY_HOME),
+                str(ProgramControlMode.PAUSE_OPTIONAL),
+                " ".join(
+                    (
+                        f"{ToolNumber(self.tool_number)}",
+                        str(LengthCompensation.ON),
+                        f"{ToolLengthOffset(self.tool_number)}",
+                        str(AutomaticChangerMode.TOOL_CHANGE),
+                    )
+                ),
+                str(StartSequence(self.speed, self.coolant)),
+            )
         )

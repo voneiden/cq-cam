@@ -36,10 +36,9 @@ class Operation:
     def to_gcode(self):
         # Set starting position above rapid height so that
         # we guarantee getting the correct Z rapid in the beginning
-        position = cq.Vector(0, 0, self.job.rapid_height + 1)
         gcodes = [f"({self.job.name} - {self.name})"]
         for command in self.commands:
-            gcode, position = command.to_gcode()
+            gcode = command.to_gcode()
 
             # Skip blank lines. These can happen for example if we try to issue
             # a move to the same position where we already are
