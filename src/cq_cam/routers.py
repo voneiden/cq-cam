@@ -166,24 +166,24 @@ def route_edge(
             start_cv = CommandVector.from_vector(edge.positionAt(start_p, "parameter"))
             commands.append(
                 cmd(
-                    end=end1,
                     center=center,
                     mid=mid1,
                     start=start_cv,
-                    arrow=arrow,
+                    end=end1,
                     feed=feed,
+                    arrow=arrow,
                 )
             )
             start_cv = end1
             mid2 = CommandVector.from_vector(edge.positionAt(mid2_p, "parameter"))
             commands.append(
                 cmd(
-                    end=end_cv,
                     center=center,
                     mid=mid2,
                     start=start_cv,
-                    arrow=arrow,
+                    end=end_cv,
                     feed=feed,
+                    arrow=arrow,
                 )
             )
         elif sp == ep:
@@ -195,12 +195,12 @@ def route_edge(
             mid = CommandVector.from_vector(edge.positionAt(mid_p, "parameter"))
             commands.append(
                 cmd(
-                    end=end_cv,
                     center=center,
                     mid=mid,
                     start=start_cv,
-                    arrow=arrow,
+                    end=end_cv,
                     feed=feed,
+                    arrow=arrow,
                 )
             )
 
@@ -235,7 +235,9 @@ def route_edge(
 def route_wires(job: "Job", wires: list[Union[cq.Wire, cq.Edge]], stepover=None):
     commands = []
     previous_wire_end = None
-    start_cv = CommandVector()
+
+    if start_cv is None:
+        start_cv = CommandVector()
 
     for wire in wires:
         # Convert wires to edges
@@ -314,7 +316,9 @@ def shift_polygon(polygon: Path, i: int):
 def route_polyface_outers(job: "Job", polyfaces: list[PathFace], stepover=None):
     commands = []
     previous_wire_end = None
-    start_cv = CommandVector()
+
+    if start_cv is None:
+        start_cv = CommandVector()
 
     for polyface in polyfaces:
         poly = polyface.outer

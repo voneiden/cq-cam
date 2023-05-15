@@ -53,11 +53,10 @@ def visualize_job(
     This method is suitable for cq-editor as it enables the use of colours.
     """
     inverse_transform = job_plane.rG
-    position = cq.Vector(0, 0, start_height)
     command_group = AIS_MultipleConnectedInteractive()
 
     for i, command in enumerate(commands):
-        shape, position = command.to_ais_shape(alt_color=i % 2)
+        shape = command.to_ais_shape(alt_color=i % 2)
         if shape:
             command_group.Connect(shape)
 
@@ -78,11 +77,10 @@ def visualize_job_as_edges(
     Used for documentation and ocp_vscode.
     """
     inverse_transform = job_plane.rG
-    position = cq.Vector(0, 0, start_height)
     edges = []
 
     for command in commands:
-        shape, position = command.to_ais_shape(as_edges=True)
+        shape = command.to_ais_shape(as_edges=True)
         if shape:
             edge = shape.transformShape(inverse_transform)
             edges.append(edge)
