@@ -178,7 +178,6 @@ class MotionCommand(Command, ABC):
     max_depth: float | None
     ais_color = "red"
     ais_alt_color = "darkred"
-    previous_command: MotionCommand | None
     feed: float | None
     start: CommandVector
     end: CommandVector
