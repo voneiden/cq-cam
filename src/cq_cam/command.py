@@ -136,6 +136,9 @@ class CommandVector(ABC):
     def to_vector(self, origin: cq.Vector, relative=False) -> cq.Vector:
         pass
 
+    def __str__(self) -> str:
+        return f"{self.x} {self.y} {self.z}"
+
 
 class RelativeCV(CommandVector):
     def to_vector(self, origin: cq.Vector, relative=False):
@@ -196,6 +199,9 @@ class MotionCommand(Command, ABC):
         self.feed = feed
         self.max_depth = None  # TODO whats this?
 
+    def __str__(self) -> str:
+        return f"{self.modal} {self.end}"
+
     @classmethod
     def abs(cls, x=None, y=None, z=None, **kwargs):
         return cls(end=AbsoluteCV(x=x, y=y, z=z), **kwargs)
@@ -205,40 +211,28 @@ class MotionCommand(Command, ABC):
         warnings.warn("Relative CV is deprecated", DeprecationWarning)
         return cls(end=RelativeCV(x=x, y=y, z=z), **kwargs)
 
-    def print_modal(self, previous: MotionCommand | None):
-        if self.modal and (previous is None or previous.modal != self.modal):
-            return self.modal
-        return ""
-
-    def print_feed(self, previous: MotionCommand | None):
-        previous_command = previous
-        while previous_command is not None and previous_command.modal == str(
-            Path.RAPID
-        ):
-            previous_command = previous_command.previous_command
-        if self.feed and (
-            previous_command is None or previous_command.feed != self.feed
-        ):
+    def print_feed(self):
+        if self.feed and self.modal != str(Path.RAPID):
             return f"{Feed(self.feed)}"
         return ""
 
-    def xyz_gcode(self, start: cq.Vector, precision=3) -> tuple[str, cq.Vector]:
+    def xyz_gcode(self, precision=3) -> tuple[str, cq.Vector]:
         coords = []
-        end = self.end.to_vector(start)
+        end = self.end
         # TODO precision
 
         # TODO use isclose
 
-        if start.x != end.x:
+        if end.x is not None:
             coords.append(f"{XAxis(end.x, precision)}")
 
-        if start.y != end.y:
+        if end.y is not None:
             coords.append(f"{YAxis(end.y, precision)}")
 
-        if start.z != end.z:
+        if end.z is not None:
             coords.append(f"{ZAxis(end.z, precision)}")
 
-        return "".join(coords), end
+        return " ".join(coords), end
 
     @abstractmethod
     def to_ais_shape(
@@ -253,9 +247,15 @@ class ConfigCommand(Command, ABC):
 
 class Linear(MotionCommand, ABC):
     def to_gcode(self) -> tuple[str, cq.Vector]:
-        xyz, end = self.xyz_gcode(self.start)
+        modal = self.modal
+        xyz, end = self.xyz_gcode()
+        feed = self.print_feed()
+        words = [modal, xyz]
+        if feed != "":
+            words.append(feed)
+
         return (
-            f"{self.print_modal(self.previous_command)}{xyz}{self.print_feed(self.previous_command)}",
+            " ".join(words),
             end,
         )
 
@@ -360,12 +360,17 @@ class Circular(MotionCommand, ABC):
         if self.center.z is not None:
             ijk.append(f"{ArcZAxis(center.z)}")
 
-        return "".join(ijk)
+        return " ".join(ijk)
 
     def to_gcode(self) -> tuple[str, cq.Vector]:
-        xyz, end = self.xyz_gcode(self.start)
+        modal = self.modal
+        xyz, end = self.xyz_gcode()
         ijk = self.ijk_gcode(self.start)
-        return f"{self.print_modal(self.previous_command)}{xyz}{ijk}", end
+        feed = self.print_feed()
+        words = [modal, xyz, ijk]
+        if feed != "":
+            words.append(feed)
+        return " ".join(words), end
 
     def to_ais_shape(self, as_edges=False, alt_color=False):
         end = self.end.to_vector(self.start)
