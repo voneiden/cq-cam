@@ -17,6 +17,7 @@ from cq_cam.address import (
     YAxis,
     ZAxis,
 )
+from cq_cam.command import AbsoluteCV
 
 
 def test_x_axis():
@@ -87,6 +88,7 @@ def test_xyz():
 
 def test_ijk():
     start = cq.Vector(10.0, 20.0, 30.0)
-    center = cq.Vector(5.0, 5.0, 5.0)
-    gcode = f"{IJK(start, center)}"
+    center_cv = AbsoluteCV(5.0, 5.0, 5.0)
+    center = center_cv.to_vector(start, relative=True)
+    gcode = f"{IJK(center)}"
     assert gcode == "I-5 J-15 K-25"

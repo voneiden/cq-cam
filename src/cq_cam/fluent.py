@@ -41,7 +41,6 @@ class Operation:
         previous_command = None
         for command in self.commands:
             command.previous_command = previous_command
-            command.start = position
             gcode, position = command.to_gcode()
             previous_command = command
 

@@ -3,7 +3,7 @@ from typing import Union
 
 import cadquery as cq
 
-from cq_cam.command import Plunge, Rapid
+from cq_cam.command import PlungeCut, Rapid
 from cq_cam.operations.base_operation import Operation, OperationError
 from cq_cam.operations.strategy import Strategy
 from cq_cam.utils.utils import flatten_list
@@ -74,7 +74,7 @@ class Drill(Operation):
                     Rapid.abs(z=self.job.op_safe_height),
                     Rapid.abs(x=point[0], y=point[1]),
                     Rapid.abs(z=0),
-                    Plunge.abs(z=depth, feed=self.job.feed),  # TODO depth
+                    PlungeCut.abs(z=depth, feed=self.job.feed),  # TODO depth
                     # Rapid.abs(z=self.job.op_safe_height),
                 ]
             )

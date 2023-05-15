@@ -10,7 +10,7 @@ from OCP.TopAbs import TopAbs_FACE
 from OCP.TopExp import TopExp_Explorer
 from OCP.TopLoc import TopLoc_Location
 
-from cq_cam.command import Cut, Plunge, Rapid
+from cq_cam.command import Cut, PlungeCut, Rapid
 from cq_cam.operations.base_operation import FaceBaseOperation
 from cq_cam.operations.strategy import ZigZagStrategy
 from cq_cam.utils import utils
@@ -138,7 +138,7 @@ class Surface3D(FaceBaseOperation):
                     self.commands.append(
                         Rapid.abs(z=self.job.op_safe_height)
                     )  # TODO plunge or rapid?
-                    self.commands.append(Plunge.abs(z=cut_start[2]))
+                    self.commands.append(PlungeCut.abs(z=cut_start[2]))
                     for cut in cut_sequence[1:]:
                         self.commands.append(
                             Cut.abs(x=cut[0], y=cut[1], z=max(depth, cut[2]))

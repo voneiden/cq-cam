@@ -90,18 +90,7 @@ import cadquery as cq
 from OCP.AIS import AIS_Line, AIS_Shape
 from OCP.Geom import Geom_CartesianPoint
 
-from cq_cam.address import (
-    ArcXAxis,
-    ArcYAxis,
-    ArcZAxis,
-    Feed,
-    Speed,
-    ToolLengthOffset,
-    ToolNumber,
-    XAxis,
-    YAxis,
-    ZAxis,
-)
+from cq_cam.address import IJK, XYZ, Feed, Speed, ToolLengthOffset, ToolNumber
 from cq_cam.groups import (
     ArcDistanceMode,
     AutomaticChangerMode,
@@ -138,6 +127,11 @@ class CommandVector(ABC):
 
     def __str__(self) -> str:
         return f"{self.x} {self.y} {self.z}"
+
+    def __eq__(self, __value: CommandVector) -> bool:
+        if self.x == __value.x and self.y == __value.y and self.z == __value.z:
+            return True
+        return False
 
 
 class RelativeCV(CommandVector):
@@ -186,13 +180,26 @@ class MotionCommand(Command, ABC):
     ais_alt_color = "darkred"
     previous_command: MotionCommand | None
     feed: float | None
-    start: cq.Vector
+    start: CommandVector
     end: CommandVector
     tab: bool  # TODO not the right place to carry tab information imo?
 
     def __init__(
-        self, end: CommandVector, arrow=False, tab=False, feed: float | None = None
+        self,
+        end: CommandVector,
+        start: CommandVector,
+        arrow=False,
+        tab=False,
+        feed: float | None = None,
     ):
+        if start is not None:
+            if end.x is None:
+                end.x = start.x
+            if end.y is None:
+                end.y = start.y
+            if end.z is None:
+                end.z = start.z
+        self.start = start
         self.end = end
         self.arrow = arrow
         self.tab = tab
@@ -203,8 +210,8 @@ class MotionCommand(Command, ABC):
         return f"{self.modal} {self.end}"
 
     @classmethod
-    def abs(cls, x=None, y=None, z=None, **kwargs):
-        return cls(end=AbsoluteCV(x=x, y=y, z=z), **kwargs)
+    def abs(cls, x=None, y=None, z=None, start: AbsoluteCV | None = None, **kwargs):
+        return cls(end=AbsoluteCV(x=x, y=y, z=z), start=start, **kwargs)
 
     @classmethod
     def rel(cls, x=None, y=None, z=None, **kwargs):
@@ -215,24 +222,6 @@ class MotionCommand(Command, ABC):
         if self.feed and self.modal != str(Path.RAPID):
             return f"{Feed(self.feed)}"
         return ""
-
-    def xyz_gcode(self, precision=3) -> tuple[str, cq.Vector]:
-        coords = []
-        end = self.end
-        # TODO precision
-
-        # TODO use isclose
-
-        if end.x is not None:
-            coords.append(f"{XAxis(end.x, precision)}")
-
-        if end.y is not None:
-            coords.append(f"{YAxis(end.y, precision)}")
-
-        if end.z is not None:
-            coords.append(f"{ZAxis(end.z, precision)}")
-
-        return " ".join(coords), end
 
     @abstractmethod
     def to_ais_shape(
@@ -248,7 +237,7 @@ class ConfigCommand(Command, ABC):
 class Linear(MotionCommand, ABC):
     def to_gcode(self) -> tuple[str, cq.Vector]:
         modal = self.modal
-        xyz, end = self.xyz_gcode()
+        xyz = str(XYZ(self.end))
         feed = self.print_feed()
         words = [modal, xyz]
         if feed != "":
@@ -256,19 +245,20 @@ class Linear(MotionCommand, ABC):
 
         return (
             " ".join(words),
-            end,
+            None,
         )
 
     def to_ais_shape(self, as_edges=False, alt_color=False):
-        end = self.end.to_vector(self.start)
-        if self.start == end:
+        start = cq.Vector(self.start.x, self.start.y, self.start.z)
+        end = self.end.to_vector(start)
+        if start == end:
             return None, end
 
         if as_edges:
-            return cq.Edge.makeLine(self.start, end), end
+            return cq.Edge.makeLine(start, end), end
 
         shape = AIS_Line(
-            Geom_CartesianPoint(self.start.toPnt()), Geom_CartesianPoint(end.toPnt())
+            Geom_CartesianPoint(start.toPnt()), Geom_CartesianPoint(end.toPnt())
         )
         if self.arrow:
             shape.Attributes().SetLineArrowDraw(True)
@@ -293,19 +283,39 @@ class Cut(Linear):
     modal = str(Path.LINEAR)
 
 
-class Plunge(Cut):
+class PlungeCut(Cut):
     ais_color = "yellow"
 
     # TODO apply plunge feed rate
 
-    def __init__(self, end, **kwargs):
+    def __init__(self, end, start, **kwargs):
         if end.x is not None or end.y is not None:
             raise RuntimeError("Plunge can only operate on z axis")
-        super().__init__(end, **kwargs)
+        super().__init__(end, start, **kwargs)
 
     @classmethod
-    def abs(cls, z=None, **kwargs):
-        return cls(end=AbsoluteCV(z=z), **kwargs)
+    def abs(cls, z=None, start: AbsoluteCV | None = None, **kwargs):
+        return cls(end=AbsoluteCV(z=z), start=start, **kwargs)
+
+    @classmethod
+    def rel(cls, z=None, **kwargs):
+        warnings.warn("Relative CV is deprecated", DeprecationWarning)
+        return cls(end=RelativeCV(z=z), **kwargs)
+
+
+class PlungeRapid(Rapid):
+    ais_color = "yellow"
+
+    # TODO apply plunge feed rate
+
+    def __init__(self, end, start, **kwargs):
+        if end.x is not None or end.y is not None:
+            raise RuntimeError("Plunge can only operate on z axis")
+        super().__init__(end, start, **kwargs)
+
+    @classmethod
+    def abs(cls, z=None, start: AbsoluteCV | None = None, **kwargs):
+        return cls(end=AbsoluteCV(z=z), start=start, **kwargs)
 
     @classmethod
     def rel(cls, z=None, **kwargs):
@@ -318,14 +328,14 @@ class Retract(Rapid):
 
     ais_color = "blue"
 
-    def __init__(self, end, **kwargs):
+    def __init__(self, end, start, **kwargs):
         if end.x is not None or end.y is not None:
             raise RuntimeError("Retract can only operate on z axis")
-        super().__init__(end, **kwargs)
+        super().__init__(end, start, **kwargs)
 
     @classmethod
-    def abs(cls, z=None, **kwargs):
-        return cls(end=AbsoluteCV(z=z), **kwargs)
+    def abs(cls, z=None, start: AbsoluteCV | None = None, **kwargs):
+        return cls(end=AbsoluteCV(z=z), start=start, **kwargs)
 
     @classmethod
     def rel(cls, z=None, **kwargs):
@@ -342,35 +352,27 @@ class Circular(MotionCommand, ABC):
     mid: CommandVector
 
     def __init__(
-        self, end: CommandVector, center: CommandVector, mid: CommandVector, **kwargs
+        self,
+        end: CommandVector,
+        center: CommandVector,
+        mid: CommandVector,
+        start: CommandVector,
+        **kwargs,
     ):
-        super().__init__(end, **kwargs)
+        super().__init__(end, start, **kwargs)
         self.center = center
         self.mid = mid
 
-    def ijk_gcode(self, start: cq.Vector, precision=3):
-        center = self.center.to_vector(start, relative=True)
-        ijk = []
-        if self.center.x is not None:
-            ijk.append(f"{ArcXAxis(center.x)}")
-
-        if self.center.y is not None:
-            ijk.append(f"{ArcYAxis(center.y)}")
-
-        if self.center.z is not None:
-            ijk.append(f"{ArcZAxis(center.z)}")
-
-        return " ".join(ijk)
-
     def to_gcode(self) -> tuple[str, cq.Vector]:
         modal = self.modal
-        xyz, end = self.xyz_gcode()
-        ijk = self.ijk_gcode(self.start)
+        xyz = str(XYZ(self.end))
+        center = self.center.to_vector(self.start, relative=True)
+        ijk = str(IJK(center))
         feed = self.print_feed()
         words = [modal, xyz, ijk]
         if feed != "":
             words.append(feed)
-        return " ".join(words), end
+        return " ".join(words), None
 
     def to_ais_shape(self, as_edges=False, alt_color=False):
         end = self.end.to_vector(self.start)
@@ -478,6 +480,7 @@ class SafetyBlock(ConfigCommand):
                 " ".join(
                     (
                         str(DistanceMode.ABSOLUTE),
+                        # str(ArcDistanceMode.INCREMENTAL),
                         str(WorkOffset.OFFSET_1),
                         str(PlannerControlMode.CONTINUOUS),
                         str(SpindleControlMode.MAX_SPINDLE_SPEED),

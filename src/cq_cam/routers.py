@@ -12,8 +12,10 @@ from cq_cam.command import (
     CircularCW,
     Cut,
     MotionCommand,
-    Plunge,
+    PlungeCut,
+    PlungeRapid,
     Rapid,
+    Retract,
 )
 from cq_cam.utils.geometry_op import Path, PathFace, distance_to_path
 from cq_cam.utils.interpolation import edge_interpolation_count
@@ -60,18 +62,28 @@ def vertical_ramp(
 
 
 def rapid_to(
+    start: AbsoluteCV,
     end: cq.Vector,
     rapid_height: float,
     safe_plunge_height=None,
     plunge_feed: float | None = None,
 ):
-    commands = [Rapid.abs(z=rapid_height), Rapid.abs(x=end.x, y=end.y, arrow=True)]
+    commands = [Retract.abs(z=rapid_height, start=start)]
+    start.z = rapid_height
+    commands.append(Rapid.abs(x=end.x, y=end.y, start=start, arrow=True))
+    start.x = end.x
+    start.y = end.y
     if safe_plunge_height is None:
-        commands.append(Plunge.abs(z=end.z, arrow=True, feed=plunge_feed))
+        commands.append(
+            PlungeCut.abs(z=end.z, start=start, arrow=True, feed=plunge_feed)
+        )
     else:
-        commands.append(Rapid.abs(z=safe_plunge_height, arrow=True))
+        commands.append(PlungeRapid.abs(z=safe_plunge_height, start=start, arrow=True))
+        start.z = safe_plunge_height
         if safe_plunge_height > end.z:
-            commands.append(Plunge.abs(z=end.z, arrow=True, feed=plunge_feed))
+            commands.append(
+                PlungeCut.abs(z=end.z, start=start, arrow=True, feed=plunge_feed)
+            )
     return commands
 
 
@@ -133,7 +145,7 @@ def route_edge(
     end_cv = AbsoluteCV.from_vector(ep)
     if geom_type == "LINE":
         # commands.append(Cut(end_cv, arrow=edge_i % 5 == 0))
-        commands.append(Cut(end_cv, arrow=arrow, feed=feed))
+        commands.append(Cut(end_cv, start_cv, arrow=arrow, feed=feed))
 
     elif geom_type == "ARC" or geom_type == "CIRCLE":
         if start_p is None:
@@ -151,22 +163,45 @@ def route_edge(
             mid1_p, end1_p, mid2_p = np.linspace(start_p, end_p, 5)[1:-1]
             mid1 = AbsoluteCV.from_vector(edge.positionAt(mid1_p, "parameter"))
             end1 = AbsoluteCV.from_vector(edge.positionAt(end1_p, "parameter"))
+            start_cv = AbsoluteCV.from_vector(edge.positionAt(start_p, "parameter"))
             commands.append(
-                cmd(end=end1, center=center, mid=mid1, arrow=arrow, feed=feed)
+                cmd(
+                    end=end1,
+                    center=center,
+                    mid=mid1,
+                    start=start_cv,
+                    arrow=arrow,
+                    feed=feed,
+                )
             )
+            start_cv = end1
             mid2 = AbsoluteCV.from_vector(edge.positionAt(mid2_p, "parameter"))
             commands.append(
-                cmd(end=end_cv, center=center, mid=mid2, arrow=arrow, feed=feed)
+                cmd(
+                    end=end_cv,
+                    center=center,
+                    mid=mid2,
+                    start=start_cv,
+                    arrow=arrow,
+                    feed=feed,
+                )
             )
         elif sp == ep:
             # Really tiny arc, might as well just cut it straight
             # TODO verify the sanity
-            commands.append(Cut(end=end_cv, arrow=arrow, feed=feed))
+            commands.append(Cut(end=end_cv, start=start_cv, arrow=arrow, feed=feed))
         else:
             mid_p = np.linspace(start_p, end_p, 3)[1]
             mid = AbsoluteCV.from_vector(edge.positionAt(mid_p, "parameter"))
             commands.append(
-                cmd(end=end_cv, center=center, mid=mid, arrow=arrow, feed=feed)
+                cmd(
+                    end=end_cv,
+                    center=center,
+                    mid=mid,
+                    start=start_cv,
+                    arrow=arrow,
+                    feed=feed,
+                )
             )
 
     elif geom_type == "BSPLINE" or geom_type == "SPLINE" or geom_type == "OFFSET":
@@ -184,10 +219,12 @@ def route_edge(
             commands.append(
                 Cut(
                     end_cv_int,
+                    start_cv,
                     arrow=arrow,
                     feed=feed,
                 )
             )
+            start_cv = end_cv_int
 
     else:
         raise RuntimeError(f"Unsupported geom type: {geom_type}")
@@ -198,6 +235,7 @@ def route_edge(
 def route_wires(job: "Job", wires: list[Union[cq.Wire, cq.Edge]], stepover=None):
     commands = []
     previous_wire_end = None
+    start_cv = AbsoluteCV()
 
     for wire in wires:
         # Convert wires to edges
@@ -224,13 +262,17 @@ def route_wires(job: "Job", wires: list[Union[cq.Wire, cq.Edge]], stepover=None)
             start = edge_start_point(edges[0])
             if param:
                 start = edges[0].positionAt(param, "parameter")
-            commands.append(Cut(AbsoluteCV.from_vector(start), feed=job.feed))
+            commands.append(Cut(AbsoluteCV.from_vector(start), start_cv, feed=job.feed))
         else:
             # Create simple transition between toolpaths
             # TODO Implement Ramping (Horizontal/Vertical)
             # TODO Implement orientation (Climb/Conventional)
             commands += rapid_to(
-                start, job.rapid_height, job.op_safe_height, plunge_feed=job.plunge_feed
+                start_cv,
+                start,
+                job.rapid_height,
+                job.op_safe_height,
+                plunge_feed=job.plunge_feed,
             )
 
         for edge_i, edge in enumerate(edges):
@@ -255,6 +297,9 @@ def route_wires(job: "Job", wires: list[Union[cq.Wire, cq.Edge]], stepover=None)
             commands += new_commands
 
         previous_wire_end = end
+        start_cv.x = end.x
+        start_cv.y = end.y
+        start_cv.z = end.z
     return commands
 
 
@@ -267,6 +312,7 @@ def shift_polygon(polygon: Path, i: int):
 def route_polyface_outers(job: "Job", polyfaces: list[PathFace], stepover=None):
     commands = []
     previous_wire_end = None
+    start_cv = AbsoluteCV()
 
     for polyface in polyfaces:
         poly = polyface.outer
@@ -288,21 +334,31 @@ def route_polyface_outers(job: "Job", polyfaces: list[PathFace], stepover=None):
             index = poly_position[0]
             poly = shift_polygon(poly, index)
             start = closest_point
-            commands.append(Cut.abs(*start, polyface.depth, feed=job.feed))
+            commands.append(Cut.abs(*start, polyface.depth, start_cv, feed=job.feed))
             pass
         else:
             # Create simple transition between toolpaths
             commands += rapid_to(
-                start, job.rapid_height, job.op_safe_height, job.plunge_feed
+                start_cv, start, job.rapid_height, job.op_safe_height, job.plunge_feed
             )
 
         for x, y in poly[1:]:
-            commands.append(Cut.abs(x, y, polyface.depth, feed=job.feed))
+            commands.append(
+                Cut.abs(x, y, polyface.depth, start=start_cv, feed=job.feed)
+            )
+            start_cv.x = x
+            start_cv.y = y
 
         if closest_point:
-            commands.append(Cut.abs(*closest_point, polyface.depth, feed=job.feed))
+            commands.append(
+                Cut.abs(*closest_point, polyface.depth, start_cv, feed=job.feed)
+            )
             previous_wire_end = closest_point
         else:
             previous_wire_end = poly[-1]
+
+        start_cv.x = previous_wire_end[0]
+        start_cv.y = previous_wire_end[1]
+        start_cv.z = polyface.depth
 
     return commands

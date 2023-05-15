@@ -83,7 +83,9 @@ class GCodeWord(ABC):
         self.address = address
 
     def __str__(self):
-        return f"{self.letter}{self.address}"
+        if self.address is not None:
+            return f"{self.letter}{self.address}"
+        return ""
 
 
 class GCodeWordPrecision(GCodeWord, ABC):
@@ -94,8 +96,10 @@ class GCodeWordPrecision(GCodeWord, ABC):
         super().__init__(letter, address)
 
     def __str__(self):
-        address_opt = optimize_float(round(self.address, self.precision))
-        return f"{self.letter}{address_opt}"
+        if self.address is not None:
+            address_opt = optimize_float(round(self.address, self.precision))
+            return f"{self.letter}{address_opt}"
+        return ""
 
 
 class XAxis(GCodeWordPrecision):
@@ -170,35 +174,34 @@ class GCodeAxisGroup(ABC):
         self.axis_3 = axis_3
 
     def __str__(self):
-        return f"{self.axis_1} {self.axis_2} {self.axis_3}"
+        coords = []
+        axis_1 = str(self.axis_1)
+        axis_2 = str(self.axis_2)
+        axis_3 = str(self.axis_3)
 
-    def to_vector(self, origin: cq.Vector, dest: cq.Vector, relative=False):
-        if relative:
-            x = 0 if dest.x is None else dest.x - origin.x
-            y = 0 if dest.y is None else dest.y - origin.y
-            z = 0 if dest.z is None else dest.z - origin.z
-        else:
-            x = origin.x if dest.x is None else dest.x
-            y = origin.y if dest.y is None else dest.y
-            z = origin.z if dest.z is None else dest.z
-        return cq.Vector(x, y, z)
+        if axis_1 != "":
+            coords.append(axis_1)
+        if axis_2 != "":
+            coords.append(axis_2)
+        if axis_3 != "":
+            coords.append(axis_3)
+
+        return " ".join(coords)
 
 
 class XYZ(GCodeAxisGroup):
-    def __init__(self, end: cq.Vector):
-        axis_1 = XAxis(end.x)
-        axis_2 = YAxis(end.y)
-        axis_3 = ZAxis(end.z)
+    def __init__(self, end: cq.Vector, precision: int = 3):
+        axis_1 = XAxis(end.x, precision)
+        axis_2 = YAxis(end.y, precision)
+        axis_3 = ZAxis(end.z, precision)
 
         super().__init__(axis_1, axis_2, axis_3)
 
 
 class IJK(GCodeAxisGroup):
-    def __init__(self, start: cq.Vector, center: cq.Vector):
-        ijk = self.to_vector(start, center, relative=True)
-
-        axis_1 = ArcXAxis(ijk.x)
-        axis_2 = ArcYAxis(ijk.y)
-        axis_3 = ArcZAxis(ijk.z)
+    def __init__(self, center: cq.Vector, precision: int = 3):
+        axis_1 = ArcXAxis(center.x, precision)
+        axis_2 = ArcYAxis(center.y, precision)
+        axis_3 = ArcZAxis(center.z, precision)
 
         super().__init__(axis_1, axis_2, axis_3)

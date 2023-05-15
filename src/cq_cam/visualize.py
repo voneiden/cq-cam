@@ -57,7 +57,6 @@ def visualize_job(
     command_group = AIS_MultipleConnectedInteractive()
 
     for i, command in enumerate(commands):
-        command.start = position
         shape, position = command.to_ais_shape(alt_color=i % 2)
         if shape:
             command_group.Connect(shape)
@@ -83,7 +82,6 @@ def visualize_job_as_edges(
     edges = []
 
     for command in commands:
-        command.start = position
         shape, position = command.to_ais_shape(as_edges=True)
         if shape:
             edge = shape.transformShape(inverse_transform)
