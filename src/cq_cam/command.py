@@ -1,10 +1,69 @@
 """
-command.py builts upon the gcode letter addresses introduced in `groups.py` to form full gcode command abstractions.
-It is organised in a similiar fashion, into motion and non motion commands.
-The code is strctured around the abstract classes CommandVector and Command:
-- CommandVector
-    - AbsouluteCV
-    - RelativeCV
+The RS274/NGC language is based on lines of code. Each line (command block) includes commands that change the internal state of the machine and/or move the machining center. Lines of code may be collected in a file to make a program.
+G-code programs are read and executed by the gcode interpreter. The interpreter reads a line (command block) of gcode, builds an internal representation and changes the internal state of the machine and/or calls one or more canonical machining function.
+G-code command can be organised into two levels of abstraction; the lower level, canonical machining functions and the higher level, RS274/NGC language.
+The interpreter is responsible for lowering the RS274//NGC language into its equivalent canonical machining function representation (e.g. canned cycles are converted into G0 and G1 commands).
+The interpreter should reject input commands or canonical functions that address non-existent equipment.
+
+The command syntax for various commands is shown below:
+Rapid Linear Motioun: G0 X… Y… Z…
+Linear Motion at Feed Rate: G1 X… Y… Z… F…
+Arc at Feed Rate (Center Format Arc): G2 X… Y… Z… I… J… K… F…
+Simple Drill: <G98> G81 X… Y… Z… R… L…
+Drill with Dwell: G82 X… Y… Z… R… L… P…
+Peck Drill: G83 X… Y… Z… R… L… Q…
+Right-hand Tap: G84 X… Y… Z… R… L…
+Reaming cycle: G85 X… Y… Z… R… L…
+Boring with spindle stop cycle: G86 X… Y… Z… R… L… P…
+Back Boring cycle: G87 X… Y… Z… R… L… I… J… K…
+Boring with manual retraction: G88 X… Y… Z… R… L… P…
+Boring cycle: G89 X… Y… Z… R… L… P…
+Dwell: G4 P…
+Return to Home: G28 X… Y… Z…
+Move in absolute coordinates: G1 G53 X… Y… Z…
+
+When there are multiple words on the same line those words are executed in the following order:
+1. Comment
+2. Feed Rate Mode (G93, G94)
+3. Set Feed Rate (F)
+4. Set Spindle Speed (S)
+5. Select Tool (T)
+6. Change Tool (M6)
+7. Spindle Control (M3, M4, M5)
+8. Coolant Control (M7, M8, M9)
+9. Enable or disable limit switches (M48, M49)
+10. Dwell (G4)
+11. Set Active Plane (G17, G18, G19)
+12. Set Length Units (G20, G21)
+13. Cutter Radius Compensation (G40, G41, G42)
+14. Cutter Length Compensation (G43, G49)
+15. Coordinate System Selection (G54-G59.3)
+16. Set Path Control Mode (G61, G61.1, G64)
+17. Set Distance Mode (G90, G91)
+18. Set Retract Mode (G98, G99)
+19. Home (G28, G30)
+20. Motion Control (G0-G3 and G80-G89)
+21. Stop (M0, M1, M2, M30, M60)
+
+These are some of the rules that we must be aware off when constructing G-code programs:
+- Demarcating a file with percents (%) is optional if the file has an M2 or M30 in it, but is is required if not
+- Spaces and tabs are allowed anywhere on a line of code and do not change the meaning of the line
+- Input is case insensitive
+- Initial and trailing zeros are allowed but not required
+- A line may have any number of G words, but two G words from the same modal group may not appear on the same line
+- It is an error to a put a G-code from group 1 and group 0 (G10, G28, G30, G92) on the same line if both of them use axis words.
+- A line may have zero to four M words, but two G words from the same modal group may not appear on the same line
+- For all other legal letter, a line may have only one words beginning with that letter
+- Axis words (ABC, XYZ) specify a destination point.
+- Axis numbers are in the currently active coordinate system, unless explicitly described as being in the aboslute coordinate system (G53)
+- Any optional ommited axes will have their current value
+- It is an error if a required axis is ommited
+- It is an error if all axis words are ommited
+- It is common practice to put the T word for the next tool after the previous tool change to maximize the time available for the carousel to move
+- It is an error if inverse time feed rate mode is active and line with G1, G2, or G3 motion does not have an F word
+
+`command.py` builts upon the gcode modal groups and letter addresses introduced in `groups.py` and `address.py` respectively, to form full gcode command abstractions.
+It is organised in a similiar fashion, into motion and non motion commands. MotionCommands are consumed by routers.py
 - Command
     - MotionCommand (abstract)
         - Linear (abstract)
@@ -20,18 +79,6 @@ The code is strctured around the abstract classes CommandVector and Command:
         - StopSequence
         - SafetyBlock
         - ToolChange
-MotionCommands keep track of the previous command and position to optimise the generated gcode into a smaller size.
-In the following example the G0 command in the second line along with X1 and Z1 are unnecessarily issued:
-```
-G0 X1 Y1 Z1
-G0 X1 Y2 Z1
-```
-A more optimised version would look like this:
-```
-G0 X1 Y1 Z1
-Y2
-```
-MotionCommands are consumed by routers.py
 """
 
 from __future__ import annotations
@@ -63,10 +110,10 @@ from cq_cam.groups import (
     CutterState,
     DistanceMode,
     FeedRateControlMode,
-    HomePosition,
     LengthCompensation,
     Path,
     PlannerControlMode,
+    Position,
     ProgramControlMode,
     RadiusCompensation,
     SpindleControlMode,
@@ -427,7 +474,7 @@ class SafetyBlock(ConfigCommand):
                     (
                         str(DistanceMode.ABSOLUTE),
                         str(WorkOffset.OFFSET_1),
-                        str(PlannerControlMode.BLEND),
+                        str(PlannerControlMode.CONTINUOUS),
                         str(SpindleControlMode.MAX_SPINDLE_SPEED),
                         str(WorkPlane.XY),
                         str(FeedRateControlMode.UNITS_PER_MINUTE),
@@ -441,7 +488,7 @@ class SafetyBlock(ConfigCommand):
                     )
                 ),
                 str(Unit.METRIC),
-                str(HomePosition.HOME_2),
+                str(Position.SECONDARY_HOME),
             )
         )
 
@@ -453,7 +500,7 @@ class SafetyBlock(ConfigCommand):
                         (
                             str(DistanceMode.ABSOLUTE),
                             str(WorkOffset.OFFSET_1),
-                            str(PlannerControlMode.BLEND),
+                            str(PlannerControlMode.CONTINUOUS),
                             str(SpindleControlMode.MAX_SPINDLE_SPEED),
                             str(WorkPlane.XY),
                             str(FeedRateControlMode.UNITS_PER_MINUTE),
@@ -467,7 +514,7 @@ class SafetyBlock(ConfigCommand):
                         )
                     ),
                     str(Unit.METRIC),
-                    str(HomePosition.HOME_2),
+                    str(Position.SECONDARY_HOME),
                 )
             ),
             None,
@@ -495,7 +542,7 @@ class ToolChange(ConfigCommand):
         return "\n".join(
             (
                 str(StopSequence(self.coolant)),
-                str(HomePosition.HOME_2),
+                str(Position.SECONDARY_HOME),
                 str(ProgramControlMode.PAUSE_OPTIONAL),
                 " ".join(
                     (
@@ -514,7 +561,7 @@ class ToolChange(ConfigCommand):
             "\n".join(
                 (
                     str(StopSequence(self.coolant)),
-                    str(HomePosition.HOME_2),
+                    str(Position.SECONDARY_HOME),
                     str(ProgramControlMode.PAUSE_OPTIONAL),
                     " ".join(
                         (

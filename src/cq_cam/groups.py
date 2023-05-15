@@ -4,7 +4,7 @@ G-code commands can be categorized as modal or non-modal. Modal commands remain 
 
 G-code Modal Groups:
 - Group 0 - Non-modal codes: G4, G10 G28, G30, G52, G53, G92, G92.1, G92.2, G92.3 
-- Group 1 - Motion: G0, G1, G2, G3, G33, G38.n, G73, G74, G76, G80, G81, G82, G83, G84, G85, G86, G87, G88, G89
+- Group 1 - Motion: G0, G1, G2, G3, G38.n, G80, G81, G82, G83, G84, G85, G86, G87, G88, G89
 - Group 2 - Plane: G17, G18, G19, G17.1, G18.1, G19.1
 - Group 3 - Distance Mode: G90, G91
 - Group 4 - Arc Distance Mode: G90.1, G91.1
@@ -36,20 +36,20 @@ class GCodeGroup(Enum):
 
 """
 The G-codes have been organised differently from the proposed modal groups.
+## Non-modal
+- Position: G04 (Dwell), G53 (Absolute Machine Coordinates) G28 (Primary Home), G30 (Secondary Home)
 
 ## Motion Control
-- Paths: G00 (Rapid), G01 (Linear), G02 (Arc CW), G03 (Arc CCW), G04 (Pause/Dwell), G05 (Cubic Spline)
-- Home Position: G28 (Home 1), G30 (Home 2)
-- FixedCycle: G73 (High Speed Peck Drill), G74 (Left-hand Tap), G76 (Boring),
+- Paths: G00 (Rapid), G01 (Linear), G02 (Arc CW), G03 (Arc CCW), G05 (Cubic Spline), G5.1 (Quadratic Spline), G5.2 (Nurbs)
 - CannedCycle: G80 (Cancel), G81 (Simple Drill), G82 (Simple Dwell), G83 (Peck), G84 (Right-hand Tap), G85 (Simple Bore), G86 (Bore Spindle Stop), G87 (Back Bore), G98 (Retract to initial Z), G99 (Retruct to last Z)
-- CannedCycleReturnMode: G98, G99
+- CannedCycleReturnMode: G98 (Return to initial position before cycle), G99 (Return to position indicated by R word)
 
 ## Machine Configuration
 - Work Plane: G17 (XY), G18 (XZ), G19 (YZ)
 - Units: G20 (inch/min), G21 (mm/min)
 - Length Compensation: G43 (ON), G49 (OFF)
 - Radius Compensation: G40 (OFF), G41 (Left), G42 (Right)
-- WorkOffset: G53, G54, G55, G56, G57, G58, G59
+- WorkOffset: G54, G55, G56, G57, G58, G59
 - MotionControlMode: G61 (Exact Stop Check), G64 (Blend)
 - DistanceMode: G90 (Absolute), G91 (Incremental)
 - ArcDistanceMode: G90.1 (Absolute), G91.1 (Incremental)
@@ -62,38 +62,64 @@ The G-codes have been organised differently from the proposed modal groups.
 """
 
 
-class Path(GCodeGroup):
+# Group 0
+class NonModal(GCodeGroup):
+    pass
+
+
+class Position(NonModal):
+    DWELL = "G4"
+    ABSOLUTE = "G53"
+    PRIMARY_HOME = "G28"
+    SECONDARY_HOME = "G30"
+
+
+# Group 1
+class MotionControl(GCodeGroup):
+    pass
+
+
+class Path(MotionControl):
     RAPID = "G0"
     LINEAR = "G1"
     ARC_CW = "G2"
     ARC_CCW = "G3"
-    PAUSE = "G4"
     CUBIC = "G5"
     QUADRATIC_SPLINE = "G5.1"
     NURBS = "G5.2"
 
 
+class ProbeMode(MotionControl):
+    ON_CONTACT_ERROR = "38.2"
+    ON_CONTACT = "G38.3"
+    LOSE_CONTACT_ERROR = "G38.4"
+    LOSE_CONTACT = "G38.5"
+
+
+class CannedCycle(MotionControl):
+    CANCEL = "G80"
+    DRILL_SIMPLE = "G81"
+    DRILL_DWELL = "G82"
+    DRILL_PECK = "G83"
+    DRILL_RIGHT_TAP = "G84"
+    BORE = "G85"
+    BORE_DWELL_STOP = "G86"
+    BORE_BACK = "G87"
+    BORE_DWELL_STOP_MANUAL = "G88"
+    BORE_DWELL = "G89"
+
+
+# Group 2
 class WorkPlane(GCodeGroup):
     XY = "G17"
     XZ = "G18"
     YZ = "G19"
 
 
+# Group 6
 class Unit(GCodeGroup):
     IMPERIAL = "G20"
     METRIC = "G21"
-
-
-class HomePosition(GCodeGroup):
-    HOME_1 = "G28"
-    HOME_2 = "G30"
-
-
-class ProbeMode(GCodeGroup):
-    ON_CONTACT_ERROR = "38.2"
-    ON_CONTACT = "G38.3"
-    LOSE_CONTACT_ERROR = "G38.4"
-    LOSE_CONTACT = "G38.5"
 
 
 class RadiusCompensation(GCodeGroup):
@@ -108,7 +134,6 @@ class LengthCompensation(GCodeGroup):
 
 
 class WorkOffset(GCodeGroup):
-    ABSOLUTE = "G53"
     OFFSET_1 = "G54"
     OFFSET_2 = "G55"
     OFFSET_3 = "G56"
@@ -118,20 +143,9 @@ class WorkOffset(GCodeGroup):
 
 
 class PlannerControlMode(GCodeGroup):
-    EXACT = "G61"
-    BLEND = "G64"
-
-
-class CannedCycle(GCodeGroup):
-    CANCEL = "G80"
-    DRILL_SIMPLE = "G81"
-    DRILL_DWELL = "G82"
-    DRILL_PECK = "G83"
-    DRILL_TAP = "G84"
-    BORE = "G85"
-    BORE_DWELL_STOP = "G86"
-    BORE_DWELL_STOP_MANUAL = "G88"
-    BORE_DWELL = "G89"
+    EXACT_PATH = "G61"
+    EXACT_STOP = "G61.1"
+    CONTINUOUS = "G64"
 
 
 class DistanceMode(GCodeGroup):
@@ -157,8 +171,8 @@ class SpindleControlMode(GCodeGroup):
 
 
 class CannedCycleReturnMode(GCodeGroup):
-    INITIAL = "G98"
-    LAST = "G99"
+    RETRACT_HEIGHT = "G98"
+    LAST_HEIGHT = "G99"
 
 
 """

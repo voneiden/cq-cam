@@ -72,7 +72,7 @@ class Job:
         coordinate: WorkOffset = WorkOffset.OFFSET_1,
         distance: DistanceMode = DistanceMode.ABSOLUTE,
         arc_distance: ArcDistanceMode = ArcDistanceMode.ABSOLUTE,
-        controller_motion: PlannerControlMode = PlannerControlMode.BLEND,
+        controller_motion: PlannerControlMode = PlannerControlMode.CONTINUOUS,
         coolant: CoolantState | None = None,
     ):
         self.top = top

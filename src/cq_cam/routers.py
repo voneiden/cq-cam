@@ -218,9 +218,6 @@ def route_wires(job: "Job", wires: list[Union[cq.Wire, cq.Edge]], stepover=None)
         else:
             distance, target, param = None, None, None
 
-        # This check is only relevant for the pocket operation as it is the only one that sets the stepover.
-        # FIXME I think this check here is included to solve the upstream bug with Offset2D. Remove if/else when upstream PR is accepted and we update to that version of cadquery
-        # TODO Create PR in upstream cadquery with the fix
         if stepover and distance and distance <= stepover:
             # Determine the index of the edge, shift edges and use param?
             edges = shift_edges(edges, target)
