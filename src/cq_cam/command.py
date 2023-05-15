@@ -113,17 +113,13 @@ from cq_cam.groups import (
 from cq_cam.visualize import cached_occ_color
 
 
-class CommandVector(ABC):
+class CommandVector:
     __slots__ = ("x", "y", "z")
 
     def __init__(self, x=None, y=None, z=None):
         self.x = x
         self.y = y
         self.z = z
-
-    @abstractmethod
-    def to_vector(self, origin: cq.Vector, relative=False) -> cq.Vector:
-        pass
 
     def __str__(self) -> str:
         return f"{self.x} {self.y} {self.z}"
@@ -133,22 +129,6 @@ class CommandVector(ABC):
             return True
         return False
 
-
-class RelativeCV(CommandVector):
-    def to_vector(self, origin: cq.Vector, relative=False):
-        warnings.warn("Relative CV is deprecated", DeprecationWarning)
-        if relative:
-            x = 0 if self.x is None else self.x
-            y = 0 if self.y is None else self.y
-            z = 0 if self.z is None else self.z
-        else:
-            x = origin.x + self.x if self.x else origin.x
-            y = origin.y + self.y if self.y else origin.y
-            z = origin.z + self.z if self.z else origin.z
-        return cq.Vector(x, y, z)
-
-
-class AbsoluteCV(CommandVector):
     @classmethod
     def from_vector(cls, v: cq.Vector):
         return cls(v.x, v.y, v.z)
@@ -176,14 +156,12 @@ class MotionCommand(Command, ABC):
     feed: float | None
     start: CommandVector
     end: CommandVector
-    tab: bool  # TODO not the right place to carry tab information imo?
 
     def __init__(
         self,
         end: CommandVector,
         start: CommandVector,
         arrow=False,
-        tab=False,
         feed: float | None = None,
     ):
         if start is not None:
@@ -196,16 +174,14 @@ class MotionCommand(Command, ABC):
         self.start = start
         self.end = end
         self.arrow = arrow
-        self.tab = tab
         self.feed = feed
-        self.max_depth = None  # TODO whats this?
 
     def __str__(self) -> str:
         return f"{self.modal} {self.end}"
 
     @classmethod
-    def abs(cls, x=None, y=None, z=None, start: AbsoluteCV | None = None, **kwargs):
-        return cls(end=AbsoluteCV(x=x, y=y, z=z), start=start, **kwargs)
+    def abs(cls, x=None, y=None, z=None, start: CommandVector | None = None, **kwargs):
+        return cls(end=CommandVector(x=x, y=y, z=z), start=start, **kwargs)
 
     @classmethod
     def rel(cls, x=None, y=None, z=None, **kwargs):
@@ -285,8 +261,8 @@ class PlungeCut(Cut):
         super().__init__(end, start, **kwargs)
 
     @classmethod
-    def abs(cls, z=None, start: AbsoluteCV | None = None, **kwargs):
-        return cls(end=AbsoluteCV(z=z), start=start, **kwargs)
+    def abs(cls, z=None, start: CommandVector | None = None, **kwargs):
+        return cls(end=CommandVector(z=z), start=start, **kwargs)
 
     @classmethod
     def rel(cls, z=None, **kwargs):
@@ -305,8 +281,8 @@ class PlungeRapid(Rapid):
         super().__init__(end, start, **kwargs)
 
     @classmethod
-    def abs(cls, z=None, start: AbsoluteCV | None = None, **kwargs):
-        return cls(end=AbsoluteCV(z=z), start=start, **kwargs)
+    def abs(cls, z=None, start: CommandVector | None = None, **kwargs):
+        return cls(end=CommandVector(z=z), start=start, **kwargs)
 
     @classmethod
     def rel(cls, z=None, **kwargs):
@@ -325,8 +301,8 @@ class Retract(Rapid):
         super().__init__(end, start, **kwargs)
 
     @classmethod
-    def abs(cls, z=None, start: AbsoluteCV | None = None, **kwargs):
-        return cls(end=AbsoluteCV(z=z), start=start, **kwargs)
+    def abs(cls, z=None, start: CommandVector | None = None, **kwargs):
+        return cls(end=CommandVector(z=z), start=start, **kwargs)
 
     @classmethod
     def rel(cls, z=None, **kwargs):
