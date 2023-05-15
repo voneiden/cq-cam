@@ -7,7 +7,7 @@ from typing import Union
 from cadquery import cq
 
 from cq_cam.command import Command, SafetyBlock, StartSequence, StopSequence, ToolChange
-from cq_cam.common import (
+from cq_cam.groups import (
     ArcDistanceMode,
     CoolantState,
     DistanceMode,
@@ -72,7 +72,7 @@ class Job:
         coordinate: WorkOffset = WorkOffset.OFFSET_1,
         distance: DistanceMode = DistanceMode.ABSOLUTE,
         arc_distance: ArcDistanceMode = ArcDistanceMode.ABSOLUTE,
-        controller_motion: PlannerControlMode = PlannerControlMode.BLEND,
+        controller_motion: PlannerControlMode = PlannerControlMode.CONTINUOUS,
         coolant: CoolantState | None = None,
     ):
         self.top = top
@@ -276,18 +276,13 @@ class Job:
 
     def to_gcode(self):
         task_break = "\n\n\n"
-        start_sequence_gcode, _ = StartSequence(
-            spindle=self.speed, coolant=self.coolant
-        ).to_gcode()
-        stop_sequence_gcode, _ = StopSequence(coolant=self.coolant).to_gcode()
-        safety_block_gcode, _ = SafetyBlock().to_gcode()
         return (
-            f"({self.name} - Feedrate: {self.feed} - Unit: {self.unit})\n"
-            f"{safety_block_gcode}\n"
-            f"{start_sequence_gcode}\n"
+            f"({self.name} - Feedrate: {self.feed} - Unit: {repr(self.unit)})\n"
+            f"{SafetyBlock()}\n"
+            f"{StartSequence(speed=self.speed, coolant=self.coolant)}\n"
             f"{task_break.join(task.to_gcode() for task in self.operations)}\n"
-            f"{safety_block_gcode}\n"
-            f"{stop_sequence_gcode}"
+            f"{SafetyBlock()}\n"
+            f"{StopSequence(coolant=self.coolant)}"
         )
 
     def save_gcode(self, file_name):

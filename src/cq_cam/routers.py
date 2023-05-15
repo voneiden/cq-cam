@@ -60,19 +60,18 @@ def vertical_ramp(
 
 
 def rapid_to(
-    v: cq.Vector,
+    end: cq.Vector,
     rapid_height: float,
     safe_plunge_height=None,
     plunge_feed: float | None = None,
 ):
-    commands = [Rapid.abs(z=rapid_height), Rapid.abs(x=v.x, y=v.y, arrow=True)]
-
+    commands = [Rapid.abs(z=rapid_height), Rapid.abs(x=end.x, y=end.y, arrow=True)]
     if safe_plunge_height is None:
-        commands.append(Plunge.abs(z=v.z, arrow=True, feed=plunge_feed))
+        commands.append(Plunge.abs(z=end.z, arrow=True, feed=plunge_feed))
     else:
         commands.append(Rapid.abs(z=safe_plunge_height, arrow=True))
-        if safe_plunge_height > v.z:
-            commands.append(Plunge.abs(z=v.z, arrow=True, feed=plunge_feed))
+        if safe_plunge_height > end.z:
+            commands.append(Plunge.abs(z=end.z, arrow=True, feed=plunge_feed))
     return commands
 
 
@@ -123,18 +122,20 @@ def route_edge(
 ) -> tuple[list[MotionCommand], cq.Vector]:
     commands = []
     geom_type = edge.geomType()
+    sp = (
+        edge_start_point(edge)
+        if start_p is None
+        else edge.positionAt(start_p, "parameter")
+    )
     ep = edge_end_point(edge) if end_p is None else edge.positionAt(end_p, "parameter")
+
+    start_cv = AbsoluteCV.from_vector(sp)
     end_cv = AbsoluteCV.from_vector(ep)
     if geom_type == "LINE":
         # commands.append(Cut(end_cv, arrow=edge_i % 5 == 0))
         commands.append(Cut(end_cv, arrow=arrow, feed=feed))
 
     elif geom_type == "ARC" or geom_type == "CIRCLE":
-        sp = (
-            edge_start_point(edge)
-            if start_p is None
-            else edge.positionAt(start_p, "parameter")
-        )
         if start_p is None:
             start_p = edge_start_param(edge)
         if end_p is None:
@@ -179,9 +180,10 @@ def route_edge(
 
         for length in np.linspace(i, j, n):
             # [e._geomAdaptor().Curve().Curve().BasisCurve().BasisCurve() for e in pocket.DEBUG[0].Edges()]
+            end_cv_int = AbsoluteCV.from_vector(edge.positionAt(length))
             commands.append(
                 Cut(
-                    AbsoluteCV.from_vector(edge.positionAt(length)),
+                    end_cv_int,
                     arrow=arrow,
                     feed=feed,
                 )
@@ -195,17 +197,17 @@ def route_edge(
 
 def route_wires(job: "Job", wires: list[Union[cq.Wire, cq.Edge]], stepover=None):
     commands = []
-    previous_wire = None
-    previous_wire_start = None
     previous_wire_end = None
-    ep = None
+
     for wire in wires:
+        # Convert wires to edges
         if isinstance(wire, cq.Edge):
             edges = [wire]
         else:
             edges = wire_to_ordered_edges(wire)
         if not edges:
             return []
+        # Set start and end point of wire
         start = edge_start_point(edges[0])
         end = edge_end_point(edges[-1])
 
@@ -216,13 +218,7 @@ def route_wires(job: "Job", wires: list[Union[cq.Wire, cq.Edge]], stepover=None)
         else:
             distance, target, param = None, None, None
 
-        if (
-            ep
-            and isclose(ep.x, start.x, abs_tol=0.001)
-            and isclose(ep.y, start.y, abs_tol=0.001)
-        ):
-            commands.append(Plunge.abs(start.z, arrow=True, feed=job.feed))
-        elif stepover and distance and distance <= stepover:
+        if stepover and distance and distance <= stepover:
             # Determine the index of the edge, shift edges and use param?
             edges = shift_edges(edges, target)
             start = edge_start_point(edges[0])
@@ -230,9 +226,13 @@ def route_wires(job: "Job", wires: list[Union[cq.Wire, cq.Edge]], stepover=None)
                 start = edges[0].positionAt(param, "parameter")
             commands.append(Cut(AbsoluteCV.from_vector(start), feed=job.feed))
         else:
+            # Create simple transition between toolpaths
+            # TODO Implement Ramping (Horizontal/Vertical)
+            # TODO Implement orientation (Climb/Conventional)
             commands += rapid_to(
                 start, job.rapid_height, job.op_safe_height, plunge_feed=job.plunge_feed
             )
+
         for edge_i, edge in enumerate(edges):
             if edge_i == 0:
                 if param is not None:
@@ -254,8 +254,6 @@ def route_wires(job: "Job", wires: list[Union[cq.Wire, cq.Edge]], stepover=None)
             )
             commands += new_commands
 
-        previous_wire = wire
-        previous_wire_start = start
         previous_wire_end = end
     return commands
 
@@ -268,10 +266,8 @@ def shift_polygon(polygon: Path, i: int):
 
 def route_polyface_outers(job: "Job", polyfaces: list[PathFace], stepover=None):
     commands = []
-    previous_wire = None
-    previous_wire_start = None
     previous_wire_end = None
-    ep = None
+
     for polyface in polyfaces:
         poly = polyface.outer
         start = cq.Vector(*poly[0], polyface.depth)
@@ -285,6 +281,7 @@ def route_polyface_outers(job: "Job", polyfaces: list[PathFace], stepover=None):
         else:
             distance, closest_point, poly_position = None, None, None
 
+        # Same comment applies here as in the same section in route_wires
         if stepover and distance and distance <= stepover:
             # Determine the index of the edge, shift edges and use param?
             # edges = shift_edges(edges, target)
@@ -294,6 +291,7 @@ def route_polyface_outers(job: "Job", polyfaces: list[PathFace], stepover=None):
             commands.append(Cut.abs(*start, polyface.depth, feed=job.feed))
             pass
         else:
+            # Create simple transition between toolpaths
             commands += rapid_to(
                 start, job.rapid_height, job.op_safe_height, job.plunge_feed
             )
@@ -306,7 +304,5 @@ def route_polyface_outers(job: "Job", polyfaces: list[PathFace], stepover=None):
             previous_wire_end = closest_point
         else:
             previous_wire_end = poly[-1]
-        # previous_wire = poly
-        # previous_wire_start = start
 
     return commands

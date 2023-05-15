@@ -1,10 +1,69 @@
 """
-command.py builts upon the gcode letter addresses introduced in common.py to form full gcode command abstractions.
-It is organised in a similiar fashion, into motion and non motion commands.
-The code is strctured around the abstract classes CommandVector and Command:
-- CommandVector
-    - AbsouluteCV
-    - RelativeCV
+The RS274/NGC language is based on lines of code. Each line (command block) includes commands that change the internal state of the machine and/or move the machining center. Lines of code may be collected in a file to make a program.
+G-code programs are read and executed by the gcode interpreter. The interpreter reads a line (command block) of gcode, builds an internal representation and changes the internal state of the machine and/or calls one or more canonical machining function.
+G-code command can be organised into two levels of abstraction; the lower level, canonical machining functions and the higher level, RS274/NGC language.
+The interpreter is responsible for lowering the RS274//NGC language into its equivalent canonical machining function representation (e.g. canned cycles are converted into G0 and G1 commands).
+The interpreter should reject input commands or canonical functions that address non-existent equipment.
+
+The command syntax for various commands is shown below:
+Rapid Linear Motioun: G0 X… Y… Z…
+Linear Motion at Feed Rate: G1 X… Y… Z… F…
+Arc at Feed Rate (Center Format Arc): G2 X… Y… Z… I… J… K… F…
+Simple Drill: <G98> G81 X… Y… Z… R… L…
+Drill with Dwell: G82 X… Y… Z… R… L… P…
+Peck Drill: G83 X… Y… Z… R… L… Q…
+Right-hand Tap: G84 X… Y… Z… R… L…
+Reaming cycle: G85 X… Y… Z… R… L…
+Boring with spindle stop cycle: G86 X… Y… Z… R… L… P…
+Back Boring cycle: G87 X… Y… Z… R… L… I… J… K…
+Boring with manual retraction: G88 X… Y… Z… R… L… P…
+Boring cycle: G89 X… Y… Z… R… L… P…
+Dwell: G4 P…
+Return to Home: G28 X… Y… Z…
+Move in absolute coordinates: G1 G53 X… Y… Z…
+
+When there are multiple words on the same line those words are executed in the following order:
+1. Comment
+2. Feed Rate Mode (G93, G94)
+3. Set Feed Rate (F)
+4. Set Spindle Speed (S)
+5. Select Tool (T)
+6. Change Tool (M6)
+7. Spindle Control (M3, M4, M5)
+8. Coolant Control (M7, M8, M9)
+9. Enable or disable limit switches (M48, M49)
+10. Dwell (G4)
+11. Set Active Plane (G17, G18, G19)
+12. Set Length Units (G20, G21)
+13. Cutter Radius Compensation (G40, G41, G42)
+14. Cutter Length Compensation (G43, G49)
+15. Coordinate System Selection (G54-G59.3)
+16. Set Path Control Mode (G61, G61.1, G64)
+17. Set Distance Mode (G90, G91)
+18. Set Retract Mode (G98, G99)
+19. Home (G28, G30)
+20. Motion Control (G0-G3 and G80-G89)
+21. Stop (M0, M1, M2, M30, M60)
+
+These are some of the rules that we must be aware off when constructing G-code programs:
+- Demarcating a file with percents (%) is optional if the file has an M2 or M30 in it, but is is required if not
+- Spaces and tabs are allowed anywhere on a line of code and do not change the meaning of the line
+- Input is case insensitive
+- Initial and trailing zeros are allowed but not required
+- A line may have any number of G words, but two G words from the same modal group may not appear on the same line
+- It is an error to a put a G-code from group 1 and group 0 (G10, G28, G30, G92) on the same line if both of them use axis words.
+- A line may have zero to four M words, but two G words from the same modal group may not appear on the same line
+- For all other legal letter, a line may have only one words beginning with that letter
+- Axis words (ABC, XYZ) specify a destination point.
+- Axis numbers are in the currently active coordinate system, unless explicitly described as being in the aboslute coordinate system (G53)
+- Any optional ommited axes will have their current value
+- It is an error if a required axis is ommited
+- It is an error if all axis words are ommited
+- It is common practice to put the T word for the next tool after the previous tool change to maximize the time available for the carousel to move
+- It is an error if inverse time feed rate mode is active and line with G1, G2, or G3 motion does not have an F word
+
+`command.py` builts upon the gcode modal groups and letter addresses introduced in `groups.py` and `address.py` respectively, to form full gcode command abstractions.
+It is organised in a similiar fashion, into motion and non motion commands. MotionCommands are consumed by routers.py
 - Command
     - MotionCommand (abstract)
         - Linear (abstract)
@@ -20,18 +79,6 @@ The code is strctured around the abstract classes CommandVector and Command:
         - StopSequence
         - SafetyBlock
         - ToolChange
-MotionCommands keep track of the previous command and position to optimise the generated gcode into a smaller size.
-In the following example the G0 command in the second line along with X1 and Z1 are unnecessarily issued:
-```
-G0 X1 Y1 Z1
-G0 X1 Y2 Z1
-```
-A more optimised version would look like this:
-```
-G0 X1 Y1 Z1
-Y2
-```
-MotionCommands are consumed by routers.py
 """
 
 from __future__ import annotations
@@ -43,7 +90,19 @@ import cadquery as cq
 from OCP.AIS import AIS_Line, AIS_Shape
 from OCP.Geom import Geom_CartesianPoint
 
-from cq_cam.common import (
+from cq_cam.address import (
+    ArcXAxis,
+    ArcYAxis,
+    ArcZAxis,
+    Feed,
+    Speed,
+    ToolLengthOffset,
+    ToolNumber,
+    XAxis,
+    YAxis,
+    ZAxis,
+)
+from cq_cam.groups import (
     ArcDistanceMode,
     AutomaticChangerMode,
     CannedCycle,
@@ -51,10 +110,10 @@ from cq_cam.common import (
     CutterState,
     DistanceMode,
     FeedRateControlMode,
-    HomePosition,
     LengthCompensation,
     Path,
     PlannerControlMode,
+    Position,
     ProgramControlMode,
     RadiusCompensation,
     SpindleControlMode,
@@ -62,7 +121,6 @@ from cq_cam.common import (
     WorkOffset,
     WorkPlane,
 )
-from cq_cam.utils.utils import optimize_float
 from cq_cam.visualize import cached_occ_color
 
 
@@ -154,15 +212,14 @@ class MotionCommand(Command, ABC):
 
     def print_feed(self, previous: MotionCommand | None):
         previous_command = previous
-        while (
-            previous_command is not None
-            and previous_command.modal == Path.RAPID.to_gcode()
+        while previous_command is not None and previous_command.modal == str(
+            Path.RAPID
         ):
             previous_command = previous_command.previous_command
         if self.feed and (
             previous_command is None or previous_command.feed != self.feed
         ):
-            return f"F{self.feed}"
+            return f"{Feed(self.feed)}"
         return ""
 
     def xyz_gcode(self, start: cq.Vector, precision=3) -> tuple[str, cq.Vector]:
@@ -173,13 +230,13 @@ class MotionCommand(Command, ABC):
         # TODO use isclose
 
         if start.x != end.x:
-            coords.append(f"X{optimize_float(round(end.x, precision))}")
+            coords.append(f"{XAxis(end.x, precision)}")
 
         if start.y != end.y:
-            coords.append(f"Y{optimize_float(round(end.y, precision))}")
+            coords.append(f"{YAxis(end.y, precision)}")
 
         if start.z != end.z:
-            coords.append(f"Z{optimize_float(round(end.z, precision))}")
+            coords.append(f"{ZAxis(end.z, precision)}")
 
         return "".join(coords), end
 
@@ -228,12 +285,12 @@ class Linear(MotionCommand, ABC):
 
 
 class Rapid(Linear):
-    modal = Path.RAPID.to_gcode()
+    modal = str(Path.RAPID)
     ais_color = "green"
 
 
 class Cut(Linear):
-    modal = Path.LINEAR.to_gcode()
+    modal = str(Path.LINEAR)
 
 
 class Plunge(Cut):
@@ -293,19 +350,15 @@ class Circular(MotionCommand, ABC):
 
     def ijk_gcode(self, start: cq.Vector, precision=3):
         center = self.center.to_vector(start, relative=True)
-        i = optimize_float(round(center.x, precision))
-        j = optimize_float(round(center.y, precision))
-        k = optimize_float(round(center.z, precision))
-
         ijk = []
         if self.center.x is not None:
-            ijk.append(f"I{i}")
+            ijk.append(f"{ArcXAxis(center.x)}")
 
         if self.center.y is not None:
-            ijk.append(f"J{j}")
+            ijk.append(f"{ArcYAxis(center.y)}")
 
         if self.center.z is not None:
-            ijk.append(f"K{k}")
+            ijk.append(f"{ArcZAxis(center.z)}")
 
         return "".join(ijk)
 
@@ -345,33 +398,47 @@ class Circular(MotionCommand, ABC):
 
 
 class CircularCW(Circular):
-    modal = Path.ARC_CW.to_gcode()
+    modal = str(Path.ARC_CW)
 
 
 class CircularCCW(Circular):
-    modal = Path.ARC_CCW.to_gcode()
+    modal = str(Path.ARC_CCW)
 
 
 class StartSequence(ConfigCommand):
-    spindle: int | None
+    speed: int | None
     coolant: CoolantState | None
 
     def __init__(
-        self, spindle: int | None = None, coolant: CoolantState | None = None
+        self, speed: int | None = None, coolant: CoolantState | None = None
     ) -> None:
-        self.spindle = spindle
+        self.speed = speed
         self.coolant = coolant
         super().__init__()
 
-    def to_gcode(self) -> tuple[str, cq.Vector]:
-        gcode_str = CutterState.ON_CW.to_gcode()
+    def __str__(self) -> str:
+        words = [f"{CutterState.ON_CW}"]
 
-        if self.spindle is not None:
-            gcode_str += f" S{self.spindle}"
+        if self.speed is not None:
+            words.append(f"{Speed(self.speed)}")
 
         if self.coolant is not None:
-            gcode_str += f" {self.coolant.to_gcode()}"
+            words.append(f"{self.coolant}")
 
+        gcode_str = " ".join(words)
+
+        return gcode_str
+
+    def to_gcode(self) -> tuple[str, cq.Vector]:
+        words = [f"{CutterState.ON_CW}"]
+
+        if self.speed is not None:
+            words.append(f"{Speed(self.speed)}")
+
+        if self.coolant is not None:
+            words.append(f"{self.coolant}")
+
+        gcode_str = " ".join(words)
         return (gcode_str, None)
 
 
@@ -382,38 +449,72 @@ class StopSequence(ConfigCommand):
         self.coolant = coolant
         super().__init__()
 
-    def to_gcode(self) -> tuple[str, cq.Vector]:
-        gcode_str = CutterState.OFF.to_gcode()
+    def __str__(self) -> str:
+        words = [f"{CutterState.OFF}"]
         if self.coolant is not None:
-            gcode_str += f" {CoolantState.OFF.to_gcode()}"
+            words.append(f"{CoolantState.OFF}")
 
+        gcode_str = " ".join(words)
+        return gcode_str
+
+    def to_gcode(self) -> tuple[str, cq.Vector]:
+        words = [f"{CutterState.OFF}"]
+        if self.coolant is not None:
+            words.append(f"{CoolantState.OFF}")
+
+        gcode_str = " ".join(words)
         return (gcode_str, None)
 
 
 class SafetyBlock(ConfigCommand):
+    def __str__(self) -> str:
+        return "\n".join(
+            (
+                " ".join(
+                    (
+                        str(DistanceMode.ABSOLUTE),
+                        str(WorkOffset.OFFSET_1),
+                        str(PlannerControlMode.CONTINUOUS),
+                        str(SpindleControlMode.MAX_SPINDLE_SPEED),
+                        str(WorkPlane.XY),
+                        str(FeedRateControlMode.UNITS_PER_MINUTE),
+                    )
+                ),
+                " ".join(
+                    (
+                        str(LengthCompensation.OFF),
+                        str(RadiusCompensation.OFF),
+                        str(CannedCycle.CANCEL),
+                    )
+                ),
+                str(Unit.METRIC),
+                str(Position.SECONDARY_HOME),
+            )
+        )
+
     def to_gcode(self) -> tuple[str, cq.Vector]:
         return (
             "\n".join(
                 (
                     " ".join(
                         (
-                            DistanceMode.ABSOLUTE.to_gcode(),
-                            WorkOffset.OFFSET_1.to_gcode(),
-                            PlannerControlMode.BLEND.to_gcode(),
-                            SpindleControlMode.MAX_SPINDLE_SPEED.to_gcode(),
-                            WorkPlane.XY.to_gcode(),
-                            FeedRateControlMode.UNITS_PER_MINUTE.to_gcode(),
+                            str(DistanceMode.ABSOLUTE),
+                            str(WorkOffset.OFFSET_1),
+                            str(PlannerControlMode.CONTINUOUS),
+                            str(SpindleControlMode.MAX_SPINDLE_SPEED),
+                            str(WorkPlane.XY),
+                            str(FeedRateControlMode.UNITS_PER_MINUTE),
                         )
                     ),
                     " ".join(
                         (
-                            LengthCompensation.OFF.to_gcode(),
-                            RadiusCompensation.OFF.to_gcode(),
-                            CannedCycle.CANCEL.to_gcode(),
+                            str(LengthCompensation.OFF),
+                            str(RadiusCompensation.OFF),
+                            str(CannedCycle.CANCEL),
                         )
                     ),
-                    Unit.METRIC.to_gcode(),
-                    HomePosition.HOME_2.to_gcode(),
+                    str(Unit.METRIC),
+                    str(Position.SECONDARY_HOME),
                 )
             ),
             None,
@@ -422,39 +523,55 @@ class SafetyBlock(ConfigCommand):
 
 class ToolChange(ConfigCommand):
     tool_number: int | None
-    spindle: int | None
+    speed: int | None
     coolant: CoolantState | None
 
     def __init__(
         self,
         tool_number: int,
-        spindle: int | None = None,
+        speed: int | None = None,
         coolant: CoolantState | None = None,
     ):
         self.tool_number = tool_number
-        self.spindle = spindle
+        self.speed = speed
         self.coolant = coolant
 
         super().__init__()
 
+    def __str__(self) -> str:
+        return "\n".join(
+            (
+                str(StopSequence(self.coolant)),
+                str(Position.SECONDARY_HOME),
+                str(ProgramControlMode.PAUSE_OPTIONAL),
+                " ".join(
+                    (
+                        f"{ToolNumber(self.tool_number)}",
+                        str(LengthCompensation.ON),
+                        f"{ToolLengthOffset(self.tool_number)}",
+                        str(AutomaticChangerMode.TOOL_CHANGE),
+                    )
+                ),
+                str(StartSequence(self.speed, self.coolant)),
+            )
+        )
+
     def to_gcode(self) -> tuple[str, cq.Vector]:
-        stop_sequence_gcode, _ = StopSequence(self.coolant).to_gcode()
-        start_sequence_gcode, _ = StartSequence(self.spindle, self.coolant).to_gcode()
         return (
             "\n".join(
                 (
-                    stop_sequence_gcode,
-                    HomePosition.HOME_2.to_gcode(),
-                    ProgramControlMode.PAUSE_OPTIONAL.to_gcode(),
+                    str(StopSequence(self.coolant)),
+                    str(Position.SECONDARY_HOME),
+                    str(ProgramControlMode.PAUSE_OPTIONAL),
                     " ".join(
                         (
-                            f"T{self.tool_number}",
-                            LengthCompensation.ON.to_gcode(),
-                            f"H{self.tool_number}",
-                            AutomaticChangerMode.TOOL_CHANGE.to_gcode(),
+                            f"{ToolNumber(self.tool_number)}",
+                            str(LengthCompensation.ON),
+                            f"{ToolLengthOffset(self.tool_number)}",
+                            str(AutomaticChangerMode.TOOL_CHANGE),
                         )
                     ),
-                    start_sequence_gcode,
+                    str(StartSequence(self.speed, self.coolant)),
                 )
             ),
             None,
