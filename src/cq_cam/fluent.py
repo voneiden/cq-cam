@@ -38,7 +38,7 @@ class Operation:
         # we guarantee getting the correct Z rapid in the beginning
         gcodes = [f"({self.job.name} - {self.name})"]
         for command in self.commands:
-            gcode = command.to_gcode()
+            gcode = str(command)
 
             # Skip blank lines. These can happen for example if we try to issue
             # a move to the same position where we already are
@@ -281,7 +281,7 @@ class Job:
         )
 
     def save_gcode(self, file_name):
-        gcode = self.to_gcode()
+        gcode = str(self)
         with open(file_name, "w") as f:
             f.write(gcode)
 

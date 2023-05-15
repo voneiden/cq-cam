@@ -168,11 +168,6 @@ class AbsoluteCV(CommandVector):
 class Command(ABC):
     modal = None
 
-    @abstractmethod
-    def to_gcode(self) -> str:
-        """Output all the necessary G-Code required to perform the command"""
-        pass
-
 
 class MotionCommand(Command, ABC):
     max_depth: float | None
@@ -234,7 +229,7 @@ class ConfigCommand(Command, ABC):
 
 
 class Linear(MotionCommand, ABC):
-    def to_gcode(self) -> str:
+    def __str__(self) -> str:
         modal = self.modal
         xyz = str(XYZ(self.end))
         feed = self.print_feed()
@@ -359,7 +354,7 @@ class Circular(MotionCommand, ABC):
         self.center = center
         self.mid = mid
 
-    def to_gcode(self) -> str:
+    def __str__(self) -> str:
         modal = self.modal
         xyz = str(XYZ(self.end))
         center = self.center.to_vector(self.start, relative=True)
@@ -432,18 +427,6 @@ class StartSequence(ConfigCommand):
 
         return gcode_str
 
-    def to_gcode(self) -> str:
-        words = [f"{CutterState.ON_CW}"]
-
-        if self.speed is not None:
-            words.append(f"{Speed(self.speed)}")
-
-        if self.coolant is not None:
-            words.append(f"{self.coolant}")
-
-        gcode_str = " ".join(words)
-        return gcode_str
-
 
 class StopSequence(ConfigCommand):
     coolant: CoolantState | None
@@ -460,43 +443,9 @@ class StopSequence(ConfigCommand):
         gcode_str = " ".join(words)
         return gcode_str
 
-    def to_gcode(self) -> str:
-        words = [f"{CutterState.OFF}"]
-        if self.coolant is not None:
-            words.append(f"{CoolantState.OFF}")
-
-        gcode_str = " ".join(words)
-        return gcode_str
-
 
 class SafetyBlock(ConfigCommand):
     def __str__(self) -> str:
-        return "\n".join(
-            (
-                " ".join(
-                    (
-                        str(DistanceMode.ABSOLUTE),
-                        # str(ArcDistanceMode.INCREMENTAL),
-                        str(WorkOffset.OFFSET_1),
-                        str(PlannerControlMode.CONTINUOUS),
-                        str(SpindleControlMode.MAX_SPINDLE_SPEED),
-                        str(WorkPlane.XY),
-                        str(FeedRateControlMode.UNITS_PER_MINUTE),
-                    )
-                ),
-                " ".join(
-                    (
-                        str(LengthCompensation.OFF),
-                        str(RadiusCompensation.OFF),
-                        str(CannedCycle.CANCEL),
-                    )
-                ),
-                str(Unit.METRIC),
-                str(Position.SECONDARY_HOME),
-            )
-        )
-
-    def to_gcode(self) -> str:
         return "\n".join(
             (
                 " ".join(
@@ -541,24 +490,6 @@ class ToolChange(ConfigCommand):
         super().__init__()
 
     def __str__(self) -> str:
-        return "\n".join(
-            (
-                str(StopSequence(self.coolant)),
-                str(Position.SECONDARY_HOME),
-                str(ProgramControlMode.PAUSE_OPTIONAL),
-                " ".join(
-                    (
-                        f"{ToolNumber(self.tool_number)}",
-                        str(LengthCompensation.ON),
-                        f"{ToolLengthOffset(self.tool_number)}",
-                        str(AutomaticChangerMode.TOOL_CHANGE),
-                    )
-                ),
-                str(StartSequence(self.speed, self.coolant)),
-            )
-        )
-
-    def to_gcode(self) -> str:
         return "\n".join(
             (
                 str(StopSequence(self.coolant)),
