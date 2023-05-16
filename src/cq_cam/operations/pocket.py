@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Literal
 import cadquery as cq
 import numpy as np
 
+from cq_cam.command import CommandVector
 from cq_cam.operations.pocket_cq import pocket_cq
 from cq_cam.routers import route_polyface_outers
 from cq_cam.utils.geometry_op import (

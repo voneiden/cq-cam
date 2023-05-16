@@ -102,7 +102,6 @@ def test_profile_stepdown(job: Job, bottom_face):
         "G1 X2.5 Y2.5 Z-1 F200\n"
         "G1 X2.5 Y-2.5 Z-1 F200\n"
         "G0 X2.5 Y-2.5 Z10\n"
-        "G0 X2.5 Y-2.5 Z10\n"
         "G0 X2.5 Y-2.5 Z1\n"
         "G1 X2.5 Y-2.5 Z-2 F200\n"
         "G1 X-2.5 Y-2.5 Z-2 F200\n"

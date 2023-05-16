@@ -7,6 +7,7 @@ from OCP.StdFail import StdFail_NotDone
 from OCP.TopAbs import TopAbs_FACE
 from OCP.TopExp import TopExp_Explorer
 
+from cq_cam.command import CommandVector
 from cq_cam.routers import route_wires
 from cq_cam.utils.geometry_op import offset_face, offset_wire
 from cq_cam.utils.tree import Tree
@@ -165,7 +166,6 @@ def pocket_cq(
         sequences += fill_pocket_contour_shrink(pocket_op, stepover)
 
     # Route wires
-    commands = []
     for sequence_wires in sequences:
         commands += route_wires(job, sequence_wires, stepover=stepover)
 

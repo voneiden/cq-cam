@@ -70,9 +70,13 @@ def rapid_to(
 ):
     commands = [Retract.abs(z=rapid_height, start=start)]
     start.z = rapid_height
-    commands.append(Rapid.abs(x=end.x, y=end.y, start=start, arrow=True))
-    start.x = end.x
-    start.y = end.y
+
+    # Don't move if you are already at the correct location
+    if start.x != end.x or start.y != end.y:
+        commands.append(Rapid.abs(x=end.x, y=end.y, start=start, arrow=True))
+        start.x = end.x
+        start.y = end.y
+
     if safe_plunge_height is None:
         commands.append(
             PlungeCut.abs(z=end.z, start=start, arrow=True, feed=plunge_feed)
@@ -232,11 +236,15 @@ def route_edge(
     return commands, ep
 
 
-def route_wires(job: "Job", wires: list[Union[cq.Wire, cq.Edge]], stepover=None):
+def route_wires(
+    job: "Job",
+    wires: list[Union[cq.Wire, cq.Edge]],
+    stepover=None,
+):
     commands = []
     previous_wire_end = None
 
-    start_cv = CommandVector()
+    previous_pos = CommandVector()
 
     for wire in wires:
         # Convert wires to edges
@@ -264,14 +272,14 @@ def route_wires(job: "Job", wires: list[Union[cq.Wire, cq.Edge]], stepover=None)
             if param:
                 start = edges[0].positionAt(param, "parameter")
             commands.append(
-                Cut(CommandVector.from_vector(start), start_cv, feed=job.feed)
+                Cut(CommandVector.from_vector(start), previous_pos, feed=job.feed)
             )
         else:
             # Create simple transition between toolpaths
             # TODO Implement Ramping (Horizontal/Vertical)
             # TODO Implement orientation (Climb/Conventional)
             commands += rapid_to(
-                start_cv,
+                previous_pos,
                 start,
                 job.rapid_height,
                 job.op_safe_height,
@@ -300,9 +308,9 @@ def route_wires(job: "Job", wires: list[Union[cq.Wire, cq.Edge]], stepover=None)
             commands += new_commands
 
         previous_wire_end = end
-        start_cv.x = end.x
-        start_cv.y = end.y
-        start_cv.z = end.z
+        previous_pos.x = end.x
+        previous_pos.y = end.y
+        previous_pos.z = end.z
     return commands
 
 
@@ -312,11 +320,15 @@ def shift_polygon(polygon: Path, i: int):
     return polygon
 
 
-def route_polyface_outers(job: "Job", polyfaces: list[PathFace], stepover=None):
+def route_polyface_outers(
+    job: "Job",
+    polyfaces: list[PathFace],
+    stepover=None,
+) -> list[MotionCommand]:
     commands = []
     previous_wire_end = None
 
-    start_cv = CommandVector()
+    previous_pos = CommandVector()
 
     for polyface in polyfaces:
         poly = polyface.outer
@@ -338,31 +350,37 @@ def route_polyface_outers(job: "Job", polyfaces: list[PathFace], stepover=None):
             index = poly_position[0]
             poly = shift_polygon(poly, index)
             start = closest_point
-            commands.append(Cut.abs(*start, polyface.depth, start_cv, feed=job.feed))
+            commands.append(
+                Cut.abs(*start, polyface.depth, previous_pos, feed=job.feed)
+            )
             pass
         else:
             # Create simple transition between toolpaths
             commands += rapid_to(
-                start_cv, start, job.rapid_height, job.op_safe_height, job.plunge_feed
+                previous_pos,
+                start,
+                job.rapid_height,
+                job.op_safe_height,
+                job.plunge_feed,
             )
 
         for x, y in poly[1:]:
             commands.append(
-                Cut.abs(x, y, polyface.depth, start=start_cv, feed=job.feed)
+                Cut.abs(x, y, polyface.depth, start=previous_pos, feed=job.feed)
             )
-            start_cv.x = x
-            start_cv.y = y
+            previous_pos.x = x
+            previous_pos.y = y
 
         if closest_point:
             commands.append(
-                Cut.abs(*closest_point, polyface.depth, start_cv, feed=job.feed)
+                Cut.abs(*closest_point, polyface.depth, previous_pos, feed=job.feed)
             )
             previous_wire_end = closest_point
         else:
             previous_wire_end = poly[-1]
 
-        start_cv.x = previous_wire_end[0]
-        start_cv.y = previous_wire_end[1]
-        start_cv.z = polyface.depth
+        previous_pos.x = previous_wire_end[0]
+        previous_pos.y = previous_wire_end[1]
+        previous_pos.z = polyface.depth
 
     return commands

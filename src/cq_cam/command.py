@@ -99,6 +99,7 @@ from cq_cam.groups import (
     CutterState,
     DistanceMode,
     FeedRateControlMode,
+    GCodeGroup,
     LengthCompensation,
     MotionControl,
     Path,
@@ -122,10 +123,14 @@ class CommandVector:
         self.y = y
         self.z = z
 
-    def __eq__(self, __value: CommandVector) -> bool:
-        if self.x == __value.x and self.y == __value.y and self.z == __value.z:
-            return True
-        return False
+    def __eq__(self, other) -> bool:
+        try:
+            return self.x == other.x and self.y == other.y and self.z == other.z
+        except AttributeError:
+            return NotImplemented
+
+    def __str__(self) -> str:
+        return f"({self.x} {self.y} {self.z})"
 
     @classmethod
     def from_vector(cls, v: cq.Vector):
@@ -157,8 +162,9 @@ class MotionCommand(Command, ABC):
     def __init__(
         self,
         end: CommandVector,
-        start: CommandVector,
+        start: CommandVector | None,
         arrow=False,
+        **kwargs,
     ):
         if start is not None:
             if end.x is None:
@@ -167,9 +173,13 @@ class MotionCommand(Command, ABC):
                 end.y = start.y
             if end.z is None:
                 end.z = start.z
+        else:
+            start = CommandVector()
         self.start = start
         self.end = end
         self.arrow = arrow
+
+        super().__init__(**kwargs)
 
     @classmethod
     def abs(cls, x=None, y=None, z=None, start: CommandVector | None = None, **kwargs):
@@ -253,9 +263,10 @@ class FeedRateCommand(MotionCommand, ABC):
         start: CommandVector,
         arrow=False,
         feed: float | None = None,
+        **kwargs,
     ):
         self.feed = feed
-        super().__init__(end, start, arrow)
+        super().__init__(end, start, arrow, **kwargs)
 
 
 class Cut(FeedRateCommand):
