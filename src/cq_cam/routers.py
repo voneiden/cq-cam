@@ -236,8 +236,7 @@ def route_wires(job: "Job", wires: list[Union[cq.Wire, cq.Edge]], stepover=None)
     commands = []
     previous_wire_end = None
 
-    if start_cv is None:
-        start_cv = CommandVector()
+    start_cv = CommandVector()
 
     for wire in wires:
         # Convert wires to edges
@@ -317,8 +316,7 @@ def route_polyface_outers(job: "Job", polyfaces: list[PathFace], stepover=None):
     commands = []
     previous_wire_end = None
 
-    if start_cv is None:
-        start_cv = CommandVector()
+    start_cv = CommandVector()
 
     for polyface in polyfaces:
         poly = polyface.outer
