@@ -39,7 +39,8 @@ def test_profile_square_outside(job: Job, top_face):
         "G1 X-3.25 Y-2.5 Z0 F200\n"
         "G3 X-2.5 Y-3.25 Z0 I0.75 J0 K0 F200\n"
         "G90 G54 G64 G50 G17 G94\nG49 G40 G80\nG21\nG30\n"
-        "M5"
+        "M5\n"
+        "M30"
     )
 
 
@@ -59,7 +60,8 @@ def test_profile_square_midline(job: Job, top_face):
         "G1 X-2.5 Y2.5 Z0 F200\n"
         "G1 X-2.5 Y-2.5 Z0 F200\n"
         "G90 G54 G64 G50 G17 G94\nG49 G40 G80\nG21\nG30\n"
-        "M5"
+        "M5\n"
+        "M30"
     )
 
 
@@ -79,7 +81,8 @@ def test_profile_square_inside(job: Job, top_face):
         "G1 X-1.75 Y1.75 Z0 F200\n"
         "G1 X-1.75 Y-1.75 Z0 F200\n"
         "G90 G54 G64 G50 G17 G94\nG49 G40 G80\nG21\nG30\n"
-        "M5"
+        "M5\n"
+        "M30"
     )
 
 
@@ -107,7 +110,8 @@ def test_profile_stepdown(job: Job, bottom_face):
         "G1 X2.5 Y2.5 Z-2 F200\n"
         "G1 X2.5 Y-2.5 Z-2 F200\n"
         "G90 G54 G64 G50 G17 G94\nG49 G40 G80\nG21\nG30\n"
-        "M5"
+        "M5\n"
+        "M30"
     )
 
 
@@ -161,7 +165,8 @@ def test_profile_tabs(job: Job, bottom_face):
         "G1 X2.5 Y-1.333 Z-2 F200\n"
         "G1 X2.5 Y-2.5 Z-2 F200\n"
         "G90 G54 G64 G50 G17 G94\nG49 G40 G80\nG21\nG30\n"
-        "M5"
+        "M5\n"
+        "M30"
     )
 
 
@@ -191,5 +196,6 @@ def test_profile_wire_tabs(job: Job, bottom_face):
         "G1 X2.5 Y-2 Z-1 F200\n"
         "G1 X2.5 Y-2.5 Z-1 F200\n"
         "G90 G54 G64 G50 G17 G94\nG49 G40 G80\nG21\nG30\n"
-        "M5"
+        "M5\n"
+        "M30"
     )

@@ -12,6 +12,7 @@ from cq_cam.groups import (
     CoolantState,
     DistanceMode,
     PlannerControlMode,
+    ProgramControlMode,
     Unit,
     WorkOffset,
     WorkPlane,
@@ -277,7 +278,8 @@ class Job:
             f"{StartSequence(speed=self.speed, coolant=self.coolant)}\n"
             f"{task_break.join(task.to_gcode() for task in self.operations)}\n"
             f"{SafetyBlock()}\n"
-            f"{StopSequence(coolant=self.coolant)}"
+            f"{StopSequence(coolant=self.coolant)}\n"
+            f"{ProgramControlMode.END_RESET}"
         )
 
     def save_gcode(self, file_name):

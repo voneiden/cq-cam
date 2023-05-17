@@ -54,5 +54,6 @@ def test_profile_square_outside(job: Job, box):
         "G1 X-1 Y-1.4 Z0\n"
         "G1 X-1.5 Y-1.4 Z0\n"
         "G90 G54 G64 G50 G17 G94\nG49 G40 G80\nG21\nG30\n"
-        "M5"
+        "M5\n"
+        "M30"
     )

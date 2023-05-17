@@ -15,5 +15,6 @@ def test_drill_superficially(box, job: Job):
         "G0 Z0\n"
         "G1 Z-1 F200\n"
         "G90 G54 G64 G50 G17 G94\nG49 G40 G80\nG21\nG30\n"
-        "M5"
+        "M5\n"
+        "M30"
     )
