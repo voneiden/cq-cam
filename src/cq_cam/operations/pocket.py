@@ -267,7 +267,12 @@ def pocket_clipper(
 
     # Route wires
     commands = []
+    previous_pos = AddressVector()
     for sequence_polyfaces in sequences:
-        commands += route_polyface_outers(job, sequence_polyfaces, stepover=stepover)
+        commands += route_polyface_outers(
+            job, sequence_polyfaces, stepover=stepover, previous_pos=previous_pos
+        )
+        cmd = commands[-1]
+        previous_pos = cmd.end
 
     return commands

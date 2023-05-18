@@ -169,8 +169,13 @@ class RapidCommand(MotionCommand, ABC):
     modal = Path.RAPID
 
     def to_ais_shape(self, as_edges=False, alt_color=False) -> AIS_Shape:
-        start = cq.Vector(self.start.x, self.start.y, self.start.z)
+        x = self.start.x if self.start.x is not None else 0
+        y = self.start.y if self.start.y is not None else 0
+        z = self.start.z if self.start.z is not None else 0
+
+        start = cq.Vector(x, y, z)
         end = self.end.to_vector(start)
+
         if start == end:
             return None
 
@@ -193,6 +198,8 @@ class RapidCommand(MotionCommand, ABC):
         modal = str(self.modal)
         xyz = str(XYZ(self.end))
         words = [modal, xyz]
+
+        # words.append(f"({XYZ(self.start)})")
 
         return " ".join(words)
 
@@ -255,11 +262,18 @@ class Cut(FeedRateCommand):
         if feed != "":
             words.append(feed)
 
+        # words.append(f"({XYZ(self.start)})")
+
         return " ".join(words)
 
     def to_ais_shape(self, as_edges=False, alt_color=False) -> AIS_Shape:
-        start = cq.Vector(self.start.x, self.start.y, self.start.z)
+        x = self.start.x if self.start.x is not None else 0
+        y = self.start.y if self.start.y is not None else 0
+        z = self.start.z if self.start.z is not None else 0
+
+        start = cq.Vector(x, y, z)
         end = self.end.to_vector(start)
+
         if start == end:
             return None
 
@@ -316,6 +330,8 @@ class Circular(FeedRateCommand, ABC):
         words = [modal, xyz, ijk]
         if feed != "":
             words.append(feed)
+
+        # words.append(f"({XYZ(self.start)})")
         return " ".join(words)
 
     def to_ais_shape(self, as_edges=False, alt_color=False) -> AIS_Shape:

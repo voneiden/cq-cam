@@ -69,13 +69,12 @@ def rapid_to(
     plunge_feed: float | None = None,
 ):
     commands = [Retract.abs(z=rapid_height, start=start)]
-    start.z = rapid_height
+    start = AddressVector(start.x, start.y, rapid_height)
 
     # Don't move if you are already at the correct location
     if start.x != end.x or start.y != end.y:
         commands.append(Rapid.abs(x=end.x, y=end.y, start=start, arrow=True))
-        start.x = end.x
-        start.y = end.y
+        start = AddressVector(end.x, end.y, rapid_height)
 
     if safe_plunge_height is None:
         commands.append(
@@ -83,7 +82,7 @@ def rapid_to(
         )
     else:
         commands.append(PlungeRapid.abs(z=safe_plunge_height, start=start, arrow=True))
-        start.z = safe_plunge_height
+        start = AddressVector(end.x, end.y, safe_plunge_height)
         if safe_plunge_height > end.z:
             commands.append(
                 PlungeCut.abs(z=end.z, start=start, arrow=True, feed=plunge_feed)
@@ -240,11 +239,13 @@ def route_wires(
     job: "Job",
     wires: list[Union[cq.Wire, cq.Edge]],
     stepover=None,
+    previous_pos: AddressVector | None = None,
 ):
     commands = []
     previous_wire_end = None
 
-    previous_pos = AddressVector()
+    if previous_pos is None:
+        previous_pos = AddressVector()
 
     for wire in wires:
         # Convert wires to edges
@@ -324,11 +325,13 @@ def route_polyface_outers(
     job: "Job",
     polyfaces: list[PathFace],
     stepover=None,
+    previous_pos: AddressVector | None = None,
 ) -> list[MotionCommand]:
     commands = []
     previous_wire_end = None
 
-    previous_pos = AddressVector()
+    if previous_pos is None:
+        previous_pos = AddressVector()
 
     for polyface in polyfaces:
         poly = polyface.outer
@@ -349,9 +352,10 @@ def route_polyface_outers(
             # edges = shift_edges(edges, target)
             index = poly_position[0]
             poly = shift_polygon(poly, index)
-            start = closest_point
+            start.x = closest_point[0]
+            start.y = closest_point[1]
             commands.append(
-                Cut.abs(*start, polyface.depth, previous_pos, feed=job.feed)
+                Cut.abs(start.x, start.y, polyface.depth, previous_pos, feed=job.feed)
             )
             pass
         else:
@@ -364,12 +368,12 @@ def route_polyface_outers(
                 job.plunge_feed,
             )
 
+        previous_pos = AddressVector(start.x, start.y, polyface.depth)
         for x, y in poly[1:]:
             commands.append(
                 Cut.abs(x, y, polyface.depth, start=previous_pos, feed=job.feed)
             )
-            previous_pos.x = x
-            previous_pos.y = y
+            previous_pos = AddressVector(x, y, polyface.depth)
 
         if closest_point:
             commands.append(
@@ -379,8 +383,8 @@ def route_polyface_outers(
         else:
             previous_wire_end = poly[-1]
 
-        previous_pos.x = previous_wire_end[0]
-        previous_pos.y = previous_wire_end[1]
-        previous_pos.z = polyface.depth
+        previous_pos = AddressVector(
+            previous_wire_end[0], previous_wire_end[1], polyface.depth
+        )
 
     return commands
