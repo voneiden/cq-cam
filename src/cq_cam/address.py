@@ -51,6 +51,39 @@ import cadquery as cq
 from cq_cam.utils.utils import optimize_float
 
 
+class AddressVector:
+    __slots__ = ("x", "y", "z")
+
+    def __init__(self, x=None, y=None, z=None):
+        self.x = x
+        self.y = y
+        self.z = z
+
+    def __eq__(self, other) -> bool:
+        try:
+            return self.x == other.x and self.y == other.y and self.z == other.z
+        except AttributeError:
+            return NotImplemented
+
+    def __str__(self) -> str:
+        return f"({self.x} {self.y} {self.z})"
+
+    @classmethod
+    def from_vector(cls, v: cq.Vector):
+        return cls(v.x, v.y, v.z)
+
+    def to_vector(self, origin: cq.Vector, relative=False):
+        if relative:
+            x = 0 if self.x is None else self.x - origin.x
+            y = 0 if self.y is None else self.y - origin.y
+            z = 0 if self.z is None else self.z - origin.z
+        else:
+            x = origin.x if self.x is None else self.x
+            y = origin.y if self.y is None else self.y
+            z = origin.z if self.z is None else self.z
+        return cq.Vector(x, y, z)
+
+
 #############################################################################
 class GCodeLetter(Enum):
     XAxis = "X"
@@ -190,7 +223,7 @@ class GCodeAxisGroup(ABC):
 
 
 class XYZ(GCodeAxisGroup):
-    def __init__(self, end: cq.Vector, precision: int = 3):
+    def __init__(self, end: AddressVector, precision: int = 3):
         axis_1 = XAxis(end.x, precision)
         axis_2 = YAxis(end.y, precision)
         axis_3 = ZAxis(end.z, precision)
@@ -199,7 +232,7 @@ class XYZ(GCodeAxisGroup):
 
 
 class IJK(GCodeAxisGroup):
-    def __init__(self, center: cq.Vector, precision: int = 3):
+    def __init__(self, center: AddressVector, precision: int = 3):
         axis_1 = ArcXAxis(center.x, precision)
         axis_2 = ArcYAxis(center.y, precision)
         axis_3 = ArcZAxis(center.z, precision)

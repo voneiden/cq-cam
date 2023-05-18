@@ -2,10 +2,10 @@ import unittest
 
 import cadquery as cq
 
+from cq_cam.address import AddressVector
 from cq_cam.command import (
     CircularCCW,
     CircularCW,
-    CommandVector,
     CoolantState,
     Cut,
     SafetyBlock,
@@ -17,25 +17,25 @@ from cq_cam.command import (
 
 class TestUtils(unittest.TestCase):
     def test_linear(self):
-        start = CommandVector(0, 0, 0)
+        start = AddressVector(0, 0, 0)
         cmd = Cut.abs(10, 5, 1, start=start, feed=200)
         gcode = str(cmd)
         self.assertEqual("G1 X10 Y5 Z1 F200", gcode)
 
     def test_cw_arc(self):
-        start = CommandVector(-1, 0, 0)
-        mid = CommandVector(x=0, y=1, z=None)
-        end = CommandVector(x=1, y=0, z=None)
-        center = CommandVector(x=0, y=0, z=None)
+        start = AddressVector(-1, 0, 0)
+        mid = AddressVector(x=0, y=1, z=None)
+        end = AddressVector(x=1, y=0, z=None)
+        center = AddressVector(x=0, y=0, z=None)
         cmd = CircularCW(end=end, center=center, mid=mid, start=start, feed=200)
         gcode = str(cmd)
         self.assertEqual("G2 X1 Y0 Z0 I1 J0 K0 F200", gcode)
 
     def test_ccw_arc(self):
-        start = CommandVector(-1, 0, 0)
-        mid = CommandVector(x=0, y=-1, z=None)
-        end = CommandVector(x=1, y=0, z=None)
-        center = CommandVector(x=0, y=0, z=None)
+        start = AddressVector(-1, 0, 0)
+        mid = AddressVector(x=0, y=-1, z=None)
+        end = AddressVector(x=1, y=0, z=None)
+        center = AddressVector(x=0, y=0, z=None)
         cmd = CircularCCW(end=end, center=center, mid=mid, start=start, feed=200)
         gcode = str(cmd)
         self.assertEqual("G3 X1 Y0 Z0 I1 J0 K0 F200", gcode)

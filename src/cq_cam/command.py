@@ -90,7 +90,15 @@ import cadquery as cq
 from OCP.AIS import AIS_Line, AIS_Shape
 from OCP.Geom import Geom_CartesianPoint
 
-from cq_cam.address import IJK, XYZ, Feed, Speed, ToolLengthOffset, ToolNumber
+from cq_cam.address import (
+    IJK,
+    XYZ,
+    AddressVector,
+    Feed,
+    Speed,
+    ToolLengthOffset,
+    ToolNumber,
+)
 from cq_cam.groups import (
     ArcDistanceMode,
     AutomaticChangerMode,
@@ -115,54 +123,21 @@ from cq_cam.groups import (
 from cq_cam.visualize import cached_occ_color
 
 
-class CommandVector:
-    __slots__ = ("x", "y", "z")
-
-    def __init__(self, x=None, y=None, z=None):
-        self.x = x
-        self.y = y
-        self.z = z
-
-    def __eq__(self, other) -> bool:
-        try:
-            return self.x == other.x and self.y == other.y and self.z == other.z
-        except AttributeError:
-            return NotImplemented
-
-    def __str__(self) -> str:
-        return f"({self.x} {self.y} {self.z})"
-
-    @classmethod
-    def from_vector(cls, v: cq.Vector):
-        return cls(v.x, v.y, v.z)
-
-    def to_vector(self, origin: cq.Vector, relative=False):
-        if relative:
-            x = 0 if self.x is None else self.x - origin.x
-            y = 0 if self.y is None else self.y - origin.y
-            z = 0 if self.z is None else self.z - origin.z
-        else:
-            x = origin.x if self.x is None else self.x
-            y = origin.y if self.y is None else self.y
-            z = origin.z if self.z is None else self.z
-        return cq.Vector(x, y, z)
-
-
 class Command(ABC):
     pass
 
 
 class MotionCommand(Command, ABC):
     modal: MotionControl
-    start: CommandVector
-    end: CommandVector
+    start: AddressVector
+    end: AddressVector
     ais_color = "red"
     ais_alt_color = "darkred"
 
     def __init__(
         self,
-        end: CommandVector,
-        start: CommandVector | None,
+        end: AddressVector,
+        start: AddressVector | None,
         arrow=False,
         **kwargs,
     ):
@@ -174,7 +149,7 @@ class MotionCommand(Command, ABC):
             if end.z is None:
                 end.z = start.z
         else:
-            start = CommandVector()
+            start = AddressVector()
         self.start = start
         self.end = end
         self.arrow = arrow
@@ -182,8 +157,8 @@ class MotionCommand(Command, ABC):
         super().__init__(**kwargs)
 
     @classmethod
-    def abs(cls, x=None, y=None, z=None, start: CommandVector | None = None, **kwargs):
-        return cls(end=CommandVector(x=x, y=y, z=z), start=start, **kwargs)
+    def abs(cls, x=None, y=None, z=None, start: AddressVector | None = None, **kwargs):
+        return cls(end=AddressVector(x=x, y=y, z=z), start=start, **kwargs)
 
     @abstractmethod
     def to_ais_shape(self, as_edges=False, alt_color=False) -> AIS_Shape:
@@ -235,8 +210,8 @@ class PlungeRapid(Rapid):
         super().__init__(end, start, **kwargs)
 
     @classmethod
-    def abs(cls, z=None, start: CommandVector | None = None, **kwargs):
-        return cls(end=CommandVector(z=z), start=start, **kwargs)
+    def abs(cls, z=None, start: AddressVector | None = None, **kwargs):
+        return cls(end=AddressVector(z=z), start=start, **kwargs)
 
 
 class Retract(Rapid):
@@ -250,8 +225,8 @@ class Retract(Rapid):
         super().__init__(end, start, **kwargs)
 
     @classmethod
-    def abs(cls, z=None, start: CommandVector | None = None, **kwargs):
-        return cls(end=CommandVector(z=z), start=start, **kwargs)
+    def abs(cls, z=None, start: AddressVector | None = None, **kwargs):
+        return cls(end=AddressVector(z=z), start=start, **kwargs)
 
 
 class FeedRateCommand(MotionCommand, ABC):
@@ -259,8 +234,8 @@ class FeedRateCommand(MotionCommand, ABC):
 
     def __init__(
         self,
-        end: CommandVector,
-        start: CommandVector,
+        end: AddressVector,
+        start: AddressVector,
         arrow=False,
         feed: float | None = None,
         **kwargs,
@@ -313,19 +288,19 @@ class PlungeCut(Cut):
         super().__init__(end, start, **kwargs)
 
     @classmethod
-    def abs(cls, z=None, start: CommandVector | None = None, **kwargs):
-        return cls(end=CommandVector(z=z), start=start, **kwargs)
+    def abs(cls, z=None, start: AddressVector | None = None, **kwargs):
+        return cls(end=AddressVector(z=z), start=start, **kwargs)
 
 
 # CIRCULAR MOTION
 class Circular(FeedRateCommand, ABC):
-    center: CommandVector
-    mid: CommandVector
+    center: AddressVector
+    mid: AddressVector
 
     def __init__(
         self,
-        center: CommandVector,
-        mid: CommandVector,
+        center: AddressVector,
+        mid: AddressVector,
         **kwargs,
     ):
         self.center = center

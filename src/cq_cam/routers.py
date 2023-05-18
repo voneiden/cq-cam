@@ -6,10 +6,10 @@ import numpy as np
 from OCP.BRepExtrema import BRepExtrema_DistShapeShape, BRepExtrema_SupportType
 from OCP.TopAbs import TopAbs_REVERSED
 
+from cq_cam.address import AddressVector
 from cq_cam.command import (
     CircularCCW,
     CircularCW,
-    CommandVector,
     Cut,
     MotionCommand,
     PlungeCut,
@@ -62,7 +62,7 @@ def vertical_ramp(
 
 
 def rapid_to(
-    start: CommandVector,
+    start: AddressVector,
     end: cq.Vector,
     rapid_height: float,
     safe_plunge_height=None,
@@ -145,8 +145,8 @@ def route_edge(
     )
     ep = edge_end_point(edge) if end_p is None else edge.positionAt(end_p, "parameter")
 
-    start_cv = CommandVector.from_vector(sp)
-    end_cv = CommandVector.from_vector(ep)
+    start_cv = AddressVector.from_vector(sp)
+    end_cv = AddressVector.from_vector(ep)
     if geom_type == "LINE":
         # commands.append(Cut(end_cv, arrow=edge_i % 5 == 0))
         commands.append(Cut(end_cv, start_cv, arrow=arrow, feed=feed))
@@ -157,7 +157,7 @@ def route_edge(
         if end_p is None:
             end_p = edge_end_param(edge)
 
-        center = CommandVector.from_vector(edge.arcCenter())
+        center = AddressVector.from_vector(edge.arcCenter())
         cmd = CircularCW if is_arc_clockwise2(edge) else CircularCCW
 
         # Actual circles are closed
@@ -165,9 +165,9 @@ def route_edge(
         # TODO ARC's are not necessarily circular, so the gcode representation can be wrong!
         if edge.Closed():
             mid1_p, end1_p, mid2_p = np.linspace(start_p, end_p, 5)[1:-1]
-            mid1 = CommandVector.from_vector(edge.positionAt(mid1_p, "parameter"))
-            end1 = CommandVector.from_vector(edge.positionAt(end1_p, "parameter"))
-            start_cv = CommandVector.from_vector(edge.positionAt(start_p, "parameter"))
+            mid1 = AddressVector.from_vector(edge.positionAt(mid1_p, "parameter"))
+            end1 = AddressVector.from_vector(edge.positionAt(end1_p, "parameter"))
+            start_cv = AddressVector.from_vector(edge.positionAt(start_p, "parameter"))
             commands.append(
                 cmd(
                     center=center,
@@ -179,7 +179,7 @@ def route_edge(
                 )
             )
             start_cv = end1
-            mid2 = CommandVector.from_vector(edge.positionAt(mid2_p, "parameter"))
+            mid2 = AddressVector.from_vector(edge.positionAt(mid2_p, "parameter"))
             commands.append(
                 cmd(
                     center=center,
@@ -196,7 +196,7 @@ def route_edge(
             commands.append(Cut(end=end_cv, start=start_cv, arrow=arrow, feed=feed))
         else:
             mid_p = np.linspace(start_p, end_p, 3)[1]
-            mid = CommandVector.from_vector(edge.positionAt(mid_p, "parameter"))
+            mid = AddressVector.from_vector(edge.positionAt(mid_p, "parameter"))
             commands.append(
                 cmd(
                     center=center,
@@ -219,7 +219,7 @@ def route_edge(
 
         for length in np.linspace(i, j, n):
             # [e._geomAdaptor().Curve().Curve().BasisCurve().BasisCurve() for e in pocket.DEBUG[0].Edges()]
-            end_cv_int = CommandVector.from_vector(edge.positionAt(length))
+            end_cv_int = AddressVector.from_vector(edge.positionAt(length))
             commands.append(
                 Cut(
                     end_cv_int,
@@ -244,7 +244,7 @@ def route_wires(
     commands = []
     previous_wire_end = None
 
-    previous_pos = CommandVector()
+    previous_pos = AddressVector()
 
     for wire in wires:
         # Convert wires to edges
@@ -272,7 +272,7 @@ def route_wires(
             if param:
                 start = edges[0].positionAt(param, "parameter")
             commands.append(
-                Cut(CommandVector.from_vector(start), previous_pos, feed=job.feed)
+                Cut(AddressVector.from_vector(start), previous_pos, feed=job.feed)
             )
         else:
             # Create simple transition between toolpaths
@@ -328,7 +328,7 @@ def route_polyface_outers(
     commands = []
     previous_wire_end = None
 
-    previous_pos = CommandVector()
+    previous_pos = AddressVector()
 
     for polyface in polyfaces:
         poly = polyface.outer
