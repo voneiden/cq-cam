@@ -166,7 +166,13 @@ def pocket_cq(
         sequences += fill_pocket_contour_shrink(pocket_op, stepover)
 
     # Route wires
+    commands = []
+    previous_pos = AddressVector()
     for sequence_wires in sequences:
-        commands += route_wires(job, sequence_wires, stepover=stepover)
+        commands += route_wires(
+            job, sequence_wires, stepover=stepover, previous_pos=previous_pos
+        )
+        cmd = commands[-1]
+        previous_pos = cmd.end
 
     return commands

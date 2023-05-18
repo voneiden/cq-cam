@@ -69,12 +69,12 @@ def rapid_to(
     plunge_feed: float | None = None,
 ):
     commands = [Retract.abs(z=rapid_height, start=start)]
-    start = AddressVector(start.x, start.y, rapid_height)
+    start = commands[-1].end
 
     # Don't move if you are already at the correct location
     if start.x != end.x or start.y != end.y:
         commands.append(Rapid.abs(x=end.x, y=end.y, start=start, arrow=True))
-        start = AddressVector(end.x, end.y, rapid_height)
+        start = commands[-1].end
 
     if safe_plunge_height is None:
         commands.append(
@@ -82,7 +82,7 @@ def rapid_to(
         )
     else:
         commands.append(PlungeRapid.abs(z=safe_plunge_height, start=start, arrow=True))
-        start = AddressVector(end.x, end.y, safe_plunge_height)
+        start = commands[-1].end
         if safe_plunge_height > end.z:
             commands.append(
                 PlungeCut.abs(z=end.z, start=start, arrow=True, feed=plunge_feed)
@@ -286,6 +286,7 @@ def route_wires(
                 job.op_safe_height,
                 plunge_feed=job.plunge_feed,
             )
+        previous_pos = commands[-1].end
 
         for edge_i, edge in enumerate(edges):
             if edge_i == 0:
@@ -293,25 +294,26 @@ def route_wires(
                     new_commands, end = route_edge(
                         edge, job.precision, start_p=param, arrow=True, feed=job.feed
                     )
+                    previous_pos = new_commands[-1].end
                     commands += new_commands
                 else:
                     new_commands, end = route_edge(
                         edge, job.precision, arrow=True, feed=job.feed
                     )
+                    previous_pos = new_commands[-1].end
                     commands += new_commands
             else:
                 new_commands, end = route_edge(edge, job.precision, feed=job.feed)
+                previous_pos = new_commands[-1].end
                 commands += new_commands
         if param:
             new_commands, end = route_edge(
                 edges[0], job.precision, end_p=param, feed=job.feed
             )
+            previous_pos = new_commands[-1].end
             commands += new_commands
 
         previous_wire_end = end
-        previous_pos.x = end.x
-        previous_pos.y = end.y
-        previous_pos.z = end.z
     return commands
 
 
@@ -357,7 +359,6 @@ def route_polyface_outers(
             commands.append(
                 Cut.abs(start.x, start.y, polyface.depth, previous_pos, feed=job.feed)
             )
-            pass
         else:
             # Create simple transition between toolpaths
             commands += rapid_to(
@@ -368,12 +369,12 @@ def route_polyface_outers(
                 job.plunge_feed,
             )
 
-        previous_pos = AddressVector(start.x, start.y, polyface.depth)
+        previous_pos = commands[-1].end
         for x, y in poly[1:]:
             commands.append(
                 Cut.abs(x, y, polyface.depth, start=previous_pos, feed=job.feed)
             )
-            previous_pos = AddressVector(x, y, polyface.depth)
+            previous_pos = commands[-1].end
 
         if closest_point:
             commands.append(
@@ -383,8 +384,6 @@ def route_polyface_outers(
         else:
             previous_wire_end = poly[-1]
 
-        previous_pos = AddressVector(
-            previous_wire_end[0], previous_wire_end[1], polyface.depth
-        )
+        previous_pos = commands[-1].end
 
     return commands

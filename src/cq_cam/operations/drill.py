@@ -3,6 +3,7 @@ from typing import Union
 
 import cadquery as cq
 
+from cq_cam.address import AddressVector
 from cq_cam.command import PlungeCut, Rapid
 from cq_cam.operations.base_operation import Operation, OperationError
 from cq_cam.operations.strategy import Strategy
@@ -68,15 +69,17 @@ class Drill(Operation):
             last = drill_point
 
         depth = -abs(self.depth)
+        previous_pos = AddressVector()
         for point in ordered_drill_points:
-            cut_sequences.append(
-                [
-                    Rapid.abs(z=self.job.op_safe_height),
-                    Rapid.abs(x=point[0], y=point[1]),
-                    Rapid.abs(z=0),
-                    PlungeCut.abs(z=depth, feed=self.job.feed),  # TODO depth
-                    # Rapid.abs(z=self.job.op_safe_height),
-                ]
-            )
+            ops = []
+            ops.append(Rapid.abs(z=self.job.op_safe_height, start=previous_pos))
+            previous_pos = ops[-1].end
+            ops.append(Rapid.abs(x=point[0], y=point[1], start=previous_pos))
+            previous_pos = ops[-1].end
+            ops.append(Rapid.abs(z=0, start=previous_pos))
+            previous_pos = ops[-1].end
+            ops.append(PlungeCut.abs(z=depth, feed=self.job.feed, start=previous_pos))
+            previous_pos = ops[-1].end
+            cut_sequences.append(ops)
         cut_sequences = flatten_list(cut_sequences)
         self.commands = cut_sequences

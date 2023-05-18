@@ -10,6 +10,7 @@ from OCP.TopAbs import TopAbs_FACE
 from OCP.TopExp import TopExp_Explorer
 from OCP.TopLoc import TopLoc_Location
 
+from cq_cam.address import AddressVector
 from cq_cam.command import Cut, PlungeCut, Rapid
 from cq_cam.operations.base_operation import FaceBaseOperation
 from cq_cam.operations.strategy import ZigZagStrategy
@@ -122,6 +123,7 @@ class Surface3D(FaceBaseOperation):
             else:
                 depths = [bottom_height]
 
+            previous_pos = AddressVector()
             for i, depth in enumerate(depths):
                 # We want to include i-2 - otherwise we get gaps between depths
                 last_last_depth = depths[i - 2] if i > 1 else 0
@@ -133,16 +135,31 @@ class Surface3D(FaceBaseOperation):
                 # TODO if there is a new cut sequence within radius of max_step then use it without retracting
                 for cut_sequence in depth_cut_sequences:
                     cut_start = cut_sequence[0]
-                    self.commands.append(Rapid.abs(z=self.job.rapid_height))
-                    self.commands.append(Rapid.abs(x=cut_start[0], y=cut_start[1]))
                     self.commands.append(
-                        Rapid.abs(z=self.job.op_safe_height)
+                        Rapid.abs(z=self.job.rapid_height, start=previous_pos)
+                    )
+                    previous_pos = self.commands[-1].end
+                    self.commands.append(
+                        Rapid.abs(x=cut_start[0], y=cut_start[1], start=previous_pos)
+                    )
+                    previous_pos = self.commands[-1].end
+                    self.commands.append(
+                        Rapid.abs(z=self.job.op_safe_height, start=previous_pos)
                     )  # TODO plunge or rapid?
-                    self.commands.append(PlungeCut.abs(z=cut_start[2]))
+                    previous_pos = self.commands[-1].end
+                    # self.commands.append(PlungeCut.abs(
+                    #     z=cut_start[2], start=previous_pos))
+                    # previous_pos = self.commands[-1].end
                     for cut in cut_sequence[1:]:
                         self.commands.append(
-                            Cut.abs(x=cut[0], y=cut[1], z=max(depth, cut[2]))
+                            Cut.abs(
+                                x=cut[0],
+                                y=cut[1],
+                                z=max(depth, cut[2]),
+                                start=previous_pos,
+                            )
                         )
+                        previous_pos = self.commands[-1].end
 
         # for i, base_boundary in enumerate(base_boundaries):
         #    show_object(base_boundary, f'base_boundary-{i}')
