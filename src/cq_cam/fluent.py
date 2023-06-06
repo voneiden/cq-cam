@@ -12,6 +12,7 @@ from cq_cam.groups import (
     CoolantState,
     DistanceMode,
     PlannerControlMode,
+    ProgramControlMode,
     Unit,
     WorkOffset,
     WorkPlane,
@@ -36,14 +37,9 @@ class Operation:
     def to_gcode(self):
         # Set starting position above rapid height so that
         # we guarantee getting the correct Z rapid in the beginning
-        position = cq.Vector(0, 0, self.job.rapid_height + 1)
         gcodes = [f"({self.job.name} - {self.name})"]
-        previous_command = None
         for command in self.commands:
-            command.previous_command = previous_command
-            command.start = position
-            gcode, position = command.to_gcode()
-            previous_command = command
+            gcode = str(command)
 
             # Skip blank lines. These can happen for example if we try to issue
             # a move to the same position where we already are
@@ -282,11 +278,12 @@ class Job:
             f"{StartSequence(speed=self.speed, coolant=self.coolant)}\n"
             f"{task_break.join(task.to_gcode() for task in self.operations)}\n"
             f"{SafetyBlock()}\n"
-            f"{StopSequence(coolant=self.coolant)}"
+            f"{StopSequence(coolant=self.coolant)}\n"
+            f"{ProgramControlMode.END_RESET}"
         )
 
     def save_gcode(self, file_name):
-        gcode = self.to_gcode()
+        gcode = str(self)
         with open(file_name, "w") as f:
             f.write(gcode)
 

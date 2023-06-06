@@ -8,6 +8,7 @@ from OCP.Geom import Geom_Plane
 from OCP.GeomProjLib import GeomProjLib
 from OCP.TopAbs import TopAbs_REVERSED
 
+from cq_cam.address import AddressVector
 from cq_cam.operations.tabs import Tabs, Transition
 from cq_cam.routers import route_wires
 from cq_cam.utils.geometry_op import offset_wire

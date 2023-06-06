@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Literal
 import cadquery as cq
 import numpy as np
 
+from cq_cam.address import AddressVector
 from cq_cam.operations.pocket_cq import pocket_cq
 from cq_cam.routers import route_polyface_outers
 from cq_cam.utils.geometry_op import (
@@ -266,7 +267,12 @@ def pocket_clipper(
 
     # Route wires
     commands = []
+    previous_pos = AddressVector()
     for sequence_polyfaces in sequences:
-        commands += route_polyface_outers(job, sequence_polyfaces, stepover=stepover)
+        commands += route_polyface_outers(
+            job, sequence_polyfaces, stepover=stepover, previous_pos=previous_pos
+        )
+        cmd = commands[-1]
+        previous_pos = cmd.end
 
     return commands

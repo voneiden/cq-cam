@@ -65,7 +65,7 @@ def test_same_tool_number(job: Job, big_box, operation):
         job = operation(job, face_1, tool=tool_1)
         job = operation(job, face_2, tool=tool_1)
 
-    gcode_str, _ = output_1.to_gcode()
+    gcode_str = str(output_1)
     assert job.operations[0].to_gcode() == f"{tool_change_label}{gcode_str}"
     assert job.operations[2].to_gcode() != f"{tool_change_label}{gcode_str}"
 
@@ -122,8 +122,8 @@ def test_different_tool_number_(
         job = operation(job, face_1, tool=tool_1)
         job = operation(job, face_2, tool=tool_2)
 
-    gcode_str_1, _ = output_1.to_gcode()
-    gcode_str_2, _ = output_2.to_gcode()
+    gcode_str_1 = str(output_1)
+    gcode_str_2 = str(output_2)
 
     assert job.operations[0].to_gcode() == f"{label}{gcode_str_1}"
     assert job.operations[2].to_gcode() == f"{label}{gcode_str_2}"

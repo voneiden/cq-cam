@@ -40,11 +40,9 @@ class Operation(ABC):
         start = cq.Vector(10, 10, 10)
 
         def command_gcode_generator(start):
-            previous_command = None
             for command in self.commands:
-                gcode, start = command.to_gcode(previous_command, start, self.job)
+                gcode, start = command.to_gcode(start, self.job)
                 yield gcode
-                previous_command = command
 
         return "\n".join(command_gcode_generator(start))
 

@@ -6,7 +6,7 @@ The interpreter is responsible for lowering the RS274//NGC language into its equ
 The interpreter should reject input commands or canonical functions that address non-existent equipment.
 
 The command syntax for various commands is shown below:
-Rapid Linear Motioun: G0 X… Y… Z…
+Rapid Linear Motion: G0 X… Y… Z…
 Linear Motion at Feed Rate: G1 X… Y… Z… F…
 Arc at Feed Rate (Center Format Arc): G2 X… Y… Z… I… J… K… F…
 Simple Drill: <G98> G81 X… Y… Z… R… L…
@@ -52,7 +52,7 @@ These are some of the rules that we must be aware off when constructing G-code p
 - Initial and trailing zeros are allowed but not required
 - A line may have any number of G words, but two G words from the same modal group may not appear on the same line
 - It is an error to a put a G-code from group 1 and group 0 (G10, G28, G30, G92) on the same line if both of them use axis words.
-- A line may have zero to four M words, but two G words from the same modal group may not appear on the same line
+- A line may have zero to four M words, but two M words from the same modal group may not appear on the same line
 - For all other legal letter, a line may have only one words beginning with that letter
 - Axis words (ABC, XYZ) specify a destination point.
 - Axis numbers are in the currently active coordinate system, unless explicitly described as being in the aboslute coordinate system (G53)
@@ -91,16 +91,13 @@ from OCP.AIS import AIS_Line, AIS_Shape
 from OCP.Geom import Geom_CartesianPoint
 
 from cq_cam.address import (
-    ArcXAxis,
-    ArcYAxis,
-    ArcZAxis,
+    IJK,
+    XYZ,
+    AddressVector,
     Feed,
     Speed,
     ToolLengthOffset,
     ToolNumber,
-    XAxis,
-    YAxis,
-    ZAxis,
 )
 from cq_cam.groups import (
     ArcDistanceMode,
@@ -110,7 +107,9 @@ from cq_cam.groups import (
     CutterState,
     DistanceMode,
     FeedRateControlMode,
+    GCodeGroup,
     LengthCompensation,
+    MotionControl,
     Path,
     PlannerControlMode,
     Position,
@@ -124,151 +123,67 @@ from cq_cam.groups import (
 from cq_cam.visualize import cached_occ_color
 
 
-class CommandVector(ABC):
-    __slots__ = ("x", "y", "z")
-
-    def __init__(self, x=None, y=None, z=None):
-        self.x = x
-        self.y = y
-        self.z = z
-
-    @abstractmethod
-    def to_vector(self, origin: cq.Vector, relative=False) -> cq.Vector:
-        pass
-
-
-class RelativeCV(CommandVector):
-    def to_vector(self, origin: cq.Vector, relative=False):
-        warnings.warn("Relative CV is deprecated", DeprecationWarning)
-        if relative:
-            x = 0 if self.x is None else self.x
-            y = 0 if self.y is None else self.y
-            z = 0 if self.z is None else self.z
-        else:
-            x = origin.x + self.x if self.x else origin.x
-            y = origin.y + self.y if self.y else origin.y
-            z = origin.z + self.z if self.z else origin.z
-        return cq.Vector(x, y, z)
-
-
-class AbsoluteCV(CommandVector):
-    @classmethod
-    def from_vector(cls, v: cq.Vector):
-        return cls(v.x, v.y, v.z)
-
-    def to_vector(self, origin: cq.Vector, relative=False):
-        if relative:
-            x = 0 if self.x is None else self.x - origin.x
-            y = 0 if self.y is None else self.y - origin.y
-            z = 0 if self.z is None else self.z - origin.z
-        else:
-            x = origin.x if self.x is None else self.x
-            y = origin.y if self.y is None else self.y
-            z = origin.z if self.z is None else self.z
-        return cq.Vector(x, y, z)
-
-
 class Command(ABC):
-    modal = None
-
-    @abstractmethod
-    def to_gcode(self) -> tuple[str, cq.Vector | None]:
-        """Output all the necessary G-Code required to perform the command"""
-        pass
-
-
-class MotionCommand(Command, ABC):
-    max_depth: float | None
-    ais_color = "red"
-    ais_alt_color = "darkred"
-    previous_command: MotionCommand | None
-    feed: float | None
-    start: cq.Vector
-    end: CommandVector
-    tab: bool  # TODO not the right place to carry tab information imo?
-
-    def __init__(
-        self, end: CommandVector, arrow=False, tab=False, feed: float | None = None
-    ):
-        self.end = end
-        self.arrow = arrow
-        self.tab = tab
-        self.feed = feed
-        self.max_depth = None  # TODO whats this?
-
-    @classmethod
-    def abs(cls, x=None, y=None, z=None, **kwargs):
-        return cls(end=AbsoluteCV(x=x, y=y, z=z), **kwargs)
-
-    @classmethod
-    def rel(cls, x=None, y=None, z=None, **kwargs):
-        warnings.warn("Relative CV is deprecated", DeprecationWarning)
-        return cls(end=RelativeCV(x=x, y=y, z=z), **kwargs)
-
-    def print_modal(self, previous: MotionCommand | None):
-        if self.modal and (previous is None or previous.modal != self.modal):
-            return self.modal
-        return ""
-
-    def print_feed(self, previous: MotionCommand | None):
-        previous_command = previous
-        while previous_command is not None and previous_command.modal == str(
-            Path.RAPID
-        ):
-            previous_command = previous_command.previous_command
-        if self.feed and (
-            previous_command is None or previous_command.feed != self.feed
-        ):
-            return f"{Feed(self.feed)}"
-        return ""
-
-    def xyz_gcode(self, start: cq.Vector, precision=3) -> tuple[str, cq.Vector]:
-        coords = []
-        end = self.end.to_vector(start)
-        # TODO precision
-
-        # TODO use isclose
-
-        if start.x != end.x:
-            coords.append(f"{XAxis(end.x, precision)}")
-
-        if start.y != end.y:
-            coords.append(f"{YAxis(end.y, precision)}")
-
-        if start.z != end.z:
-            coords.append(f"{ZAxis(end.z, precision)}")
-
-        return "".join(coords), end
-
-    @abstractmethod
-    def to_ais_shape(
-        self, as_edges=False, alt_color=False
-    ) -> tuple[AIS_Shape, cq.Vector]:
-        pass
-
-
-class ConfigCommand(Command, ABC):
     pass
 
 
-class Linear(MotionCommand, ABC):
-    def to_gcode(self) -> tuple[str, cq.Vector]:
-        xyz, end = self.xyz_gcode(self.start)
-        return (
-            f"{self.print_modal(self.previous_command)}{xyz}{self.print_feed(self.previous_command)}",
-            end,
-        )
+class MotionCommand(Command, ABC):
+    modal: MotionControl
+    start: AddressVector
+    end: AddressVector
+    ais_color = "red"
+    ais_alt_color = "darkred"
 
-    def to_ais_shape(self, as_edges=False, alt_color=False):
-        end = self.end.to_vector(self.start)
-        if self.start == end:
-            return None, end
+    def __init__(
+        self,
+        end: AddressVector,
+        start: AddressVector | None,
+        arrow=False,
+        **kwargs,
+    ):
+        if start is not None:
+            if end.x is None:
+                end.x = start.x
+            if end.y is None:
+                end.y = start.y
+            if end.z is None:
+                end.z = start.z
+        else:
+            start = AddressVector()
+        self.start = start
+        self.end = end
+        self.arrow = arrow
+
+        super().__init__(**kwargs)
+
+    @classmethod
+    def abs(cls, x=None, y=None, z=None, start: AddressVector | None = None, **kwargs):
+        return cls(end=AddressVector(x=x, y=y, z=z), start=start, **kwargs)
+
+    @abstractmethod
+    def to_ais_shape(self, as_edges=False, alt_color=False) -> AIS_Shape:
+        pass
+
+
+class RapidCommand(MotionCommand, ABC):
+    modal = Path.RAPID
+
+    def to_ais_shape(self, as_edges=False, alt_color=False) -> AIS_Shape:
+        x = self.start.x if self.start.x is not None else 0
+        y = self.start.y if self.start.y is not None else 0
+        z = self.start.z if self.start.z is not None else 0
+
+        start = cq.Vector(x, y, z)
+        end = self.end.to_vector(start)
+
+        if start == end:
+            return None
 
         if as_edges:
-            return cq.Edge.makeLine(self.start, end), end
+            return cq.Edge.makeLine(start, end)
 
         shape = AIS_Line(
-            Geom_CartesianPoint(self.start.toPnt()), Geom_CartesianPoint(end.toPnt())
+            Geom_CartesianPoint(start.toPnt()), Geom_CartesianPoint(end.toPnt())
         )
         if self.arrow:
             shape.Attributes().SetLineArrowDraw(True)
@@ -277,40 +192,33 @@ class Linear(MotionCommand, ABC):
             cached_occ_color(self.ais_alt_color if alt_color else self.ais_color)
         )
 
-        return shape, end
+        return shape
 
-    def flip(self, new_end: cq.Vector) -> tuple[MotionCommand, cq.Vector]:
-        start = new_end - self.relative_end
-        return self.__class__(-self.relative_end), start
+    def __str__(self) -> str:
+        modal = str(self.modal)
+        xyz = str(XYZ(self.end))
+        words = [modal, xyz]
+
+        # words.append(f"({XYZ(self.start)})")
+
+        return " ".join(words)
 
 
-class Rapid(Linear):
-    modal = str(Path.RAPID)
+class Rapid(RapidCommand):
     ais_color = "green"
 
 
-class Cut(Linear):
-    modal = str(Path.LINEAR)
-
-
-class Plunge(Cut):
+class PlungeRapid(Rapid):
     ais_color = "yellow"
 
-    # TODO apply plunge feed rate
-
-    def __init__(self, end, **kwargs):
+    def __init__(self, end, start, **kwargs):
         if end.x is not None or end.y is not None:
             raise RuntimeError("Plunge can only operate on z axis")
-        super().__init__(end, **kwargs)
+        super().__init__(end, start, **kwargs)
 
     @classmethod
-    def abs(cls, z=None, **kwargs):
-        return cls(end=AbsoluteCV(z=z), **kwargs)
-
-    @classmethod
-    def rel(cls, z=None, **kwargs):
-        warnings.warn("Relative CV is deprecated", DeprecationWarning)
-        return cls(end=RelativeCV(z=z), **kwargs)
+    def abs(cls, z=None, start: AddressVector | None = None, **kwargs):
+        return cls(end=AddressVector(z=z), start=start, **kwargs)
 
 
 class Retract(Rapid):
@@ -318,56 +226,115 @@ class Retract(Rapid):
 
     ais_color = "blue"
 
-    def __init__(self, end, **kwargs):
+    def __init__(self, end, start, **kwargs):
         if end.x is not None or end.y is not None:
             raise RuntimeError("Retract can only operate on z axis")
-        super().__init__(end, **kwargs)
+        super().__init__(end, start, **kwargs)
 
     @classmethod
-    def abs(cls, z=None, **kwargs):
-        return cls(end=AbsoluteCV(z=z), **kwargs)
+    def abs(cls, z=None, start: AddressVector | None = None, **kwargs):
+        return cls(end=AddressVector(z=z), start=start, **kwargs)
+
+
+class FeedRateCommand(MotionCommand, ABC):
+    feed: float | None
+
+    def __init__(
+        self,
+        end: AddressVector,
+        start: AddressVector,
+        arrow=False,
+        feed: float | None = None,
+        **kwargs,
+    ):
+        self.feed = feed
+        super().__init__(end, start, arrow, **kwargs)
+
+
+class Cut(FeedRateCommand):
+    modal = Path.LINEAR
+
+    def __str__(self) -> str:
+        modal = str(self.modal)
+        xyz = str(XYZ(self.end))
+        feed = str(Feed(self.feed))
+        words = [modal, xyz]
+        if feed != "":
+            words.append(feed)
+
+        # words.append(f"({XYZ(self.start)})")
+
+        return " ".join(words)
+
+    def to_ais_shape(self, as_edges=False, alt_color=False) -> AIS_Shape:
+        x = self.start.x if self.start.x is not None else 0
+        y = self.start.y if self.start.y is not None else 0
+        z = self.start.z if self.start.z is not None else 0
+
+        start = cq.Vector(x, y, z)
+        end = self.end.to_vector(start)
+
+        if start == end:
+            return None
+
+        if as_edges:
+            return cq.Edge.makeLine(start, end)
+
+        shape = AIS_Line(
+            Geom_CartesianPoint(start.toPnt()), Geom_CartesianPoint(end.toPnt())
+        )
+        if self.arrow:
+            shape.Attributes().SetLineArrowDraw(True)
+
+        shape.SetColor(
+            cached_occ_color(self.ais_alt_color if alt_color else self.ais_color)
+        )
+
+        return shape
+
+
+class PlungeCut(Cut):
+    ais_color = "yellow"
+
+    def __init__(self, end, start, **kwargs):
+        if end.x is not None or end.y is not None:
+            raise RuntimeError("Plunge can only operate on z axis")
+        super().__init__(end, start, **kwargs)
 
     @classmethod
-    def rel(cls, z=None, **kwargs):
-        warnings.warn("Relative CV is deprecated", DeprecationWarning)
-        return cls(end=RelativeCV(z=z), **kwargs)
+    def abs(cls, z=None, start: AddressVector | None = None, **kwargs):
+        return cls(end=AddressVector(z=z), start=start, **kwargs)
 
 
 # CIRCULAR MOTION
-
-
-class Circular(MotionCommand, ABC):
-    end: CommandVector
-    center: CommandVector
-    mid: CommandVector
+class Circular(FeedRateCommand, ABC):
+    center: AddressVector
+    mid: AddressVector
 
     def __init__(
-        self, end: CommandVector, center: CommandVector, mid: CommandVector, **kwargs
+        self,
+        center: AddressVector,
+        mid: AddressVector,
+        **kwargs,
     ):
-        super().__init__(end, **kwargs)
         self.center = center
         self.mid = mid
+        super().__init__(**kwargs)
 
-    def ijk_gcode(self, start: cq.Vector, precision=3):
-        center = self.center.to_vector(start, relative=True)
-        ijk = []
-        if self.center.x is not None:
-            ijk.append(f"{ArcXAxis(center.x)}")
+    def __str__(self) -> str:
+        modal = str(self.modal)
+        xyz = str(XYZ(self.end))
+        center = self.center.to_vector(self.start, relative=True)
+        ijk = str(IJK(center))
+        feed = str(Feed(self.feed))
+        words = [modal, xyz, ijk]
+        if feed != "":
+            words.append(feed)
 
-        if self.center.y is not None:
-            ijk.append(f"{ArcYAxis(center.y)}")
+        # words.append(f"({XYZ(self.start)})")
+        return " ".join(words)
 
-        if self.center.z is not None:
-            ijk.append(f"{ArcZAxis(center.z)}")
-
-        return "".join(ijk)
-
-    def to_gcode(self) -> tuple[str, cq.Vector]:
-        xyz, end = self.xyz_gcode(self.start)
-        ijk = self.ijk_gcode(self.start)
-        return f"{self.print_modal(self.previous_command)}{xyz}{ijk}", end
-
-    def to_ais_shape(self, as_edges=False, alt_color=False):
+    def to_ais_shape(self, as_edges=False, alt_color=False) -> AIS_Shape:
         end = self.end.to_vector(self.start)
         mid = self.mid.to_vector(self.start)
 
@@ -387,22 +354,26 @@ class Circular(MotionCommand, ABC):
                 edge = cq.Edge.makeLine(self.start, end)
             except:
                 # Too small to render ?
-                return None, end
+                return None
         if as_edges:
-            return edge, end
+            return edge
         shape = AIS_Shape(edge.wrapped)
         shape.SetColor(
             cached_occ_color(self.ais_alt_color if alt_color else self.ais_color)
         )
-        return shape, end
+        return shape
 
 
 class CircularCW(Circular):
-    modal = str(Path.ARC_CW)
+    modal = Path.ARC_CW
 
 
 class CircularCCW(Circular):
-    modal = str(Path.ARC_CCW)
+    modal = Path.ARC_CCW
+
+
+class ConfigCommand(Command, ABC):
+    pass
 
 
 class StartSequence(ConfigCommand):
@@ -425,21 +396,7 @@ class StartSequence(ConfigCommand):
         if self.coolant is not None:
             words.append(f"{self.coolant}")
 
-        gcode_str = " ".join(words)
-
-        return gcode_str
-
-    def to_gcode(self) -> tuple[str, cq.Vector]:
-        words = [f"{CutterState.ON_CW}"]
-
-        if self.speed is not None:
-            words.append(f"{Speed(self.speed)}")
-
-        if self.coolant is not None:
-            words.append(f"{self.coolant}")
-
-        gcode_str = " ".join(words)
-        return (gcode_str, None)
+        return " ".join(words)
 
 
 class StopSequence(ConfigCommand):
@@ -454,16 +411,7 @@ class StopSequence(ConfigCommand):
         if self.coolant is not None:
             words.append(f"{CoolantState.OFF}")
 
-        gcode_str = " ".join(words)
-        return gcode_str
-
-    def to_gcode(self) -> tuple[str, cq.Vector]:
-        words = [f"{CutterState.OFF}"]
-        if self.coolant is not None:
-            words.append(f"{CoolantState.OFF}")
-
-        gcode_str = " ".join(words)
-        return (gcode_str, None)
+        return " ".join(words)
 
 
 class SafetyBlock(ConfigCommand):
@@ -473,6 +421,7 @@ class SafetyBlock(ConfigCommand):
                 " ".join(
                     (
                         str(DistanceMode.ABSOLUTE),
+                        # str(ArcDistanceMode.INCREMENTAL),
                         str(WorkOffset.OFFSET_1),
                         str(PlannerControlMode.CONTINUOUS),
                         str(SpindleControlMode.MAX_SPINDLE_SPEED),
@@ -490,34 +439,6 @@ class SafetyBlock(ConfigCommand):
                 str(Unit.METRIC),
                 str(Position.SECONDARY_HOME),
             )
-        )
-
-    def to_gcode(self) -> tuple[str, cq.Vector]:
-        return (
-            "\n".join(
-                (
-                    " ".join(
-                        (
-                            str(DistanceMode.ABSOLUTE),
-                            str(WorkOffset.OFFSET_1),
-                            str(PlannerControlMode.CONTINUOUS),
-                            str(SpindleControlMode.MAX_SPINDLE_SPEED),
-                            str(WorkPlane.XY),
-                            str(FeedRateControlMode.UNITS_PER_MINUTE),
-                        )
-                    ),
-                    " ".join(
-                        (
-                            str(LengthCompensation.OFF),
-                            str(RadiusCompensation.OFF),
-                            str(CannedCycle.CANCEL),
-                        )
-                    ),
-                    str(Unit.METRIC),
-                    str(Position.SECONDARY_HOME),
-                )
-            ),
-            None,
         )
 
 
@@ -554,25 +475,4 @@ class ToolChange(ConfigCommand):
                 ),
                 str(StartSequence(self.speed, self.coolant)),
             )
-        )
-
-    def to_gcode(self) -> tuple[str, cq.Vector]:
-        return (
-            "\n".join(
-                (
-                    str(StopSequence(self.coolant)),
-                    str(Position.SECONDARY_HOME),
-                    str(ProgramControlMode.PAUSE_OPTIONAL),
-                    " ".join(
-                        (
-                            f"{ToolNumber(self.tool_number)}",
-                            str(LengthCompensation.ON),
-                            f"{ToolLengthOffset(self.tool_number)}",
-                            str(AutomaticChangerMode.TOOL_CHANGE),
-                        )
-                    ),
-                    str(StartSequence(self.speed, self.coolant)),
-                )
-            ),
-            None,
         )
