@@ -1,3 +1,12 @@
+⚠ ATTENTION ⚠
+=============
+
+A parallel project exists with a significantly larger feature set at the cost of having a hard
+dependency to FreeCAD libraries: [ocp-freecad-cam](https://github.com/voneiden/ocp-freecad-cam)
+
+Regardless of the dependency, the advantages with the approach of ocp-freecad-cam appear to be 
+such that further development of cq-cam may not be relevant anymore. 
+
 CQ-CAM
 ====
 
